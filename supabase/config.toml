@@ -1,0 +1,4 @@
+project_id = "fkzwgzyhyckvqixjshds"
+
+[functions.cleanup-match-chats]
+verify_jwt = false

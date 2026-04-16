@@ -1,0 +1,1 @@
+ALTER TABLE public.tournaments ADD COLUMN canvas_state jsonb DEFAULT NULL;

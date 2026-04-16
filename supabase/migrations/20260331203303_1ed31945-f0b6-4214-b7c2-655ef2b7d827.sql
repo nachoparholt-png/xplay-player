@@ -1,0 +1,1 @@
+ALTER PUBLICATION supabase_realtime ADD TABLE public.membership_tiers, public.courts, public.coaching_sessions;

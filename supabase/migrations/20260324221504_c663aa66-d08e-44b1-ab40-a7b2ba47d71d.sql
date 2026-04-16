@@ -1,0 +1,1 @@
+ALTER TABLE public.match_bets ADD COLUMN is_player boolean NOT NULL DEFAULT false;

@@ -1,0 +1,1 @@
+ALTER TABLE tournament_bet_config ADD COLUMN IF NOT EXISTS odds_locked boolean NOT NULL DEFAULT false;

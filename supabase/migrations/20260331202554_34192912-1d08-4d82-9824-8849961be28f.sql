@@ -1,0 +1,1 @@
+ALTER TABLE public.membership_tiers ADD COLUMN tier_tag text NOT NULL DEFAULT 'default';

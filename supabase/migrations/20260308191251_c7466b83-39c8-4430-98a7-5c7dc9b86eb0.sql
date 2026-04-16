@@ -1,0 +1,1 @@
+ALTER TABLE public.clubs ADD CONSTRAINT clubs_club_name_key UNIQUE (club_name);

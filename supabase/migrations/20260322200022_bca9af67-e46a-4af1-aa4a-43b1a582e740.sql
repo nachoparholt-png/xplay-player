@@ -1,0 +1,1 @@
+ALTER TABLE public.point_packages ADD COLUMN stripe_price_id text;

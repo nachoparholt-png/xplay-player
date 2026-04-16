@@ -1,0 +1,1 @@
+ALTER TABLE public.tournaments ADD COLUMN skill_level_min numeric DEFAULT NULL, ADD COLUMN skill_level_max numeric DEFAULT NULL;
