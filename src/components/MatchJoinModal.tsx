@@ -235,7 +235,22 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     setJoining(true);
     try {
       await doJoin();
-      toast({ title: "You're in! 🎾", description: "Match added to My Matches" });
+
+      // ── +30 XP: first match bonus (once only) ─────────────────────
+      const alreadyGranted = (profile as any)?.first_match_bonus_granted === true;
+      if (!alreadyGranted) {
+        await supabase.rpc("increment_points", { p_user_id: user.id, p_amount: 30 });
+        await supabase
+          .from("profiles")
+          .update({ first_match_bonus_granted: true })
+          .eq("user_id", user.id);
+      }
+      // ───────────────────────────────────────────────────────────────
+
+      toast({
+        title: !alreadyGranted ? "You're in! +30 XP 🎾" : "You're in! 🎾",
+        description: "Match added to My Matches",
+      });
       onOpenChange(false);
       navigate("/matches");
     } catch (e: any) {

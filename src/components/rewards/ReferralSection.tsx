@@ -17,7 +17,9 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
 
   if (!enabled) return null;
 
-  const referralLink = referralCode ? `https://racketeer-rewards.lovable.app/auth?ref=${referralCode}` : "";
+  const referralLink = referralCode
+    ? `${window.location.origin}/auth?ref=${referralCode}`
+    : "";
 
   const handleCopy = () => {
     if (!referralLink) return;
@@ -30,7 +32,7 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
   const handleShare = async () => {
     if (navigator.share && referralLink) {
       try {
-        await navigator.share({ title: "Join XPLAY", text: "Join me on XPLAY!", url: referralLink });
+        await navigator.share({ title: "Join XPLAY", text: "Join me on XPLAY — compete, earn XP, and win rewards. Sign up with my link:", url: referralLink });
       } catch {}
     } else {
       handleCopy();
