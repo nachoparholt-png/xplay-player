@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [openMatches, setOpenMatches] = useState<any[]>([]);
   const [openMatchesLoading, setOpenMatchesLoading] = useState(true);
   const [playerCount, setPlayerCount] = useState<number | null>(null);
+  const [globalRank, setGlobalRank] = useState<number | null>(null);
   const [weeklyChallenge, setWeeklyChallenge] = useState<{ title: string; body: string } | null>(null);
   const [fabExpanded, setFabExpanded] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -45,6 +46,17 @@ const Dashboard = () => {
       .select("user_id", { count: "exact", head: true })
       .then(({ count }) => setPlayerCount(count));
   }, []);
+
+  // Real global rank — count players with more XP than the current user
+  useEffect(() => {
+    if (!profile) return;
+    const myPoints = profile.padel_park_points ?? 0;
+    supabase
+      .from("profiles")
+      .select("user_id", { count: "exact", head: true })
+      .gt("padel_park_points", myPoints)
+      .then(({ count }) => setGlobalRank(count != null ? count + 1 : null));
+  }, [profile]);
 
   // Weekly challenge from app_settings
   useEffect(() => {
@@ -190,7 +202,7 @@ const Dashboard = () => {
       >
         <StatCard
           label="Global Rank"
-          value={profile?.total_matches ? `#${profile.total_matches}` : "—"}
+          value={globalRank != null ? `#${globalRank}` : "—"}
           icon={Award}
           variant="primary"
         />

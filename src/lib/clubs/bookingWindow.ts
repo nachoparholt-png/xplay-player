@@ -4,14 +4,18 @@ import { supabase } from "@/integrations/supabase/client";
  * Returns the max number of days in advance a user can book a court at a club.
  */
 export async function getBookingWindow(clubId: string, userId: string): Promise<number> {
-  // Check user membership tier
-  const { data: membership } = await supabase
+  // Check user membership tier — use status='active' + expiry guard
+  const now = new Date().toISOString();
+  const { data: memberships } = await supabase
     .from("club_memberships")
-    .select("*")
+    .select("tier_id, expires_at")
     .eq("user_id", userId)
     .eq("club_id", clubId)
-    .eq("active", true)
-    .maybeSingle();
+    .eq("status", "active");
+
+  const membership = (memberships || []).find(
+    (m) => !m.expires_at || m.expires_at > now
+  ) ?? null;
 
   const tierId = membership?.tier_id;
   if (tierId) {

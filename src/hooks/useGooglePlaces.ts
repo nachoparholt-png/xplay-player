@@ -55,13 +55,16 @@ export function useGooglePlaces(
   inputRef: React.RefObject<HTMLInputElement>,
   onSelect: (place: PlaceResult) => void
 ) {
-  const [ready, setReady] = useState(scriptState === "ready");
-  const [failed, setFailed] = useState(scriptState === "error");
+  // If no API key is configured, skip the script entirely and fall back immediately
+  const noKey = !GOOGLE_MAPS_KEY;
+  const [ready, setReady] = useState(!noKey && scriptState === "ready");
+  const [failed, setFailed] = useState(noKey || scriptState === "error");
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
+    if (noKey) return; // nothing to load
     loadScript(() => setReady(true), () => setFailed(true));
-  }, []);
+  }, [noKey]);
 
   useEffect(() => {
     if (!ready || !inputRef.current || autocompleteRef.current) return;

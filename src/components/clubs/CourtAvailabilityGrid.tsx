@@ -192,7 +192,10 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
 
       <div className="flex items-center justify-between bg-card border border-border/50 rounded-2xl px-4 py-3">
         <p className="text-[11px] text-muted-foreground">
-          You can book <span className="font-semibold text-foreground">{maxDays} days</span> ahead · <span className="text-primary font-semibold">Upgrade to see more →</span>
+          You can book <span className="font-semibold text-foreground">{maxDays} days</span> ahead
+          {!memberTierName && (
+            <> · <span className="text-primary font-semibold">Upgrade to see more →</span></>
+          )}
         </p>
         <Zap className="w-4 h-4 text-primary flex-shrink-0" />
       </div>
@@ -317,17 +320,19 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
         </div>
       )}
 
-      {/* Upsell card */}
-      <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 rounded-2xl p-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4 text-primary" />
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Unlock Peak Hours</p>
+      {/* Upsell card — only shown to non-members */}
+      {!memberTierName && (
+        <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 rounded-2xl p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-primary" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Unlock Peak Hours</p>
+          </div>
+          <p className="text-xs text-muted-foreground">Get early access to court bookings and 15% discount on clinic sessions with XPLAY Pro.</p>
+          <button className="text-[11px] font-display font-bold uppercase tracking-wider text-primary hover:underline">
+            Upgrade Now →
+          </button>
         </div>
-        <p className="text-xs text-muted-foreground">Get early access to court bookings and 15% discount on clinic sessions with XPLAY Pro.</p>
-        <button className="text-[11px] font-display font-bold uppercase tracking-wider text-primary hover:underline">
-          Upgrade Now →
-        </button>
-      </div>
+      )}
 
       <BookingSlotModal
         open={modalOpen}
