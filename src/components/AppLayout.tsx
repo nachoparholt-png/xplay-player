@@ -1,6 +1,6 @@
 import React, { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Swords, MessageSquare, Store, User, Shield, Trophy, Package } from "lucide-react";
+import { Swords, MessageSquare, Gift, User, Shield, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
@@ -9,7 +9,7 @@ import xplayLogo from "@/assets/xplay-logo-full.png";
 const navItems = [
   { path: "/matches", icon: Swords, label: "Matches" },
   { path: "/tournaments", icon: Trophy, label: "Tourneys" },
-  { path: "/marketplace", icon: Store, label: "Shop" },
+  { path: "/rewards", icon: Gift, label: "Rewards" },
   { path: "/messages", icon: MessageSquare, label: "Messages" },
   { path: "/profile", icon: User, label: "Profile" },
 ];

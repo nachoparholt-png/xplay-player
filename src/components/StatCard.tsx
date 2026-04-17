@@ -7,13 +7,16 @@ interface StatCardProps {
   icon: LucideIcon;
   subtitle?: string;
   variant?: "default" | "primary" | "secondary";
+  onClick?: () => void;
 }
 
-const StatCard = ({ label, value, icon: Icon, subtitle, variant = "default" }: StatCardProps) => {
+const StatCard = ({ label, value, icon: Icon, subtitle, variant = "default", onClick }: StatCardProps) => {
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className="bg-surface-container p-5 rounded-2xl flex flex-col justify-between h-32 border-l-4"
+      whileTap={onClick ? { scale: 0.97 } : undefined}
+      onClick={onClick}
+      className={`bg-surface-container p-5 rounded-2xl flex flex-col justify-between h-32 border-l-4 transition-opacity${onClick ? " cursor-pointer active:opacity-80" : ""}`}
       style={{
         borderLeftColor: variant === "primary"
           ? "hsl(var(--primary))"

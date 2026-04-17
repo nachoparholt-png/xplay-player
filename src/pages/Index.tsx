@@ -211,6 +211,7 @@ const Dashboard = () => {
           value={profile?.padel_park_points ?? 0}
           icon={Zap}
           variant="secondary"
+          onClick={() => navigate("/rewards")}
         />
       </motion.section>
 

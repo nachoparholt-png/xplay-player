@@ -362,9 +362,72 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
   );
 }
 
+/* ── Welcome Bonus Celebration Step ── */
+
+function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
+  return (
+    <motion.div
+      variants={slideVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center"
+    >
+      {/* Animated XP burst */}
+      <motion.div
+        initial={{ scale: 0, rotate: -20 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 14, delay: 0.1 }}
+        className="relative w-28 h-28 flex items-center justify-center mb-8"
+      >
+        <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl" />
+        <div className="w-28 h-28 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[0_0_40px_hsl(var(--primary)/0.4)]">
+          <Zap className="w-14 h-14 text-primary-foreground" />
+        </div>
+      </motion.div>
+
+      {/* Floating +50 XP label */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="bg-primary/10 border border-primary/30 rounded-2xl px-6 py-2 mb-6"
+      >
+        <span className="font-display text-4xl font-black text-primary tracking-tight">+50 XP</span>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="space-y-3 mb-10"
+      >
+        <h2 className="font-display text-2xl font-bold">Welcome Bonus!</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">
+          50 XPLAY Points have been added to your wallet. Use them to stake on matches and win more.
+        </p>
+        <p className="text-xs text-muted-foreground/60">
+          1 XP = £0.10 · Stake smart, win big.
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.65 }}
+        className="w-full max-w-xs"
+      >
+        <Button onClick={onContinue} className="w-full h-12 rounded-xl font-bold text-base gap-2">
+          Start Playing <ChevronRight className="w-4 h-4" />
+        </Button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /* ── Main Onboarding Page ── */
 
-type Step = "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "level" | "court-side" | "intro";
+type Step = "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "level" | "court-side" | "intro" | "bonus";
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -431,9 +494,12 @@ const Onboarding = () => {
 
       if (error) throw error;
 
+      // Grant 50 XP welcome bonus — uses SECURITY DEFINER RPC that bypasses RLS
+      await supabase.rpc("increment_points", { p_user_id: user.id, p_amount: 50 });
+
       await refreshProfile();
-      toast({ title: "You're all set! 🎾", description: `Your starting level is ${selectedLevel.toFixed(1)}` });
-      navigate("/matches", { replace: true });
+      // Show celebration screen before navigating
+      setStep("bonus");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -483,6 +549,12 @@ const Onboarding = () => {
         )}
         {step === "intro" && (
           <IntroStep key="intro" onFinish={handleFinish} />
+        )}
+        {step === "bonus" && (
+          <WelcomeBonusStep
+            key="bonus"
+            onContinue={() => navigate("/matches", { replace: true })}
+          />
         )}
       </AnimatePresence>
     </div>

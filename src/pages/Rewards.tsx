@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gift, ShoppingCart, Star, Clock, Package, Zap, ArrowRight, Loader2, Filter } from "lucide-react";
+import { Gift, ShoppingCart, Star, Clock, Package, Zap, ArrowRight, Loader2, Filter, Store } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRewards, useRedeemReward, type Reward, type PointsPack } from "@/hooks/useRewards";
 import { supabase } from "@/integrations/supabase/client";
@@ -52,6 +52,7 @@ import { Badge } from "@/components/ui/badge";
 
 const Rewards = () => {
   const { profile, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     rewards, settings, transactions, referrals, stakeStats,
@@ -205,9 +206,19 @@ const Rewards = () => {
         <h1 className="font-display font-black tracking-tighter uppercase text-xl italic text-primary">
           {getSetting("rewards_section_title", "XPLAY REWARDS")}
         </h1>
-        <div className="bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 flex items-center gap-2">
-          <Zap className="w-4 h-4 text-primary" />
-          <span className="text-primary font-display text-sm font-bold">{userPoints.toLocaleString()} XP</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/marketplace")}
+            className="bg-surface-container px-3 py-1.5 rounded-full border border-border/50 flex items-center gap-1.5 active:scale-95 transition-transform"
+            aria-label="Marketplace"
+          >
+            <Store className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground font-display text-xs font-bold">Shop</span>
+          </button>
+          <div className="bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-primary" />
+            <span className="text-primary font-display text-sm font-bold">{userPoints.toLocaleString()} XP</span>
+          </div>
         </div>
       </div>
 
