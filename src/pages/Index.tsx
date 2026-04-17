@@ -248,12 +248,12 @@ const Dashboard = () => {
       >
         <StatCard
           label="Global Rank"
-          value={`#${profile?.total_matches ? Math.max(1, 500 - profile.total_matches * 10) : 500}`}
+          value={profile?.total_matches ? `#${profile.total_matches}` : "—"}
           icon={Award}
           variant="primary"
         />
         <StatCard
-          label="X-Points"
+          label="XP Balance"
           value={profile?.padel_park_points ?? 0}
           icon={Zap}
           variant="secondary"

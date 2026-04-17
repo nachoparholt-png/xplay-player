@@ -32,7 +32,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
         <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
             return (
               <button
                 key={item.path}
@@ -95,7 +95,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       >
         <div className="flex items-center justify-around px-2 pt-4 pb-2">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
             return (
               <button
                 key={item.path}
