@@ -54,16 +54,24 @@ export function usePlayerCourtAvailability(
       const closeTime: string = hoursRow?.close_time ?? '22:00';
 
       // 2. Existing (non-available) slots for this court + date
+      // court_slots uses starts_at / ends_at (full timestamps), not slot_date/start_time
+      const dayStart = new Date(date + 'T00:00:00');
+      const dayEnd   = new Date(date + 'T23:59:59');
       const { data: existingSlots } = await supabase
         .from('court_slots')
-        .select('start_time, end_time, status')
+        .select('starts_at, ends_at, status')
         .eq('court_id', courtId)
-        .eq('slot_date', date)
+        .gte('starts_at', dayStart.toISOString())
+        .lte('starts_at', dayEnd.toISOString())
         .neq('status', 'available');
 
+      const isoToHHMM = (iso: string) => {
+        const d = new Date(iso);
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      };
       const occupied = (existingSlots ?? []).map(s => ({
-        start: timeToMins(s.start_time),
-        end:   timeToMins(s.end_time),
+        start: timeToMins(isoToHHMM(s.starts_at)),
+        end:   timeToMins(isoToHHMM(s.ends_at)),
       }));
 
       // 3. Generate candidate windows at 30-min intervals within operating hours

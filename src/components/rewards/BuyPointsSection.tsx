@@ -39,6 +39,13 @@ const BuyPointsSection = ({ packs, enabled, title, onBuyPack, suggestedAmount }:
         </motion.div>
       )}
 
+      {packs.length === 0 && (
+        <div className="card-elevated p-4 text-center space-y-1">
+          <p className="text-sm font-semibold text-foreground">No packages available</p>
+          <p className="text-xs text-muted-foreground">Point packages will appear here once they're set up. Check back soon!</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         {packs.map((pack, i) => (
           <motion.div

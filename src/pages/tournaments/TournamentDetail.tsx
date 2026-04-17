@@ -313,12 +313,16 @@ const TournamentDetail = () => {
             <p className="text-sm font-medium">{tournament.club}</p>
           </div>
         )}
-        {tournament.scheduled_date && (
-          <div className="p-3 rounded-xl bg-muted/50 space-y-1">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <p className="text-sm font-medium">{tournament.scheduled_date}</p>
-          </div>
-        )}
+        <div className="p-3 rounded-xl bg-muted/50 space-y-1">
+          <Calendar className="w-4 h-4 text-muted-foreground" />
+          <p className="text-sm font-medium">
+            {tournament.scheduled_date
+              ? new Date(tournament.scheduled_date + 'T12:00:00').toLocaleDateString(undefined, {
+                  weekday: "short", day: "numeric", month: "short", year: "numeric",
+                })
+              : "Date TBD"}
+          </p>
+        </div>
         <div className="p-3 rounded-xl bg-muted/50 space-y-1">
           <Users className="w-4 h-4 text-muted-foreground" />
           <p className="text-sm font-medium">{playingCount}/{tournament.player_count}</p>

@@ -203,6 +203,13 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
         </div>
       ) : courts.length === 0 ? (
         <p className="text-center text-sm text-muted-foreground py-8">No courts available</p>
+      ) : slots.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm font-semibold text-foreground">No slots available for this date</p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            This club hasn't published court slots for the selected day yet. Try a different date or contact the club directly.
+          </p>
+        </div>
       ) : (
         <div className="space-y-6 divide-y divide-border/30">
           {courts.map((court) => {

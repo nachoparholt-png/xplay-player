@@ -25,12 +25,13 @@ const Marketplace = () => {
   }, [search]);
 
   // Fetch Shopify products
-  const { data: shopifyProducts, isLoading: shopifyLoading } = useQuery({
+  const { data: shopifyProducts, isLoading: shopifyLoading, isError: shopifyError } = useQuery({
     queryKey: ["shopify-products"],
     queryFn: async () => {
       const data = await storefrontApiRequest(PRODUCTS_QUERY, { first: 50, query: "-tag:xplay-points-package" });
       return (data?.data?.products?.edges || []) as ShopifyProduct[];
     },
+    retry: 1,
   });
 
   // Fetch local products for point pricing
@@ -133,6 +134,14 @@ const Marketplace = () => {
               </div>
             </div>
           ))}
+        </div>
+      ) : shopifyError ? (
+        <div className="text-center py-20 space-y-3">
+          <Store className="w-12 h-12 text-muted-foreground mx-auto" />
+          <p className="text-sm font-semibold text-foreground">Marketplace unavailable</p>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            We couldn't connect to the store right now. Please check your connection and try again.
+          </p>
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20 space-y-3">

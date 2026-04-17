@@ -39,9 +39,16 @@ const ClubsExplorer = () => {
       })));
 
       if (user) {
+        const now = new Date().toISOString();
         const { data: mems } = await supabase.from("club_memberships")
-          .select("club_id").eq("user_id", user.id).eq("active", true);
-        setMemberships(new Set((mems || []).map((m) => m.club_id)));
+          .select("club_id, expires_at")
+          .eq("user_id", user.id)
+          .eq("status", "active");
+        // Filter out expired memberships
+        const activeMems = (mems || []).filter(
+          (m) => !m.expires_at || m.expires_at > now
+        );
+        setMemberships(new Set(activeMems.map((m) => m.club_id)));
       }
       setLoading(false);
     };
