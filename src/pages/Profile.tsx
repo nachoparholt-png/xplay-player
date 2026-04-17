@@ -259,14 +259,14 @@ const Profile = () => {
             <div className="text-right">
               <span className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Confidence</span>
               <span className="text-xl font-display font-black text-primary">
-                {Math.min(100, Math.round((profile.reliability_score ?? 100) * 0.88 + 12))}%
+                {Math.min(100, profile.reliability_score ?? 100)}%
               </span>
             </div>
           </div>
           <div className="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-primary to-accent rounded-full shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
-              style={{ width: `${Math.min(100, Math.round((profile.reliability_score ?? 100) * 0.88 + 12))}%` }}
+              style={{ width: `${Math.min(100, profile.reliability_score ?? 100)}%` }}
             />
           </div>
         </motion.section>
@@ -326,7 +326,9 @@ const Profile = () => {
             )}
             <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">
               <Gauge className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-wider">Cat {levelToCategory(profile?.padel_level ?? null)}</span>
+              <span className="text-xs font-bold uppercase tracking-wider">
+                {profile?.padel_level ? `Cat ${levelToCategory(profile.padel_level)}` : "Unrated"}
+              </span>
             </div>
           </div>
         </motion.section>

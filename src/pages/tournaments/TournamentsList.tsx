@@ -533,7 +533,7 @@ const TournamentCard = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {(t.status === "active" || t.status === "draft") && onBet && !isCreator && (
+            {t.status === "active" && onBet && !isCreator && (
               <Button
                 size="sm"
                 variant="outline"

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import CreateMatchModal from "@/components/CreateMatchModal";
 import MatchJoinModal from "@/components/MatchJoinModal";
-import { Zap, Award, Search, Plus, ArrowRight, MapPin, Calendar, Users, Star, Clock, SlidersHorizontal } from "lucide-react";
+import { Zap, Award, Search, Plus, SlidersHorizontal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import StatCard from "@/components/StatCard";
 import MatchCard from "@/components/MatchCard";
@@ -11,81 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
-const upcomingMatches = [
-  {
-    matchId: "demo-1",
-    club: "Padel Park BCN",
-    date: "Today",
-    time: "19:00",
-    format: "competitive",
-    levelMin: 3.0,
-    levelMax: 4.5,
-    maxPlayers: 4,
-    spotsLeft: 1,
-    status: "open" as const,
-    teamA: [
-      { name: "Carlos", avatar: "", rating: 3.8 },
-      { name: "Ana", avatar: "", rating: 4.1 },
-    ],
-    teamB: [
-      { name: "Pablo", avatar: "", rating: 3.5 },
-    ],
-    totalPointsStaked: 500,
-    teamAOdds: 0,
-    teamBOdds: 0,
-    isBettingOpen: true,
-    isJoined: false,
-    isEligible: true,
-  },
-  {
-    matchId: "demo-2",
-    club: "Olympic Stadium Courts",
-    date: "Tomorrow",
-    time: "10:00",
-    format: "social",
-    levelMin: 2.0,
-    levelMax: 3.5,
-    maxPlayers: 4,
-    spotsLeft: 2,
-    status: "open" as const,
-    teamA: [
-      { name: "Maria", avatar: "", rating: 2.8 },
-    ],
-    teamB: [
-      { name: "Luis", avatar: "", rating: 3.1 },
-    ],
-    totalPointsStaked: 0,
-    teamAOdds: 0,
-    teamBOdds: 0,
-    isBettingOpen: false,
-    isJoined: false,
-    isEligible: true,
-  },
-];
-
-const suggestedMatches = [
-  {
-    matchId: "demo-3",
-    club: "Valencia Padel Center",
-    date: "Tomorrow",
-    time: "18:00",
-    format: "social",
-    levelMin: 2.5,
-    levelMax: 4.0,
-    maxPlayers: 4,
-    spotsLeft: 2,
-    status: "open" as const,
-    teamA: [{ name: "Jorge", avatar: "", rating: 3.2 }],
-    teamB: [{ name: "Lucia", avatar: "", rating: 3.5 }],
-    totalPointsStaked: 0,
-    teamAOdds: 0,
-    teamBOdds: 0,
-    isBettingOpen: false,
-    isJoined: false,
-    isEligible: true,
-  },
-];
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -93,10 +18,14 @@ const Dashboard = () => {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [myMatches, setMyMatches] = useState<any[]>([]);
   const [myMatchesLoading, setMyMatchesLoading] = useState(true);
+  const [openMatches, setOpenMatches] = useState<any[]>([]);
+  const [openMatchesLoading, setOpenMatchesLoading] = useState(true);
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
+  const [weeklyChallenge, setWeeklyChallenge] = useState<{ title: string; body: string } | null>(null);
   const [fabExpanded, setFabExpanded] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
 
-  // FAB scroll behavior
+  // FAB scroll behaviour
   useEffect(() => {
     const handleScroll = () => {
       const currentY = window.scrollY;
@@ -109,7 +38,34 @@ const Dashboard = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY]);
 
-  // Fetch user's matches from DB
+  // Real player count for subtitle
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("user_id", { count: "exact", head: true })
+      .then(({ count }) => setPlayerCount(count));
+  }, []);
+
+  // Weekly challenge from app_settings
+  useEffect(() => {
+    supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["weekly_challenge_title", "weekly_challenge_body"])
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const map: Record<string, string> = {};
+        data.forEach((r: { key: string; value: string }) => { map[r.key] = r.value; });
+        if (map["weekly_challenge_title"]) {
+          setWeeklyChallenge({
+            title: map["weekly_challenge_title"],
+            body: map["weekly_challenge_body"] ?? "",
+          });
+        }
+      });
+  }, []);
+
+  // Fetch MY matches (confirmed + active)
   useEffect(() => {
     const fetchMyMatches = async () => {
       if (!user) return;
@@ -136,66 +92,50 @@ const Dashboard = () => {
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
 
-      if (matchData && matchData.length > 0) {
-        const ids = matchData.map((m) => m.id);
-        const { data: playerData } = await supabase
-          .from("match_players")
-          .select("match_id, user_id, status, team")
-          .in("match_id", ids)
-          .eq("status", "confirmed");
-
-        const userIds = [...new Set((playerData || []).map((p) => p.user_id))];
-        const { data: profiles } = userIds.length > 0
-          ? await supabase.from("profiles").select("user_id, display_name, avatar_url, padel_level").in("user_id", userIds)
-          : { data: [] };
-
-        const profileMap = new Map((profiles || []).map((p) => [p.user_id, { name: p.display_name, avatar: p.avatar_url, rating: p.padel_level }]));
-
-        const enriched = matchData.map((m) => {
-          const matchPlayerList = (playerData || []).filter((p) => p.match_id === m.id);
-          const teamAPlayers = matchPlayerList.filter((p) => p.team === "team_a").map((p) => ({
-            name: profileMap.get(p.user_id)?.name || "Player",
-            avatar: profileMap.get(p.user_id)?.avatar || "",
-            rating: profileMap.get(p.user_id)?.rating ?? null,
-            isCreator: p.user_id === m.organizer_id,
-          }));
-          const teamBPlayers = matchPlayerList.filter((p) => p.team === "team_b").map((p) => ({
-            name: profileMap.get(p.user_id)?.name || "Player",
-            avatar: profileMap.get(p.user_id)?.avatar || "",
-            rating: profileMap.get(p.user_id)?.rating ?? null,
-            isCreator: p.user_id === m.organizer_id,
-          }));
-          return {
-            matchId: m.id,
-            club: m.club,
-            court: m.court,
-            date: format(new Date(m.match_date + "T00:00:00"), "EEEE d MMMM"),
-            time: m.match_time.slice(0, 5),
-            format: m.format,
-            levelMin: m.level_min,
-            levelMax: m.level_max,
-            maxPlayers: m.max_players,
-            spotsLeft: m.max_players - matchPlayerList.length,
-            status: m.status,
-            teamA: teamAPlayers,
-            teamB: teamBPlayers,
-            totalPointsStaked: 0,
-            teamAOdds: 0,
-            teamBOdds: 0,
-            isBettingOpen: m.format !== "social" && ["open", "almost_full", "full"].includes(m.status),
-            isJoined: true,
-            isEligible: true,
-            id: m.id,
-          };
-        });
-        setMyMatches(enriched);
-      } else {
-        setMyMatches([]);
-      }
+      setMyMatches(await enrichMatches(matchData || [], user.id));
       setMyMatchesLoading(false);
     };
-
     fetchMyMatches();
+  }, [user]);
+
+  // Fetch OPEN matches the user hasn't joined — "Suggested for You"
+  useEffect(() => {
+    const fetchOpenMatches = async () => {
+      setOpenMatchesLoading(true);
+
+      const { data: matchData } = await supabase
+        .from("matches")
+        .select("*")
+        .in("status", ["open", "almost_full"])
+        .gte("match_date", new Date().toISOString().slice(0, 10))
+        .order("match_date", { ascending: true })
+        .order("match_time", { ascending: true })
+        .limit(6);
+
+      if (!matchData || matchData.length === 0) {
+        setOpenMatches([]);
+        setOpenMatchesLoading(false);
+        return;
+      }
+
+      // Filter out matches user is already in
+      const myMatchIds = new Set(
+        user
+          ? (
+              await supabase
+                .from("match_players")
+                .select("match_id")
+                .eq("user_id", user.id)
+                .eq("status", "confirmed")
+            ).data?.map((j) => j.match_id) ?? []
+          : []
+      );
+
+      const filtered = matchData.filter((m) => !myMatchIds.has(m.id)).slice(0, 3);
+      setOpenMatches(await enrichMatches(filtered, user?.id ?? null));
+      setOpenMatchesLoading(false);
+    };
+    fetchOpenMatches();
   }, [user]);
 
   return (
@@ -210,11 +150,13 @@ const Dashboard = () => {
           Find Your <span className="text-primary italic">Arena</span>
         </h1>
         <p className="text-muted-foreground font-medium text-sm">
-          Join {profile?.display_name ? `${profile.display_name}, ` : ""}2,400+ active players today
+          {playerCount != null
+            ? `Join ${playerCount.toLocaleString()}+ active players today`
+            : "Join the XPLAY community"}
         </p>
       </motion.section>
 
-      {/* Search Bar */}
+      {/* Search shortcut */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -224,7 +166,7 @@ const Dashboard = () => {
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <input
-            className="w-full bg-surface-container-lowest border-none focus:ring-0 focus:border-b-2 focus:border-primary py-4 pl-12 pr-4 rounded-xl text-foreground placeholder:text-muted-foreground/50 font-medium transition-all"
+            className="w-full bg-surface-container-lowest border-none focus:ring-0 focus:border-b-2 focus:border-primary py-4 pl-12 pr-4 rounded-xl text-foreground placeholder:text-muted-foreground/50 font-medium transition-all cursor-pointer"
             placeholder="Search clubs, levels, or players..."
             type="text"
             onClick={() => navigate("/matches")}
@@ -260,38 +202,12 @@ const Dashboard = () => {
         />
       </motion.section>
 
-      {/* Upcoming Matches */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-xs font-black tracking-[0.2em] text-muted-foreground uppercase">
-            UPCOMING MATCHES
-          </h2>
-          <button
-            onClick={() => navigate("/matches")}
-            className="text-primary text-[10px] font-bold font-display uppercase hover:underline"
-          >
-            See All
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {upcomingMatches.map((match, i) => (
-            <MatchCard key={match.matchId} {...match} />
-          ))}
-        </div>
-      </motion.section>
-
-      {/* My Matches */}
+      {/* MY MATCHES */}
       {user && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.15 }}
           className="space-y-4"
         >
           <div className="flex items-center justify-between">
@@ -327,42 +243,68 @@ const Dashboard = () => {
         </motion.section>
       )}
 
-      {/* Promotion Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-container-high to-background p-5 border border-primary/20 h-32 flex flex-col justify-center"
-      >
-        <div className="absolute right-[-10%] top-[-20%] opacity-10">
-          <Award className="w-32 h-32 text-primary" />
-        </div>
-        <p className="text-primary font-display font-black text-xs uppercase tracking-widest mb-1">Weekly Challenge</p>
-        <h4 className="font-display text-xl font-black uppercase leading-tight max-w-[60%]">
-          Win 3 Matches, Get 500 Points
-        </h4>
-      </motion.div>
+      {/* Weekly Challenge — only shown when configured in app_settings */}
+      {weeklyChallenge && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-container-high to-background p-5 border border-primary/20 h-32 flex flex-col justify-center"
+        >
+          <div className="absolute right-[-10%] top-[-20%] opacity-10">
+            <Award className="w-32 h-32 text-primary" />
+          </div>
+          <p className="text-primary font-display font-black text-xs uppercase tracking-widest mb-1">Weekly Challenge</p>
+          <h4 className="font-display text-xl font-black uppercase leading-tight max-w-[60%]">
+            {weeklyChallenge.title}
+          </h4>
+          {weeklyChallenge.body && (
+            <p className="text-xs text-muted-foreground mt-1 max-w-[65%]">{weeklyChallenge.body}</p>
+          )}
+        </motion.div>
+      )}
 
-      {/* Suggested For You */}
+      {/* SUGGESTED FOR YOU — real open matches */}
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.25 }}
         className="space-y-4"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-display text-xs font-black tracking-[0.2em] text-muted-foreground uppercase">
-            SUGGESTED FOR YOU
+            OPEN MATCHES
           </h2>
           <button onClick={() => navigate("/matches")} className="text-primary text-[10px] font-bold font-display uppercase hover:underline">
-            See More
+            See All
           </button>
         </div>
-        <div className="space-y-4">
-          {suggestedMatches.map((match) => (
-            <MatchCard key={match.matchId} {...match} />
-          ))}
-        </div>
+
+        {openMatchesLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : openMatches.length === 0 ? (
+          <div className="text-center py-8 space-y-2">
+            <p className="text-sm text-muted-foreground">No open matches right now</p>
+            <button
+              onClick={() => setShowCreateMatch(true)}
+              className="text-primary text-sm font-semibold hover:underline"
+            >
+              Post the first one →
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {openMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                {...match}
+                onClick={() => navigate(`/matches/${match.id}`)}
+              />
+            ))}
+          </div>
+        )}
       </motion.section>
 
       {/* FAB */}
@@ -405,5 +347,59 @@ const Dashboard = () => {
     </div>
   );
 };
+
+// ── Shared enrichment helper ────────────────────────────────────────────────
+
+async function enrichMatches(matchData: any[], userId: string | null): Promise<any[]> {
+  if (matchData.length === 0) return [];
+  const ids = matchData.map((m) => m.id);
+
+  const { data: playerData } = await supabase
+    .from("match_players")
+    .select("match_id, user_id, status, team")
+    .in("match_id", ids)
+    .eq("status", "confirmed");
+
+  const userIds = [...new Set((playerData || []).map((p: any) => p.user_id))];
+  const { data: profiles } = userIds.length > 0
+    ? await supabase.from("profiles").select("user_id, display_name, avatar_url, padel_level").in("user_id", userIds)
+    : { data: [] };
+
+  const profileMap = new Map(
+    (profiles || []).map((p: any) => [p.user_id, { name: p.display_name, avatar: p.avatar_url, rating: p.padel_level }])
+  );
+
+  return matchData.map((m) => {
+    const matchPlayers = (playerData || []).filter((p: any) => p.match_id === m.id);
+    const toPlayer = (p: any) => ({
+      name: profileMap.get(p.user_id)?.name || "Player",
+      avatar: profileMap.get(p.user_id)?.avatar || "",
+      rating: profileMap.get(p.user_id)?.rating ?? null,
+      isCreator: p.user_id === m.organizer_id,
+    });
+    return {
+      id: m.id,
+      matchId: m.id,
+      club: m.club,
+      court: m.court,
+      date: format(new Date(m.match_date + "T00:00:00"), "EEEE d MMMM"),
+      time: m.match_time.slice(0, 5),
+      format: m.format,
+      levelMin: m.level_min,
+      levelMax: m.level_max,
+      maxPlayers: m.max_players,
+      spotsLeft: m.max_players - matchPlayers.length,
+      status: m.status,
+      teamA: matchPlayers.filter((p: any) => p.team === "team_a").map(toPlayer),
+      teamB: matchPlayers.filter((p: any) => p.team === "team_b").map(toPlayer),
+      totalPointsStaked: 0,
+      teamAOdds: 0,
+      teamBOdds: 0,
+      isBettingOpen: m.format !== "social" && ["open", "almost_full", "full"].includes(m.status),
+      isJoined: userId ? matchPlayers.some((p: any) => p.user_id === userId) : false,
+      isEligible: true,
+    };
+  });
+}
 
 export default Dashboard;
