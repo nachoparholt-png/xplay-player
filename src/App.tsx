@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminProvider } from "@/contexts/AdminContext";
+import { TourProvider } from "@/contexts/TourContext";
 import AppLayout from "./components/AppLayout";
 import SplashScreen from "./components/SplashScreen";
 import { useCartSync } from "./hooks/useCartSync";
@@ -155,8 +156,10 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <AdminProvider>
-              <OfflineBanner />
-              <AppRoutes />
+              <TourProvider>
+                <OfflineBanner />
+                <AppRoutes />
+              </TourProvider>
             </AdminProvider>
           </AuthProvider>
         </BrowserRouter>

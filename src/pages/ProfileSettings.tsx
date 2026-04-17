@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Save, Lock } from "lucide-react";
+import { ArrowLeft, Camera, Save, Lock, PlayCircle, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
+import { useTour } from "@/contexts/TourContext";
 
 
 const ProfileSettings = () => {
@@ -19,6 +19,7 @@ const ProfileSettings = () => {
   const levelAlreadySet = profile?.padel_level != null;
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { startTour } = useTour();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -272,6 +273,21 @@ const ProfileSettings = () => {
         <Save className="w-4 h-4" />
         {saving ? "Saving..." : "Save Changes"}
       </Button>
+
+      {/* ── App Tour shortcut ── */}
+      <button
+        onClick={startTour}
+        className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-container border border-border/30 hover:bg-surface-container-high transition-colors active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-3">
+          <PlayCircle className="w-5 h-5 text-primary" />
+          <div className="text-left">
+            <p className="text-sm font-semibold">Take the App Tour</p>
+            <p className="text-xs text-muted-foreground">Explore features & the reward program</p>
+          </div>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
     </div>
   );
 };

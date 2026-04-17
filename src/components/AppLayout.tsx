@@ -4,6 +4,7 @@ import { Swords, MessageSquare, Gift, User, Shield, Trophy } from "lucide-react"
 import { motion } from "framer-motion";
 import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
+import AppTour from "@/components/AppTour";
 import xplayLogo from "@/assets/xplay-logo-full.png";
 
 const navItems = [
@@ -87,6 +88,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           <div className="max-w-4xl mx-auto">{children}</div>
         </div>
       </main>
+
+      {/* App Tour overlay — rendered above everything except the nav */}
+      <AppTour />
 
       {/* Mobile Bottom Nav - hidden on chat threads */}
       <nav
