@@ -23,7 +23,7 @@ const PointsWalletCard = ({ available, pending, lifetimeEarned, lifetimeSpent, o
         <span className="text-secondary font-display text-xs tracking-widest uppercase font-bold mb-2 block">Points Balance</span>
         <div className="flex items-baseline gap-2 mb-1">
           <span className="font-display text-4xl font-black tracking-tighter">{available.toLocaleString()}</span>
-          <span className="text-muted-foreground font-display font-bold text-sm">PP</span>
+          <span className="text-muted-foreground font-display font-bold text-sm">XP</span>
         </div>
         {pending > 0 && (
           <div className="flex items-center gap-1.5 mt-1">

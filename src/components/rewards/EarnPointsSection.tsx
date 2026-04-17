@@ -18,7 +18,7 @@ const EarnPointsSection = ({ title, settings }: EarnPointsSectionProps) => {
     {
       icon: Gift,
       title: "Welcome Bonus",
-      description: "Get 50 Padel Park Points when you join the platform",
+      description: "Get 50 XPLAY Points when you join the platform",
       color: "text-primary",
     },
     {

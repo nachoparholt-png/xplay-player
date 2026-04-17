@@ -216,7 +216,21 @@ const TournamentDetail = () => {
   };
 
   const handleLaunch = async () => {
-    if (!user || !id) return;
+    if (!user || !id || !tournament) return;
+
+    // Guard: tournament must have a real name
+    const nameOk = tournament.name && tournament.name.trim() && tournament.name !== "Untitled Tournament";
+    if (!nameOk) {
+      toast({ title: "Add a tournament name", description: "Go back to the wizard to set a name before launching.", variant: "destructive" });
+      return;
+    }
+
+    // Guard: at least 2 players must have joined
+    if (playingCount < 2) {
+      toast({ title: "Not enough players", description: `You need at least 2 players. Currently ${playingCount}/${tournament.player_count} have joined.`, variant: "destructive" });
+      return;
+    }
+
     setLaunching(true);
     const result = await launchTournament(id, user.id);
     setLaunching(false);
@@ -388,14 +402,21 @@ const TournamentDetail = () => {
       {/* Actions */}
       <div className="space-y-2">
         {tournament.status === "draft" && isCreator && (
-          <Button
-            onClick={handleLaunch}
-            disabled={launching}
-            className="w-full rounded-xl h-12 font-semibold gap-2 glow-primary text-base"
-          >
-            <Rocket className="w-4.5 h-4.5" />
-            {launching ? "Launching..." : "Start Tournament 🏆"}
-          </Button>
+          <>
+            {playingCount < 2 && (
+              <p className="text-xs text-center text-muted-foreground pb-1">
+                Need at least 2 players to launch ({playingCount}/{tournament.player_count} joined)
+              </p>
+            )}
+            <Button
+              onClick={handleLaunch}
+              disabled={launching}
+              className="w-full rounded-xl h-12 font-semibold gap-2 glow-primary text-base"
+            >
+              <Rocket className="w-4.5 h-4.5" />
+              {launching ? "Launching..." : "Start Tournament 🏆"}
+            </Button>
+          </>
         )}
 
         {tournament.status === "active" && (

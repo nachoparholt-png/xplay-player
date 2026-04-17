@@ -30,7 +30,7 @@ const StakeOptionsSection = ({ title, stakeEnabled, activeStakeCount, minStake, 
         <div className="flex items-start gap-2">
           <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
           <p className="text-sm text-muted-foreground">
-            Use your Padel Park Points to raise the stakes in selected matches. Winners can earn more, while draws return your staked points.
+            Use your XPLAY Points (XP) to raise the stakes in selected matches. Winners can earn more, while draws return your staked points.
           </p>
         </div>
 

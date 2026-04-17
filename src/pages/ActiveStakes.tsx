@@ -124,7 +124,7 @@ const ActiveStakes = () => {
             <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Balance</span>
           </div>
           <p className="text-2xl font-display font-bold text-primary">{profile?.padel_park_points ?? 0}</p>
-          <p className="text-xs text-muted-foreground">Padel Park Points</p>
+          <p className="text-xs text-muted-foreground">XPLAY Points (XP)</p>
         </div>
         <div className="card-elevated p-4">
           <div className="flex items-center gap-2 mb-1">

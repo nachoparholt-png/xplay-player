@@ -60,7 +60,7 @@ const BuyPointsSection = ({ packs, enabled, title, onBuyPack, suggestedAmount }:
               </span>
             )}
             <div className="stat-number text-lg text-foreground">${pack.price.toFixed(2)}</div>
-            <span className="text-[10px] text-muted-foreground">Padel Park Points</span>
+            <span className="text-[10px] text-muted-foreground">XPLAY Points (XP)</span>
           </motion.div>
         ))}
       </div>

@@ -155,7 +155,9 @@ const Profile = () => {
       : "0%";
 
   const reliabilityLabel =
-    (profile?.reliability_score ?? 100) >= 90
+    (profile?.total_matches ?? 0) === 0
+      ? "NEW"
+      : (profile?.reliability_score ?? 100) >= 90
       ? "HIGH"
       : (profile?.reliability_score ?? 100) >= 70
       ? "MED"
@@ -286,7 +288,7 @@ const Profile = () => {
             <span className="text-5xl font-display font-black text-primary">
               {(profile?.padel_park_points ?? 0).toLocaleString()}
             </span>
-            <span className="text-sm font-bold text-muted-foreground">PP</span>
+            <span className="text-sm font-bold text-muted-foreground">XP</span>
           </div>
           <button
             onClick={() => navigate("/points-store")}
@@ -317,7 +319,9 @@ const Profile = () => {
             {profile?.preferred_side && (
               <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">
                 <Crosshair className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-wider capitalize">{profile.preferred_side} Side</span>
+                <span className="text-xs font-bold uppercase tracking-wider">
+                {profile.preferred_side === 'both' ? 'Both Sides' : `${profile.preferred_side.charAt(0).toUpperCase() + profile.preferred_side.slice(1)} Side`}
+              </span>
               </div>
             )}
             <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">

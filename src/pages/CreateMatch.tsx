@@ -75,7 +75,10 @@ const CreateMatch = () => {
   const [selectedCourtId, setSelectedCourtId] = useState("");
   const [selectedSlotDate, setSelectedSlotDate] = useState(""); // YYYY-MM-DD
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
-  const SLOT_DURATION = 90; // 90-min match blocks
+
+  // Duration is always locked to the court's configured slot_duration_minutes — never free choice
+  const selectedCourtObj = clubCourts.find(c => c.id === selectedCourtId);
+  const slotDuration = selectedCourtObj?.slot_duration_minutes ?? 90;
 
   const { data: clubCourts = [], isLoading: courtsLoading } = useClubCourtsForPlayer(
     venueMode === "xplay" ? (selectedClub?.id ?? null) : null
@@ -84,7 +87,7 @@ const CreateMatch = () => {
     venueMode === "xplay" ? (selectedClub?.id ?? null) : null,
     selectedCourtId || null,
     selectedSlotDate || null,
-    SLOT_DURATION
+    slotDuration
   );
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [notes, setNotes] = useState("");
@@ -355,7 +358,12 @@ const CreateMatch = () => {
             ) : (
               <Select
                 value={selectedCourtId}
-                onValueChange={v => { setSelectedCourtId(v); setSelectedSlot(null); setCourt(clubCourts.find(c => c.id === v)?.nickname ?? clubCourts.find(c => c.id === v)?.name ?? ""); }}
+                onValueChange={v => {
+                  setSelectedCourtId(v);
+                  setSelectedSlot(null); // reset — new court may have different slot_duration_minutes
+                  const c = clubCourts.find(x => x.id === v);
+                  setCourt(c?.nickname ?? c?.name ?? "");
+                }}
               >
                 <SelectTrigger className="h-12 rounded-xl bg-muted border-border/50">
                   <SelectValue placeholder="Select a court…" />
@@ -395,6 +403,21 @@ const CreateMatch = () => {
               />
               {errors.date && <p className="text-[11px] text-destructive mt-1">Please pick a date</p>}
             </div>
+
+            {/* Slot duration — locked to court's configured value, not player's choice */}
+            {selectedCourtId && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted border border-border/40">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground">
+                  Slot duration: <strong className="text-foreground">
+                    {slotDuration < 60
+                      ? `${slotDuration} min`
+                      : `${Math.floor(slotDuration / 60)}h${slotDuration % 60 ? ` ${slotDuration % 60}min` : ''}`}
+                  </strong>
+                  <span className="ml-1 opacity-60">· set by the club</span>
+                </span>
+              </div>
+            )}
 
             {/* Available time slots */}
             {selectedCourtId && selectedSlotDate && (

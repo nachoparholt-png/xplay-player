@@ -154,7 +154,7 @@ const TournamentsList = () => {
     let list = tournaments;
 
     if (tab === "my_entries") list = list.filter((t) => myTournamentIds.has(t.id));
-    else if (tab === "open") list = list.filter((t) => t.status === "active" || t.status === "draft");
+    else if (tab === "open") list = list.filter((t) => t.status === "active");
     else if (tab === "completed") list = list.filter((t) => t.status === "completed" || t.status === "cancelled");
 
     if (skillFilter !== "all") {

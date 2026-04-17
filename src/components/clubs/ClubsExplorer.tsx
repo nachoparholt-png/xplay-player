@@ -18,13 +18,16 @@ const ClubsExplorer = () => {
       
       // Count active courts and derive court types from surface + indoor columns
       const { data: courts } = await supabase.from("courts").select("club_id, surface, indoor").eq("active", true);
+      const formatSurface = (s: string) =>
+        s.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
       const courtCounts: Record<string, number> = {};
       const courtTypes: Record<string, Set<string>> = {};
       (courts || []).forEach((c: any) => {
         courtCounts[c.club_id] = (courtCounts[c.club_id] || 0) + 1;
         if (!courtTypes[c.club_id]) courtTypes[c.club_id] = new Set();
         const label = c.surface
-          ? `${c.indoor ? "Indoor" : "Outdoor"} ${c.surface.charAt(0).toUpperCase() + c.surface.slice(1)}`
+          ? `${c.indoor ? "Indoor" : "Outdoor"} ${formatSurface(c.surface)}`
           : c.indoor != null ? (c.indoor ? "Indoor" : "Outdoor") : "Padel";
         courtTypes[c.club_id].add(label);
       });
@@ -94,7 +97,7 @@ const ClubsExplorer = () => {
               key={club.id}
               id={club.id}
               name={club.club_name}
-              city={club.city}
+              city={club.city ?? club.location}
               courtCount={club._activeCourtCount}
               logoUrl={club.logo_url}
               courtType={club._courtTypes}

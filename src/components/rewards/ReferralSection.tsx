@@ -30,7 +30,7 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
   const handleShare = async () => {
     if (navigator.share && referralLink) {
       try {
-        await navigator.share({ title: "Join Padel Park", text: "Join me on Padel Park!", url: referralLink });
+        await navigator.share({ title: "Join XPLAY", text: "Join me on XPLAY!", url: referralLink });
       } catch {}
     } else {
       handleCopy();

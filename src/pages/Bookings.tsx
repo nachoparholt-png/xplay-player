@@ -191,7 +191,15 @@ const Bookings = () => {
           {tab === "upcoming" && (
             <div className="space-y-3">
               {upcomingBookings.length === 0 && upcomingCoaching.length === 0 ? (
-                <p className="text-center text-muted-foreground text-sm py-8">No upcoming bookings</p>
+                <div className="flex flex-col items-center gap-4 py-12 text-center">
+                  <p className="text-muted-foreground text-sm">No upcoming bookings</p>
+                  <button
+                    onClick={() => navigate("/matches?tab=clubs")}
+                    className="bg-primary text-primary-foreground rounded-xl px-6 py-2.5 text-sm font-semibold active:scale-[0.98] transition-transform"
+                  >
+                    Browse Clubs
+                  </button>
+                </div>
               ) : (
                 <>
                   {upcomingBookings.map((b) => (

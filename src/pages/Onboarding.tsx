@@ -78,11 +78,11 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </motion.div>
 
       <h1 className="font-display text-3xl font-bold text-foreground mb-4">
-        Welcome to<br />Padel Park
+        Welcome to<br />XPLAY
       </h1>
 
       <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mb-2">
-        Padel Park is a community where players can create matches, join games, chat with other players, and compete using Padel Park Points and stakes.
+        XPLAY is a community where players can create matches, join games, chat with other players, and compete using XPLAY Points (XP) and stakes.
       </p>
 
       <p className="text-[11px] text-muted-foreground/60 mb-10">
@@ -331,11 +331,11 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
       </motion.div>
 
       <h2 className="font-display text-2xl font-bold text-foreground mb-3">
-        Welcome to<br />Padel Park
+        Welcome to<br />XPLAY
       </h2>
 
       <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-8">
-        Padel Park helps players connect and compete. The more you play and grow the community, the more Padel Park Points you earn.
+        XPLAY helps players connect and compete. The more you play and grow the community, the more XPLAY Points (XP) you earn.
       </p>
 
       <div className="w-full max-w-xs space-y-3 mb-10">
