@@ -163,7 +163,7 @@ export const useRewards = () => {
   const getPointsPacks = (): PointsPack[] => {
     return (packagesQuery.data || []).map((pkg: any) => ({
       id: pkg.id,
-      amount: (pkg.total_points ?? pkg.points) + (pkg.bonus_points || 0),
+      amount: pkg.total_points ?? (pkg.points + (pkg.bonus_points || 0)),
       price: pkg.price_gbp,
       bonus: pkg.bonus_points || 0,
       label: pkg.name,
