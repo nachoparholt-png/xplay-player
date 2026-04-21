@@ -48,7 +48,7 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-lg h-[75vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 pb-3 border-b border-border/30">
           <DialogTitle className="font-display flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" /> Select Club
