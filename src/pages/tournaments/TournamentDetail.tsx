@@ -276,362 +276,392 @@ const TournamentDetail = () => {
   const confirmedPlayers = players.filter(p => p.status === "confirmed");
 
   return (
-    <div className="px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/tournaments")} className="rounded-xl">
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-display font-bold truncate flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-primary shrink-0" />
+    <div className="min-h-screen pb-32">
+      {/* Header with back button and status badges */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border/[0.07] px-4 py-3 flex items-center justify-between">
+        <button
+          onClick={() => navigate("/tournaments")}
+          className="w-8 h-8 rounded-[10px] bg-card flex items-center justify-center hover:bg-card/80 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-foreground" />
+        </button>
+        <div className="flex items-center gap-2">
+          {tournament.visibility === "draft" && tournament.status === "draft" && (
+            <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Draft</Badge>
+          )}
+          {tournament.visibility === "public" && (
+            <Badge className="bg-purple-500/20 text-purple-300 text-[9px] font-black uppercase tracking-[0.14em]">Public</Badge>
+          )}
+          {tournament.visibility === "private" && tournament.status !== "draft" && (
+            <Badge className="bg-amber-400/15 text-amber-400 text-[9px] font-black uppercase tracking-[0.14em]">Private</Badge>
+          )}
+          {hasBetConfig && (
+            <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Betting</Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-5 space-y-6">
+        {/* Title Hero */}
+        <div>
+          <div className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-2">
+            🏆 {tournament.tournament_type === "pairs" ? "Round robin" : "Individual"} · {tournament.player_count} {tournament.tournament_type === "pairs" ? "pairs" : "players"}
+          </div>
+          <h1 className="font-display text-[30px] font-black italic uppercase text-foreground leading-[0.9] tracking-[-0.02em]">
             {tournament.name}
           </h1>
-          <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-            {tournament.visibility === "private" ? (
-              <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Private</span>
-            ) : (
-              <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> Public</span>
-            )}
-            <span>•</span>
-            <Badge variant="outline" className="text-[10px]">{tournament.status}</Badge>
-            {hasBetConfig && (
-              <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 gap-1">
-                <TrendingUp className="w-2.5 h-2.5" />
-                Betting
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="grid grid-cols-2 gap-3">
-        {tournament.club && (
-          <div className="p-3 rounded-xl bg-muted/50 space-y-1">
-            <MapPin className="w-4 h-4 text-muted-foreground" />
-            <p className="text-sm font-medium">{tournament.club}</p>
-          </div>
-        )}
-        <div className="p-3 rounded-xl bg-muted/50 space-y-1">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
-          <p className="text-sm font-medium">
-            {tournament.scheduled_date
-              ? new Date(tournament.scheduled_date + 'T12:00:00').toLocaleDateString(undefined, {
-                  weekday: "short", day: "numeric", month: "short", year: "numeric",
-                })
-              : "Date TBD"}
-          </p>
-        </div>
-        <div className="p-3 rounded-xl bg-muted/50 space-y-1">
-          <Users className="w-4 h-4 text-muted-foreground" />
-          <p className="text-sm font-medium">{playingCount}/{tournament.player_count}</p>
-        </div>
-        <div className="p-3 rounded-xl bg-muted/50 space-y-1">
-          <Clock className="w-4 h-4 text-muted-foreground" />
-          <p className="text-sm font-medium capitalize">{tournament.format_type.replace("_", " ")}</p>
-        </div>
-      </div>
-
-      {/* Betting Card */}
-      {(hasBetConfig || isJoined) && (
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">Tournament Betting</p>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Coins className="w-3 h-3" />
-                  <span>{userPoints} XPLAY</span>
-                </div>
-              </div>
-            </div>
-            <Badge
-              variant="outline"
-              className={`text-[10px] ${oddsLocked
-                ? "border-green-500 text-green-700 bg-green-500/10"
-                : "border-amber-500 text-amber-700 bg-amber-500/10"
-              }`}
-            >
-              {oddsLocked ? "Final Odds" : "Preliminary"}
-            </Badge>
-          </div>
-
-          {/* Phase odds preview */}
-          {phaseOddsPreview.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              {phaseOddsPreview.map(p => (
-                <div key={p.stage} className="rounded-xl bg-card/60 border border-border/30 p-2 text-center">
-                  <p className="text-[10px] text-muted-foreground">{formatLabel(p.stage)}</p>
-                  <p className="text-sm font-bold font-mono text-primary">×{p.multiplier.toFixed(2)}</p>
-                  <Badge variant="secondary" className="text-[8px] mt-0.5">{p.tier}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!oddsLocked && (
-            <p className="text-[11px] text-muted-foreground text-center">
-              Multipliers update as players join • {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} left
-            </p>
-          )}
-
-          {/* Coordinator block */}
-          {isCreator ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/30">
-              <ShieldAlert className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground">
-                Tournament coordinators cannot place bets on their own tournament.
+          <div className="text-[11px] text-muted-foreground/55 mt-2 flex items-center gap-3">
+            {tournament.club && <span>{tournament.club}</span>}
+            {tournament.scheduled_date && (
+              <span>
+                {new Date(tournament.scheduled_date + 'T12:00:00').toLocaleDateString(undefined, {
+                  weekday: "short", day: "numeric", month: "short",
+                })}
               </span>
-            </div>
-          ) : isJoined ? (
-            <Button
-              onClick={() => setBetSheetOpen(true)}
-              className="w-full rounded-xl h-11 font-semibold gap-2"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Place Your Bets
-            </Button>
-          ) : !hasBetConfig ? (
-            <p className="text-xs text-muted-foreground text-center">
-              Join the tournament to place bets
-            </p>
-          ) : null}
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Actions */}
-      <div className="space-y-2">
-        {tournament.status === "draft" && isCreator && (
-          <>
-            {playingCount < 2 && (
-              <p className="text-xs text-center text-muted-foreground pb-1">
-                Need at least 2 players to launch ({playingCount}/{tournament.player_count} joined)
+        {/* 2 Dominant Numbers */}
+        <div className="flex gap-3">
+          {/* Pairs Joined Card */}
+          <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
+            <div className="leading-none">
+              <div className="font-display text-[24px] font-black italic text-foreground leading-[0.95]">
+                {playingCount}
+                <span className="text-[14px] text-muted-foreground/40 font-normal not-italic ml-0.5">/{tournament.player_count}</span>
+              </div>
+            </div>
+            <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
+              {tournament.tournament_type === "pairs" ? "Pairs" : "Players"} Joined
+            </div>
+          </div>
+
+          {/* XP Pool or Spots Left */}
+          {tournament.prize_pool && tournament.prize_pool > 0 ? (
+            <div className="flex-1 p-3 rounded-[14px] bg-amber-400/10 border border-amber-400/20">
+              <div className="leading-none">
+                <div className="font-display text-[24px] font-black italic text-amber-400 leading-[0.95]">
+                  {tournament.prize_pool}
+                </div>
+              </div>
+              <div className="text-[9px] font-bold text-amber-400/70 uppercase tracking-[0.1em] mt-1.5">
+                XP Prize Pool
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
+              <div className="leading-none">
+                <div className="font-display text-[24px] font-black italic text-foreground leading-[0.95]">
+                  {spotsLeft}
+                </div>
+              </div>
+              <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
+                Spots Left
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Betting Card - Tightened */}
+        {(hasBetConfig || isJoined) && (
+          <div className="rounded-[18px] bg-primary/[0.06] border border-primary/20 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] font-black text-primary uppercase tracking-[0.14em]">● Live Odds</div>
+              <div className="text-[10px] text-muted-foreground font-bold">{userPoints} XP</div>
+            </div>
+
+            {/* Odds grid - 3 columns */}
+            {phaseOddsPreview.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {phaseOddsPreview.map(p => (
+                  <div key={p.stage} className="rounded-[12px] bg-background/50 border border-border/[0.06] p-[10px_6px] text-center">
+                    <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.1em]">{formatLabel(p.stage)}</p>
+                    <p className="font-display text-[17px] font-black italic text-primary leading-none mt-0.5">×{p.multiplier.toFixed(2)}</p>
+                    <p className="text-[8px] text-muted-foreground mt-1">{p.tier}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!oddsLocked && (
+              <p className="text-[11px] text-muted-foreground text-center">
+                Multipliers update as players join
               </p>
             )}
-            <Button
-              onClick={handleLaunch}
-              disabled={launching}
-              className="w-full rounded-xl h-12 font-semibold gap-2 glow-primary text-base"
+
+            {/* Coordinator block */}
+            {isCreator ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/30 text-[11px] text-muted-foreground">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                Coordinators cannot bet on their tournament.
+              </div>
+            ) : isJoined ? (
+              <Button
+                onClick={() => setBetSheetOpen(true)}
+                className="w-full rounded-[12px] h-10 font-semibold gap-2 text-sm bg-primary text-primary-foreground"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Place Your Bets
+              </Button>
+            ) : !hasBetConfig ? (
+              <p className="text-[10px] text-muted-foreground text-center">
+                Join the tournament to place bets
+              </p>
+            ) : null}
+          </div>
+        )}
+
+        {/* Format Section */}
+        {(tournament.format_type || skillLevelMin != null) && (
+          <div>
+            <div className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase px-[20px] pb-1.5">Details</div>
+            <div className="mx-4 p-3 rounded-[14px] bg-card border border-border/[0.07] space-y-2 text-[12px] text-foreground">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Format</span>
+                <span className="font-semibold capitalize">{tournament.format_type.replace("_", " ")}</span>
+              </div>
+              {skillLevelMin != null && skillLevelMax != null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Skill Level</span>
+                  <span className="font-semibold">{skillLevelMin} – {skillLevelMax}</span>
+                </div>
+              )}
+              {tournament.require_admin_approval && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Approval</span>
+                  <span className="font-semibold text-amber-400">Required</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Approval requests panel */}
+        {isCreator && tournament.status === "draft" && (
+          <ApprovalRequestPanel tournamentId={tournament.id} onApproved={reloadPlayers} />
+        )}
+
+        {/* Partner confirm banner */}
+        {tournament && user && !isCreator && (
+          <PartnerConfirmBanner
+            tournamentId={tournament.id}
+            onResponded={reloadPlayers}
+          />
+        )}
+
+        {/* Structure / Fixture toggle */}
+        <div>
+          <div className="flex gap-1 bg-muted/30 rounded-lg p-1 w-fit mb-3">
+            <button
+              onClick={() => setViewMode("structure")}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === "structure" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground/70"
+              }`}
             >
-              <Rocket className="w-4.5 h-4.5" />
-              {launching ? "Launching..." : "Start Tournament 🏆"}
-            </Button>
-          </>
-        )}
-
-        {tournament.status === "active" && (
-          <Button
-            onClick={() => navigate(`/tournaments/${tournament.id}/live`)}
-            className="w-full rounded-xl h-12 font-semibold gap-2 glow-primary"
-          >
-            <Play className="w-4 h-4" />
-            Go Live
-          </Button>
-        )}
-
-        {(tournament.status === "draft" || tournament.status === "active") && (
-          <>
-            {!isJoined && !isCreator && spotsLeft > 0 && (
-              <Button onClick={() => setJoinOpen(true)} className="w-full rounded-xl h-11 font-semibold">
-                {`Join Tournament (${spotsLeft} spots left)`}
-              </Button>
-            )}
-            {isJoined && !isCreator && (
-              <Button variant="outline" onClick={handleLeave} className="w-full rounded-xl h-11 font-semibold text-destructive">
-                Leave Tournament
-              </Button>
-            )}
-            {isCreator && (
-              <Button
-                variant="outline"
-                onClick={() => setInviteOpen(true)}
-                className="w-full rounded-xl h-11 font-semibold gap-2"
-              >
-                <Send className="w-4 h-4" />
-                Invite Players
-              </Button>
-            )}
-          </>
-        )}
-        {isCreator && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full rounded-xl h-11 font-semibold gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Tournament
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete tournament?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently delete "{tournament.name}" and all associated data. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
-      </div>
-
-      {/* Skill level range */}
-      {skillLevelMin != null && skillLevelMax != null && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Skill level:</span>
-          <Badge variant="outline" className="text-xs">{skillLevelMin} – {skillLevelMax}</Badge>
-          {tournament.require_admin_approval && (
-            <span className="text-[10px] text-muted-foreground">(approval required)</span>
+              Tournament Structure
+            </button>
+            <button
+              onClick={() => setViewMode("fixture")}
+              className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+                viewMode === "fixture" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground/70"
+              }`}
+            >
+              📋 Fixture View
+            </button>
+          </div>
+          {viewMode === "structure" && (
+            <TournamentStructurePreview
+              formatType={tournament.format_type}
+              tournamentType={tournament.tournament_type as "pairs" | "individual"}
+              playerCount={tournament.player_count}
+              courtCount={tournament.court_count}
+              bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
+              filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
+              canvasState={undefined}
+            />
+          )}
+          {viewMode === "fixture" && (
+            <TournamentFixtureView
+              formatType={tournament.format_type}
+              tournamentType={tournament.tournament_type as "pairs" | "individual"}
+              playerCount={tournament.player_count}
+              courtCount={tournament.court_count}
+              bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
+              filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
+              canvasState={undefined}
+            />
           )}
         </div>
-      )}
 
-      {/* Approval requests panel */}
-      {isCreator && tournament.status === "draft" && (
-        <ApprovalRequestPanel tournamentId={tournament.id} onApproved={reloadPlayers} />
-      )}
-
-      {/* Partner confirm banner */}
-      {tournament && user && !isCreator && (
-        <PartnerConfirmBanner
-          tournamentId={tournament.id}
-          onResponded={reloadPlayers}
-        />
-      )}
-
-      {/* Structure / Fixture toggle */}
-      <div>
-        <div className="flex gap-1 bg-muted/30 rounded-lg p-1 w-fit mb-3">
-          <button
-            onClick={() => setViewMode("structure")}
-            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
-              viewMode === "structure" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground/70"
-            }`}
-          >
-            Tournament Structure
-          </button>
-          <button
-            onClick={() => setViewMode("fixture")}
-            className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
-              viewMode === "fixture" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground/70"
-            }`}
-          >
-            📋 Fixture View
-          </button>
-        </div>
-        {viewMode === "structure" && (
-          <TournamentStructurePreview
-            formatType={tournament.format_type}
-            tournamentType={tournament.tournament_type as "pairs" | "individual"}
-            playerCount={tournament.player_count}
-            courtCount={tournament.court_count}
-            bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
-            filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
-            canvasState={undefined}
-          />
-        )}
-        {viewMode === "fixture" && (
-          <TournamentFixtureView
-            formatType={tournament.format_type}
-            tournamentType={tournament.tournament_type as "pairs" | "individual"}
-            playerCount={tournament.player_count}
-            courtCount={tournament.court_count}
-            bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
-            filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
-            canvasState={undefined}
-          />
-        )}
-      </div>
-
-      {/* Players */}
-      <div>
-        <h2 className="font-semibold text-sm mb-3">Players ({confirmedPlayers.length})</h2>
-        <div className="space-y-2">
-          {confirmedPlayers.map(p => {
-            const prof = playerProfiles[p.user_id];
-            return (
-              <div key={p.id || p.user_id} className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/30">
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
-                  {prof?.display_name?.[0]?.toUpperCase() || "?"}
+        {/* Players */}
+        <div>
+          <h2 className="text-[14px] font-bold text-foreground mb-3">{tournament.tournament_type === "pairs" ? "Pairs" : "Players"} ({confirmedPlayers.length})</h2>
+          <div className="space-y-1">
+            {confirmedPlayers.map(p => {
+              const prof = playerProfiles[p.user_id];
+              return (
+                <div key={p.id || p.user_id} className="flex items-center gap-3 p-2.5 rounded-[14px] bg-card/30">
+                  <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                    {prof?.display_name?.[0]?.toUpperCase() || "?"}
+                  </div>
+                  <span className="text-sm font-medium truncate">{prof?.display_name || "Player"}</span>
+                  {p.user_id === tournament.created_by && (
+                    <AdminBadge role={p.role === "organiser" ? "organiser" : "admin"} size="sm" />
+                  )}
+                  {p.role === "organiser" && (
+                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser only</Badge>
+                  )}
+                  {p.user_id === tournament.created_by && p.role !== "organiser" && (
+                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser</Badge>
+                  )}
+                  {p.partner_status === "pending" && (
+                    <Badge variant="outline" className="text-[9px] ml-auto text-warning border-warning/40">⏳ Partner pending</Badge>
+                  )}
+                  {p.partner_status === "confirmed" && tournament.tournament_type === "pairs" && (
+                    <Badge variant="outline" className="text-[9px] ml-auto text-primary border-primary/40">✓ Paired</Badge>
+                  )}
                 </div>
-                <span className="text-sm font-medium truncate">{prof?.display_name || "Player"}</span>
-                {p.user_id === tournament.created_by && (
-                  <AdminBadge role={p.role === "organiser" ? "organiser" : "admin"} size="sm" />
-                )}
-                {p.role === "organiser" && (
-                  <Badge variant="outline" className="text-[9px] ml-auto">Organiser only</Badge>
-                )}
-                {p.user_id === tournament.created_by && p.role !== "organiser" && (
-                  <Badge variant="outline" className="text-[9px] ml-auto">Organiser</Badge>
-                )}
-                {p.partner_status === "pending" && (
-                  <Badge variant="outline" className="text-[9px] ml-auto text-warning border-warning/40">⏳ Partner pending</Badge>
-                )}
-                {p.partner_status === "confirmed" && tournament.tournament_type === "pairs" && (
-                  <Badge variant="outline" className="text-[9px] ml-auto text-primary border-primary/40">✓ Paired</Badge>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+
+        {/* Invite modal */}
+        {tournament && (
+          <InviteTournamentPlayerModal
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            tournamentId={tournament.id}
+            tournamentName={tournament.name}
+            existingPlayerIds={players.map(p => p.user_id)}
+          />
+        )}
+
+        {/* Join modal */}
+        {tournament && (
+          <JoinTournamentModal
+            open={joinOpen}
+            onOpenChange={setJoinOpen}
+            tournamentId={tournament.id}
+            tournamentType={tournament.tournament_type as "pairs" | "individual"}
+            formatType={tournament.format_type}
+            playerCount={tournament.player_count}
+            courtCount={tournament.court_count}
+            bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
+            filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
+            existingPlayerIds={players.map(p => p.user_id)}
+            takenSlots={players.filter(p => p.slot_index !== null).map(p => p.slot_index as number)}
+            onJoined={handleJoinedViaModal}
+            skillLevelMin={skillLevelMin}
+            skillLevelMax={skillLevelMax}
+            requireAdminApproval={tournament.require_admin_approval}
+          />
+        )}
+
+        {/* Bet Sheet */}
+        <TournamentBetSheet
+          open={betSheetOpen}
+          onClose={() => setBetSheetOpen(false)}
+          tournament={tournament ? {
+            tournamentId: tournament.id,
+            name: tournament.name,
+            formatType: tournament.format_type,
+            bracketConfig: tournament.bracket_config || {},
+          } : null}
+          onBetPlaced={() => {}}
+          isCreatorBlocked={isCreator}
+        />
       </div>
 
-      {/* Invite modal */}
-      {tournament && (
-        <InviteTournamentPlayerModal
-          open={inviteOpen}
-          onOpenChange={setInviteOpen}
-          tournamentId={tournament.id}
-          tournamentName={tournament.name}
-          existingPlayerIds={players.map(p => p.user_id)}
-        />
-      )}
+      {/* Sticky CTA Footer */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background to-transparent">
+        <div className="flex flex-col gap-2">
+          {tournament.status === "draft" && isCreator && (
+            <>
+              {playingCount < 2 && (
+                <p className="text-xs text-center text-muted-foreground pb-1">
+                  Need at least 2 players to launch ({playingCount}/{tournament.player_count} joined)
+                </p>
+              )}
+              <button
+                onClick={handleLaunch}
+                disabled={launching}
+                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-50 transition-all"
+              >
+                <span>Launch tournament</span>
+                <span>🏆</span>
+              </button>
+            </>
+          )}
 
-      {/* Join modal */}
-      {tournament && (
-        <JoinTournamentModal
-          open={joinOpen}
-          onOpenChange={setJoinOpen}
-          tournamentId={tournament.id}
-          tournamentType={tournament.tournament_type as "pairs" | "individual"}
-          formatType={tournament.format_type}
-          playerCount={tournament.player_count}
-          courtCount={tournament.court_count}
-          bracketConfig={(tournament.bracket_config || {}) as BracketConfig}
-          filledPlayers={confirmedPlayers.map(p => playerProfiles[p.user_id]?.display_name || "Player")}
-          existingPlayerIds={players.map(p => p.user_id)}
-          takenSlots={players.filter(p => p.slot_index !== null).map(p => p.slot_index as number)}
-          onJoined={handleJoinedViaModal}
-          skillLevelMin={skillLevelMin}
-          skillLevelMax={skillLevelMax}
-          requireAdminApproval={tournament.require_admin_approval}
-        />
-      )}
+          {tournament.status === "active" && (
+            <button
+              onClick={() => navigate(`/tournaments/${tournament.id}/live`)}
+              className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
+            >
+              <span>Go live</span>
+              <ArrowLeft className="w-5 h-5 rotate-180" />
+            </button>
+          )}
 
-      {/* Bet Sheet — uses TournamentBetSheet instead of BetPlacementSheet */}
-      <TournamentBetSheet
-        open={betSheetOpen}
-        onClose={() => setBetSheetOpen(false)}
-        tournament={tournament ? {
-          tournamentId: tournament.id,
-          name: tournament.name,
-          formatType: tournament.format_type,
-          bracketConfig: tournament.bracket_config || {},
-        } : null}
-        onBetPlaced={() => {}}
-        isCreatorBlocked={isCreator}
-      />
+          {(tournament.status === "draft" || tournament.status === "active") && (
+            <>
+              {!isJoined && !isCreator && spotsLeft > 0 && (
+                <button
+                  onClick={() => setJoinOpen(true)}
+                  className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
+                >
+                  <span>Join tournament</span>
+                  <span>{spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} left</span>
+                </button>
+              )}
+              {isJoined && !isCreator && (
+                <button
+                  onClick={handleLeave}
+                  className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all"
+                >
+                  Leave Tournament
+                </button>
+              )}
+              {isCreator && (
+                <button
+                  onClick={() => setInviteOpen(true)}
+                  className="w-full h-[54px] rounded-[16px] border border-primary/30 text-primary font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
+                >
+                  <Send className="w-4 h-4" />
+                  Invite Players
+                </button>
+              )}
+            </>
+          )}
+
+          {isCreator && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all flex items-center justify-center gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete tournament?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete "{tournament.name}" and all associated data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

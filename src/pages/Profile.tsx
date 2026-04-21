@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Target, TrendingUp, Calendar, Zap, Award, ChevronRight, Settings, LogOut, Timer, MapPin, Bolt, Crosshair, Gauge, Building2 } from "lucide-react";
+import { ChevronRight, Settings, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +49,6 @@ const Profile = () => {
     const fetchRecentMatches = async () => {
       setMatchesLoading(true);
       try {
-        // Single deep join: rating_history → matches → match_players → profiles
         const { data: history, error: historyError } = await supabase
           .from("rating_history")
           .select(`
@@ -93,7 +92,6 @@ const Profile = () => {
           match_players?: MatchPlayerRow[];
         };
 
-        // Build the final list from the single joined query
         const built: RecentMatch[] = history.map((h) => {
           const match = h.matches as MatchRow | null;
           const matchPlayers = match?.match_players || [];
@@ -154,194 +152,149 @@ const Profile = () => {
       ? `${Math.round((profile.wins / profile.total_matches) * 100)}%`
       : "0%";
 
-  const reliabilityLabel =
-    (profile?.total_matches ?? 0) === 0
-      ? "NEW"
-      : (profile?.reliability_score ?? 100) >= 90
-      ? "HIGH"
-      : (profile?.reliability_score ?? 100) >= 70
-      ? "MED"
-      : "LOW";
-
   return (
-    <div className="px-6 py-6 space-y-8">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <button
-          onClick={() => navigate("/profile/settings")}
-          className="p-2 active:scale-95 transition-transform"
-        >
-          <Settings className="w-6 h-6 text-primary" />
-        </button>
-        <h1 className="font-display font-bold tracking-tight text-lg uppercase text-foreground">Player Profile</h1>
-        <button
-          onClick={signOut}
-          className="p-2 active:scale-95 transition-transform"
-        >
-          <LogOut className="w-6 h-6 text-primary" />
-        </button>
-      </header>
-
-      {/* Hero Section */}
+    <div className="px-6 py-6 space-y-6">
+      {/* IDENTITY HERO - Row layout */}
       <motion.section
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="flex flex-col items-center pt-2"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
       >
-        <div className="relative">
-          <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary to-surface-container-low shadow-[0_0_30px_hsl(var(--primary)/0.15)]">
+        <div className="flex items-center gap-3 flex-1">
+          {/* Avatar */}
+          <div className="w-14 h-14 rounded-full bg-primary p-0.5 flex-shrink-0">
             <Avatar className="w-full h-full">
               <AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
-              <AvatarFallback className="text-3xl font-black bg-surface-container">
+              <AvatarFallback className="text-lg font-black bg-primary text-primary-foreground">
                 {profile?.display_name?.[0]?.toUpperCase() || "P"}
               </AvatarFallback>
             </Avatar>
           </div>
-          {profile?.padel_level && (
-            <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground font-black px-3 py-1 rounded-full text-lg shadow-xl">
-              {profile.padel_level.toFixed(1)}
-            </div>
-          )}
+          {/* Name & location */}
+          <div className="flex-1 min-w-0">
+            <h2 className="font-display text-[22px] font-black italic uppercase text-foreground leading-tight">
+              {profile?.display_name || "Player"}
+            </h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {profile?.location || "No location"}
+            </p>
+          </div>
         </div>
-
-        <div className="mt-6 text-center space-y-1">
-          <h2 className="text-3xl font-display font-extrabold tracking-tight uppercase italic">
-            {profile?.display_name || "Player"}
-          </h2>
-          <p className="text-muted-foreground font-medium tracking-wide text-xs uppercase flex items-center justify-center gap-2">
-            <MapPin className="w-3 h-3" />
-            {[
-              levelToCategory(profile?.padel_level ?? null) <= 2 ? "Advanced" : "Intermediate",
-              "Player",
-              profile?.location ? `• ${profile.location}` : "",
-            ].join(" ")}
-          </p>
-        </div>
+        {/* Settings button */}
+        <button
+          onClick={() => navigate("/profile/settings")}
+          className="p-2 active:scale-95 transition-transform ml-2"
+        >
+          <Settings className="w-5 h-5 text-foreground" />
+        </button>
       </motion.section>
 
-      {/* Stats Row */}
+      {/* 2 INSIGHT CARDS */}
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="grid grid-cols-3 gap-3"
+        transition={{ delay: 0.05 }}
+        className="grid grid-cols-2 gap-2"
       >
-        <div className="bg-surface-container-low rounded-xl p-4 flex flex-col items-center justify-center">
-          <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Matches</span>
-          <span className="text-2xl font-display font-black">{profile?.total_matches ?? 0}</span>
+        {/* Card 1: Level (primary bg) */}
+        <div className="flex-1 p-3 rounded-[14px] bg-primary text-primary-foreground">
+          <div className="font-display text-[22px] font-black italic leading-[0.95]">
+            {profile?.padel_level ? profile.padel_level.toFixed(1) : "—"}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-70 mt-0.5">Level</div>
+          <div className="text-[9px] opacity-60 mt-1">
+            {profile?.padel_level ? `Cat ${levelToCategory(profile.padel_level)}` : "Unrated"}
+          </div>
         </div>
-        <div className="bg-surface-container-low rounded-xl p-4 flex flex-col items-center justify-center">
-          <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Win Rate</span>
-          <span className="text-2xl font-display font-black text-primary">{winRate}</span>
-        </div>
-        <div className="bg-surface-container-low rounded-xl p-4 flex flex-col items-center justify-center border-l-2 border-primary/20">
-          <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-1">Reliability</span>
-          <span className="text-lg font-display font-black">{reliabilityLabel}</span>
+
+        {/* Card 2: Win Rate (ghost card) */}
+        <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
+          <div className="font-display text-[22px] font-black italic leading-[0.95] text-foreground">
+            {winRate}
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground opacity-70 mt-0.5">Win Rate</div>
+          <div className="text-[9px] text-muted-foreground opacity-60 mt-1">
+            {profile?.total_matches ? `${profile.wins || 0} of ${profile.total_matches}` : "No matches"}
+          </div>
         </div>
       </motion.section>
 
-      {/* Rating & Level Card */}
-      {profile?.padel_level && (
+      {/* FORM CHART CARD */}
+      {user && (
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="bg-surface-container-high rounded-xl p-6 relative overflow-hidden"
+          transition={{ delay: 0.1 }}
+          className="bg-card rounded-[18px] border border-border/[0.07] p-4"
         >
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/10 blur-[60px] rounded-full" />
-          <div className="flex items-end justify-between mb-6">
-            <div className="space-y-1">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">Padel Rating</h3>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-display font-black">{profile.padel_level.toFixed(1)}</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Confidence</span>
-              <span className="text-xl font-display font-black text-primary">
-                {Math.min(100, profile.reliability_score ?? 100)}%
-              </span>
-            </div>
-          </div>
-          <div className="w-full h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-primary to-accent rounded-full shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
-              style={{ width: `${Math.min(100, profile.reliability_score ?? 100)}%` }}
-            />
-          </div>
-        </motion.section>
-      )}
-
-      {/* XPLAY Points Balance */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.17 }}
-      >
-        <div className="bg-surface-container-high rounded-xl p-6 relative overflow-hidden">
-          <div className="absolute -top-12 -left-12 w-32 h-32 bg-primary/10 blur-[60px] rounded-full" />
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">XPLAY Points</h3>
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
-          <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-5xl font-display font-black text-primary">
-              {(profile?.padel_park_points ?? 0).toLocaleString()}
-            </span>
-            <span className="text-sm font-bold text-muted-foreground">XP</span>
-          </div>
-          <button
-            onClick={() => navigate("/points-store")}
-            className="w-full bg-primary text-primary-foreground rounded-lg py-2.5 text-sm font-display font-bold uppercase tracking-wider active:scale-[0.98] transition-transform"
-          >
-            Get More Points
-          </button>
-        </div>
-      </motion.section>
-
-      {/* Skill Highlights */}
-      {(profile?.dominant_hand || profile?.preferred_side) && (
-        <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h3 className="text-sm font-display font-black text-muted-foreground uppercase tracking-widest mb-4 px-1">
-            Tactical Assets
-          </h3>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {profile?.dominant_hand && (
-              <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">
-                <Bolt className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-wider capitalize">{profile.dominant_hand} Hand</span>
-              </div>
-            )}
-            {profile?.preferred_side && (
-              <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">
-                <Crosshair className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-wider">
-                {profile.preferred_side === 'both' ? 'Both Sides' : `${profile.preferred_side.charAt(0).toUpperCase() + profile.preferred_side.slice(1)} Side`}
-              </span>
-              </div>
-            )}
-            <div className="flex-shrink-0 flex items-center gap-2 bg-surface-container-low border border-primary/30 px-4 py-2 rounded-full">
-              <Gauge className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-wider">
-                {profile?.padel_level ? `Cat ${levelToCategory(profile.padel_level)}` : "Unrated"}
-              </span>
+            <div className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">
+              Form · Last 90 Days
+            </div>
+            <div className="text-[11px] font-bold text-primary">
+              ▲ Trending up
             </div>
           </div>
+          <RatingEvolutionChart userId={user.id} />
         </motion.section>
       )}
 
-      {/* Rating Evolution Chart */}
-      {user && <RatingEvolutionChart userId={user.id} />}
+      {/* 3 COLLAPSED RAILS */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="space-y-2"
+      >
+        {/* Rail 1: Rating & history */}
+        <button
+          onClick={() => navigate("/matches")}
+          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
+        >
+          <div className="text-[16px]">📊</div>
+          <div className="flex-1 text-left">
+            <div className="text-[13px] font-bold text-foreground">Rating & History</div>
+            <div className="text-[10px] text-muted-foreground mt-[2px]">
+              {profile?.total_matches || 0} matches · {profile?.wins || 0} W · {(profile?.total_matches || 0) - (profile?.wins || 0)} L
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+        </button>
+
+        {/* Rail 2: Payments & subscriptions */}
+        <button
+          onClick={() => navigate("/bookings")}
+          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
+        >
+          <div className="text-[16px]">💳</div>
+          <div className="flex-1 text-left">
+            <div className="text-[13px] font-bold text-foreground">Payments & Subscriptions</div>
+            <div className="text-[10px] text-muted-foreground mt-[2px]">
+              {(profile?.padel_park_points ?? 0).toLocaleString()} XP · Bookings
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+        </button>
+
+        {/* Rail 3: Notifications & privacy */}
+        <button
+          onClick={() => navigate("/profile/settings")}
+          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
+        >
+          <div className="text-[16px]">🔔</div>
+          <div className="flex-1 text-left">
+            <div className="text-[13px] font-bold text-foreground">Notifications & Privacy</div>
+            <div className="text-[10px] text-muted-foreground mt-[2px]">Match reminders on</div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
+        </button>
+      </motion.section>
 
       {/* Recent Matches */}
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
+        transition={{ delay: 0.2 }}
         className="space-y-4"
       >
         <div className="flex items-center justify-between px-1">
@@ -350,23 +303,22 @@ const Profile = () => {
         </div>
         <div className="space-y-3">
           {matchesLoading ? (
-            // Skeleton placeholders while loading
             [0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="bg-surface-container-high rounded-xl p-5 space-y-2 animate-pulse"
+                className="bg-card/30 rounded-[14px] p-4 space-y-2 animate-pulse"
               >
                 <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <div className="h-3 w-24 bg-surface-container-low rounded" />
-                    <div className="h-5 w-40 bg-surface-container-low rounded" />
+                  <div className="space-y-2 flex-1">
+                    <div className="h-3 w-32 bg-muted rounded" />
+                    <div className="h-4 w-40 bg-muted rounded" />
                   </div>
-                  <div className="h-6 w-12 bg-surface-container-low rounded" />
+                  <div className="h-5 w-16 bg-muted rounded" />
                 </div>
               </div>
             ))
           ) : recentMatches.length === 0 ? (
-            <div className="bg-surface-container-high rounded-xl p-6 text-center">
+            <div className="bg-card/30 rounded-[14px] p-6 text-center">
               <p className="text-sm text-muted-foreground font-medium">No matches played yet</p>
               <p className="text-xs text-muted-foreground mt-1">Join a match to see your history here</p>
             </div>
@@ -376,11 +328,11 @@ const Profile = () => {
                 key={match.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.05 }}
-                className="bg-surface-container-high rounded-xl p-5 space-y-2 active:scale-[0.98] transition-transform"
+                transition={{ delay: 0.25 + i * 0.05 }}
+                className="bg-card/30 rounded-[14px] p-4 space-y-2 active:scale-[0.98] transition-transform"
               >
                 <div className="flex justify-between items-start">
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-[10px] font-black px-2 py-0.5 rounded italic ${
@@ -392,22 +344,23 @@ const Profile = () => {
                         {match.result === "win" ? "WIN" : "LOSS"}
                       </span>
                       <span className="text-xs text-muted-foreground font-medium">
-                        {match.date} • {match.venue}
+                        {match.date}
                       </span>
                     </div>
-                    <h4 className="text-lg font-display font-bold tracking-tight">
+                    <h4 className="text-sm font-display font-bold tracking-tight">
                       vs {match.opponent}
                     </h4>
+                    <p className="text-[10px] text-muted-foreground">{match.venue}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <div
-                      className={`font-display font-black text-lg ${
+                      className={`font-display font-black text-sm ${
                         match.result === "win" ? "text-primary" : "text-destructive"
                       }`}
                     >
                       {match.ratingChange}
                     </div>
-                    <div className="text-[10px] text-muted-foreground font-bold">RATING</div>
+                    <div className="text-[9px] text-muted-foreground font-bold">RATING</div>
                   </div>
                 </div>
               </motion.div>
@@ -416,46 +369,18 @@ const Profile = () => {
         </div>
       </motion.section>
 
-
-      {/* Active Stakes */}
+      {/* Sign Out */}
       <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="pt-4 pb-4"
       >
         <button
-          onClick={() => navigate("/stakes")}
-          className="w-full bg-surface-container-low border border-border/30 rounded-xl p-4 flex items-center gap-3 hover:border-primary/30 transition-colors active:scale-[0.98]"
+          onClick={signOut}
+          className="text-[11px] text-muted-foreground/60 font-semibold active:scale-95 transition-transform"
         >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Timer className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-display font-bold text-sm">{activeStakeCount} active stake{activeStakeCount !== 1 ? "s" : ""}</p>
-            <p className="text-xs text-muted-foreground">{profile?.padel_park_points ?? 0} XP balance</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </button>
-      </motion.section>
-
-      {/* My Bookings */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <button
-          onClick={() => navigate("/bookings")}
-          className="w-full bg-surface-container-low border border-border/30 rounded-xl p-4 flex items-center gap-3 hover:border-primary/30 transition-colors active:scale-[0.98]"
-        >
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Building2 className="w-5 h-5 text-primary" />
-          </div>
-          <div className="flex-1 text-left">
-            <p className="font-display font-bold text-sm">My Bookings & Memberships</p>
-            <p className="text-xs text-muted-foreground">Courts, coaching & club plans</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          Sign out
         </button>
       </motion.section>
     </div>

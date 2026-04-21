@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Clock, Calendar, AlertTriangle, TrendingUp, ShieldAlert, LogOut, ListPlus, Zap, Send, WifiOff } from "lucide-react";
+import { AlertTriangle, ShieldAlert, LogOut, WifiOff } from "lucide-react";
 import CancelRegistrationModal from "@/components/CancelRegistrationModal";
 import { supabase } from "@/integrations/supabase/client";
 import { parseISO, addHours, isBefore, format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import StatusChip from "@/components/StatusChip";
 import BetModal from "@/components/BetModal";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 
@@ -350,83 +347,185 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     return valid.includes(s as typeof valid[number]) ? (s as typeof valid[number]) : "open";
   };
 
+  // Calculate time until match
+  const timeUntilMatch = (() => {
+    if (!match) return null;
+    try {
+      const now = new Date();
+      const matchStart = parseISO(`${match.match_date}T${match.match_time}`);
+      const diffMs = matchStart.getTime() - now.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `in ${hours}h ${minutes}m`;
+    } catch {
+      return null;
+    }
+  })();
+
+  const emptySlots = slots.filter((s) => !s).length;
+  const ctaState = (() => {
+    if (userWaitlistEntry && confirmedCount < (match?.max_players ?? 4)) {
+      return { type: "claim", label: `Claim my spot · ${emptySlots > 0 ? "200 XP" : "waitlist"}` };
+    }
+    if (userJoinRequest?.status === "pending") {
+      return { type: "pending", label: "Request pending…" };
+    }
+    if (!isAlreadyJoined && !userWaitlistEntry && !userJoinRequest && match?.status === "full") {
+      return { type: "waitlist", label: "Join waitlist" };
+    }
+    if (!isAlreadyJoined && !userWaitlistEntry && !userJoinRequest && !userLevelFits) {
+      return { type: "request", label: "Request to join" };
+    }
+    if (isAlreadyJoined) {
+      return { type: "joined", label: "You're in this match" };
+    }
+    if (match?.status === "full" || match?.status === "cancelled" || match?.status === "completed") {
+      return { type: "unavailable", label: "Match unavailable" };
+    }
+    return { type: "join", label: "Claim my spot · 200 XP" };
+  })();
+
   if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-card border-border/50 p-0">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : !match ? (
-          <div className="p-6 text-center text-muted-foreground">Match not found</div>
-        ) : (
-          <>
-            {/* Header */}
-            <div className="p-5 pb-0">
-              <DialogHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <DialogTitle className="font-display text-xl">{match.club}</DialogTitle>
-                    {match.court && <p className="text-sm text-muted-foreground mt-0.5">{match.court}</p>}
-                  </div>
-                  <StatusChip status={toStatusUI(match.status)} />
-                </div>
-              </DialogHeader>
+    <>
+      {/* Overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={() => onOpenChange(false)}
+          style={{ animation: "fadeIn 0.2s ease-out" }}
+        />
+      )}
 
-              <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" />{match.match_date}</span>
-                <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" />{match.match_time.slice(0, 5)}</span>
-              </div>
+      {/* Bottom Sheet */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-[28px] border-t border-border/[0.08]"
+        style={{
+          animation: "slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+          maxHeight: "85vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from {
+              transform: translateY(100%);
+            }
+            to {
+              transform: translateY(0);
+            }
+          }
+        `}</style>
 
-              <div className="flex gap-2 mt-3">
-                <span className="text-xs bg-muted px-2.5 py-1 rounded-full font-medium capitalize">{match.format}</span>
-                <span className="text-xs bg-muted px-2.5 py-1 rounded-full font-medium">Level {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</span>
-              </div>
+        {/* Grab Handle */}
+        <div className="flex justify-center pt-3 pb-0">
+          <div className="w-10 h-1 rounded-full bg-muted" />
+        </div>
 
-              {!isOnline && (
-                <div className="flex items-center gap-2 mt-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-medium">
-                  <WifiOff className="w-4 h-4 shrink-0" />
-                  {pendingCount > 0
-                    ? `You're offline · ${pendingCount} action${pendingCount !== 1 ? 's' : ''} queued — will retry on reconnect`
-                    : "You're offline · joining will be queued and retried automatically"}
-                </div>
-              )}
-
-              {!userLevelFits && (
-                <div className="flex items-center gap-2 mt-3 p-2.5 rounded-xl bg-destructive/10 text-destructive text-xs font-medium">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Your level doesn't fit the required range
-                </div>
-              )}
-
-              {cancellationWindowClosed && (
-                <div className="flex items-start gap-2.5 mt-3 p-3 rounded-xl bg-gold/10 border border-gold/20">
-                  <ShieldAlert className="w-4 h-4 shrink-0 text-gold mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-gold">Cancellation window closed</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      The deadline to cancel was {cancellationDeadlineFormatted}. Only an admin can remove you from this match now.
-                    </p>
-                  </div>
-                </div>
-              )}
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : !match ? (
+            <div className="p-6 text-center text-muted-foreground">Match not found</div>
+          ) : (
+            <>
+              {/* HEADER: Club Initials + Name + Details */}
+              <div className="px-5 pt-3">
+                <div className="flex items-start gap-3 mb-4">
+                  {/* Club Initials Block */}
+                  <div className="flex-shrink-0">
+                    <div className="w-[42px] h-[42px] rounded-xl bg-muted border border-primary/40 flex items-center justify-center">
+                      <span className="font-display font-black italic uppercase text-primary text-xs">
+                        {match.club.slice(0, 2)}
+                      </span>
+                    </div>
+                  </div>
 
-            {/* Padel Court Visual */}
-            <div className="px-5 py-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-3 text-center">
-                {isAlreadyJoined ? "You're already in this match" : "Tap an empty spot to join"}
-              </p>
-              <div className="relative mx-auto" style={{ maxWidth: 320 }}>
-                {/* Court background */}
-                <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
-                  {/* Net line */}
-                  <div className="relative">
+                  {/* Club Name & Details */}
+                  <div className="flex-1">
+                    <h2 className="font-display text-[15px] font-black italic uppercase text-foreground">
+                      {match.club}
+                    </h2>
+                    <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground font-semibold uppercase tracking-[0.04em] mt-1">
+                      {match.court && <span>{match.court}</span>}
+                      <span>{match.format} • Level {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TIME + SPOTS CALLOUT */}
+                <div className="flex items-start justify-between border-b border-border/[0.08] pb-3 mb-3">
+                  {/* Time */}
+                  <div>
+                    <div className="font-display text-[32px] font-black italic text-foreground leading-[0.95]">
+                      {match.match_time.slice(0, 5)}
+                    </div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                      {timeUntilMatch}
+                    </div>
+                  </div>
+
+                  {/* Spots */}
+                  <div className="text-right">
+                    <div className="font-display text-[18px] font-black italic text-amber-400">
+                      {emptySlots} spot{emptySlots !== 1 ? "s" : ""}
+                    </div>
+                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                      left · 200 XP
+                    </div>
+                  </div>
+                </div>
+
+                {/* ALERTS */}
+                {!isOnline && (
+                  <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-medium">
+                    <WifiOff className="w-4 h-4 shrink-0" />
+                    {pendingCount > 0
+                      ? `Offline · ${pendingCount} action${pendingCount !== 1 ? "s" : ""} queued`
+                      : "Offline · will retry on reconnect"}
+                  </div>
+                )}
+
+                {!userLevelFits && (
+                  <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-destructive/10 text-destructive text-xs font-medium">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Your level doesn't fit the required range
+                  </div>
+                )}
+
+                {cancellationWindowClosed && (
+                  <div className="flex items-start gap-2.5 mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-amber-500">Cancellation window closed</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Deadline was {cancellationDeadlineFormatted}. Only an admin can remove you now.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* COURT VISUAL */}
+              <div className="px-5 py-4">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-center text-muted-foreground mb-2">
+                  {isAlreadyJoined ? "You're already in" : "Tap an empty spot"}
+                </p>
+
+                <div className="relative mx-auto" style={{ maxWidth: 320 }}>
+                  {/* Court background */}
+                  <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 overflow-hidden">
                     {/* Team A side */}
                     <div className="p-4 pb-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium text-center mb-2">Team A</p>
                       <div className="grid grid-cols-2 gap-3">
                         {slots.slice(0, 2).map((slot, i) => (
                           <CourtSlot
@@ -450,7 +549,6 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
 
                     {/* Team B side */}
                     <div className="p-4 pt-2">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium text-center mb-2">Team B</p>
                       <div className="grid grid-cols-2 gap-3">
                         {slots.slice(2, 4).map((slot, i) => (
                           <CourtSlot
@@ -465,91 +563,87 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Court lines overlay */}
-                <div className="absolute inset-0 pointer-events-none rounded-2xl">
-                  {/* Center line */}
-                  <div className="absolute left-1/2 top-4 bottom-4 w-px bg-primary/15" />
+                  {/* Court center line overlay */}
+                  <div className="absolute inset-0 pointer-events-none rounded-2xl">
+                    <div className="absolute left-1/2 top-4 bottom-4 w-px bg-primary/15" />
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
+          )}
+        </div>
 
-            {/* Footer */}
-            <div className="px-5 pb-5 space-y-2">
+        {/* FOOTER: Actions */}
+        {!loading && match && (
+          <div className="px-5 pb-5 pt-3 border-t border-border/[0.08] space-y-3">
+            {/* PRIMARY CTA - One button that adapts */}
+            <button
+              onClick={() => {
+                if (ctaState.type === "claim") handleClaimSpot();
+                else if (ctaState.type === "waitlist") handleJoinWaitlist();
+                else if (ctaState.type === "request") handleRequestToJoin();
+                else if (ctaState.type === "join") {
+                  const firstEmptySlot = slots.findIndex((s) => !s);
+                  if (firstEmptySlot !== -1) handleJoinSlot(firstEmptySlot);
+                }
+              }}
+              disabled={joining || ctaState.type === "pending" || ctaState.type === "unavailable" || ctaState.type === "joined" || isAlreadyJoined}
+              className={`w-full h-[52px] rounded-[16px] font-display text-[14px] font-black italic uppercase tracking-[0.04em] transition-all ${
+                ctaState.type === "joined" || ctaState.type === "unavailable" || isAlreadyJoined
+                  ? "bg-muted text-muted-foreground cursor-not-allowed"
+                  : ctaState.type === "pending"
+                  ? "bg-amber-500/20 text-amber-500 cursor-wait"
+                  : `bg-primary text-primary-foreground shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:shadow-[0_8px_32px_hsl(var(--primary)/0.4)]`
+              }`}
+            >
+              {joining && ctaState.type !== "pending" ? "Loading…" : ctaState.label}
+            </button>
 
-              {/* Claim open spot from waitlist */}
-              {userWaitlistEntry && confirmedCount < (match.max_players ?? 4) && (
-                <Button onClick={handleClaimSpot} disabled={joining}
-                  className="w-full h-12 rounded-xl font-semibold gap-2 bg-primary text-primary-foreground">
-                  <Zap className="w-4 h-4" />
-                  {joining ? "Claiming..." : "Claim Your Spot! ⚡"}
-                </Button>
-              )}
-
-              {/* Join waitlist when full */}
-              {!isAlreadyJoined && !userWaitlistEntry && !userJoinRequest && match.status === "full" && (
-                <Button onClick={handleJoinWaitlist} disabled={joining} variant="outline"
-                  className="w-full h-11 rounded-xl font-semibold gap-2 border-primary/40 text-primary hover:bg-primary/10">
-                  <ListPlus className="w-4 h-4" />
-                  {joining ? "Joining..." : "Join Waitlist"}
-                </Button>
-              )}
-
-              {/* Request to join outside skill range */}
-              {!isAlreadyJoined && !userWaitlistEntry && !userJoinRequest && !userLevelFits &&
-               match.status !== "full" && match.status !== "cancelled" && match.status !== "completed" && (
-                <Button onClick={handleRequestToJoin} disabled={joining} variant="outline"
-                  className="w-full h-11 rounded-xl font-semibold gap-2 border-amber-500/40 text-amber-500 hover:bg-amber-500/10">
-                  <Send className="w-4 h-4" />
-                  {joining ? "Sending..." : "Request to Join (Outside Range)"}
-                </Button>
-              )}
-
-              {/* Pending approval status */}
-              {userJoinRequest && userJoinRequest.status === "pending" && (
-                <div className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 text-sm font-medium">
-                  <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
-                  Waiting for players to approve your request…
-                </div>
-              )}
-
-              {canCancel && (
-                <Button variant="outline" onClick={() => setShowCancelModal(true)}
-                  className="w-full h-11 rounded-xl font-semibold gap-2 border-destructive/30 text-destructive hover:bg-destructive/10">
-                  <LogOut className="w-4 h-4" />
-                  Cancel My Spot
-                </Button>
-              )}
-              <Button onClick={() => setShowBetModal(true)} variant="outline"
-                className="w-full h-11 rounded-xl font-semibold gap-2 border-primary/30 text-primary hover:bg-primary/10">
-                <TrendingUp className="w-4 h-4" />
-                Bet Points
-              </Button>
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full h-11 rounded-xl">
-                Close
-              </Button>
-            </div>
-
-            <BetModal matchId={matchId} open={showBetModal} onOpenChange={setShowBetModal} />
-            {match && (
-              <CancelRegistrationModal
-                open={showCancelModal}
-                onOpenChange={setShowCancelModal}
-                matchId={match.id}
-                matchClub={match.club}
-                matchDate={match.match_date}
-                matchTime={match.match_time}
-                onCancelled={() => {
-                  onOpenChange(false);
-                  navigate("/matches");
-                }}
-              />
+            {/* BET LINK - Secondary, quiet */}
+            {true && (
+              <div className="text-center text-[11px] text-muted-foreground font-semibold">
+                Also betting?{" "}
+                <button
+                  onClick={() => setShowBetModal(true)}
+                  className="text-primary font-bold hover:underline"
+                >
+                  Add a bet →
+                </button>
+              </div>
             )}
-          </>
+
+            {/* CANCEL SPOT - Secondary, only if joined and can cancel */}
+            {canCancel && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="w-full px-4 py-2 rounded-[12px] text-sm font-semibold text-destructive border border-destructive/30 hover:bg-destructive/5 transition-colors"
+              >
+                <LogOut className="inline-block w-3.5 h-3.5 mr-1.5 align-text-bottom" />
+                Cancel my spot
+              </button>
+            )}
+          </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      {/* Modals */}
+      <BetModal matchId={matchId} open={showBetModal} onOpenChange={setShowBetModal} />
+      {match && (
+        <CancelRegistrationModal
+          open={showCancelModal}
+          onOpenChange={setShowCancelModal}
+          matchId={match.id}
+          matchClub={match.club}
+          matchDate={match.match_date}
+          matchTime={match.match_time}
+          onCancelled={() => {
+            onOpenChange(false);
+            navigate("/matches");
+          }}
+        />
+      )}
+    </>
   );
 };
 
@@ -574,19 +668,23 @@ const CourtSlot = ({
         transition={{ delay: index * 0.1 }}
         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-colors ${
           isCurrentUser
-            ? "bg-primary/20 border-primary/40"
-            : "bg-card border-border/50"
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-card/60 border-border/20"
         }`}
       >
-        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+          isCurrentUser
+            ? "bg-primary-foreground/20 text-primary-foreground"
+            : "bg-muted"
+        }`}>
           {slot.display_name?.[0]?.toUpperCase() || "?"}
         </div>
         <span className="text-xs font-semibold truncate max-w-full">{slot.display_name || "Player"}</span>
         {slot.padel_level != null && (
-          <span className="text-[10px] text-muted-foreground">Lvl {slot.padel_level.toFixed(1)}</span>
+          <span className="text-[10px] opacity-80">Lvl {slot.padel_level.toFixed(1)}</span>
         )}
         {isCurrentUser && (
-          <span className="text-[10px] text-primary font-semibold">You</span>
+          <span className="text-[10px] font-semibold">You</span>
         )}
       </motion.div>
     );
@@ -598,19 +696,19 @@ const CourtSlot = ({
       whileTap={canJoin ? { scale: 0.95 } : {}}
       onClick={canJoin ? onJoin : undefined}
       disabled={!canJoin}
-      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 border-dashed transition-all min-h-[100px] ${
+      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 transition-all min-h-[100px] ${
         canJoin
-          ? "border-primary/50 bg-primary/5 hover:bg-primary/10 hover:border-primary cursor-pointer"
-          : "border-border/30 bg-muted/30 cursor-not-allowed opacity-50"
+          ? "border-2 border-primary bg-primary/10 hover:shadow-[0_0_18px_hsl(var(--primary)/0.3)] cursor-pointer"
+          : "border-2 border-border/20 bg-muted/30 cursor-not-allowed opacity-50"
       }`}
     >
-      <div className={`w-10 h-10 rounded-full border-2 border-dashed flex items-center justify-center ${
-        canJoin ? "border-primary/50 text-primary" : "border-border/30 text-muted-foreground"
+      <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center ${
+        canJoin ? "border-primary text-primary" : "border-border/30 text-muted-foreground"
       }`}>
-        <span className="text-lg">+</span>
+        <span className="text-lg font-bold">+</span>
       </div>
       <span className={`text-xs font-medium ${canJoin ? "text-primary" : "text-muted-foreground"}`}>
-        {canJoin ? "Join here" : "Empty"}
+        {canJoin ? "Tap to join" : "Empty"}
       </span>
     </motion.button>
   );

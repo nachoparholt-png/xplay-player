@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, Clock, MapPin } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { format } from "date-fns";
+import { format, isToday, isTomorrow } from "date-fns";
 import { formatInClubTz } from "@/utils/dateTimezone";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type BookingsTab = "upcoming" | "past" | "memberships";
 
@@ -153,31 +154,74 @@ const Bookings = () => {
     return e.status !== "confirmed" || s == null || new Date(s) < now;
   });
 
-  const tabs: { key: BookingsTab; label: string }[] = [
-    { key: "upcoming", label: "Upcoming" },
-    { key: "past", label: "Past" },
-    { key: "memberships", label: "Memberships" },
+  // Group bookings by date
+  const groupBookingsByDate = (items: (CourtBookingRow | CoachingEnrollmentRow)[], type: 'court' | 'coaching') => {
+    const grouped: Record<string, (CourtBookingRow | CoachingEnrollmentRow)[]> = {};
+    items.forEach((item) => {
+      const dateStr = type === 'court'
+        ? item.court_slots?.starts_at
+        : item.coaching_sessions?.starts_at;
+      if (!dateStr) return;
+      const date = new Date(dateStr).toISOString().split('T')[0];
+      if (!grouped[date]) grouped[date] = [];
+      grouped[date].push(item);
+    });
+    return Object.entries(grouped).sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime());
+  };
+
+  const getDateLabel = (dateStr: string): { label: string; subtitle: string } => {
+    const d = new Date(dateStr);
+    if (isToday(d)) {
+      return { label: "Today", subtitle: format(d, "d MMM") };
+    }
+    if (isTomorrow(d)) {
+      return { label: "Tomorrow", subtitle: format(d, "d MMM") };
+    }
+    return { label: format(d, "EEE d"), subtitle: format(d, "MMM yyyy") };
+  };
+
+  const getItemType = (item: CourtBookingRow | CoachingEnrollmentRow): { badge: string; bgClass: string; textClass: string } => {
+    if ('court_slots' in item) {
+      return { badge: "CRT", bgClass: "bg-primary/15", textClass: "text-primary" };
+    }
+    return { badge: "COA", bgClass: "bg-purple-500/25", textClass: "text-purple-300" };
+  };
+
+  const tabs: { key: BookingsTab; label: string; count: number }[] = [
+    { key: "upcoming", label: "Upcoming", count: upcomingBookings.length + upcomingCoaching.length },
+    { key: "past", label: "Past", count: pastBookings.length + pastCoaching.length },
+    { key: "memberships", label: "Plans", count: memberships.length },
   ];
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div className="flex items-center gap-3">
+    <div className="pb-8">
+      {/* Header */}
+      <div className="px-4 pt-4 pb-5 flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="p-2 active:scale-95 transition-transform">
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
-        <h1 className="font-display font-bold text-lg text-foreground">My Bookings</h1>
+        <h1 className="font-display text-[22px] font-black italic uppercase text-foreground">Schedule</h1>
       </div>
 
-      <div className="flex gap-1 bg-card rounded-xl p-1">
+      {/* 3-Tab Selector */}
+      <div className="flex gap-[6px] mx-4 mb-5">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
-              tab === t.key ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={cn(
+              "flex-1 p-[10px_8px] rounded-[14px] text-center cursor-pointer transition-colors",
+              tab === t.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-card border border-border/[0.07] text-foreground"
+            )}
           >
-            {t.label}
+            <div className="font-display text-[18px] font-black italic leading-[0.95]">
+              {t.count}
+            </div>
+            <div className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-70">
+              {t.label}
+            </div>
           </button>
         ))}
       </div>
@@ -189,7 +233,7 @@ const Bookings = () => {
       ) : (
         <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
           {tab === "upcoming" && (
-            <div className="space-y-3">
+            <div>
               {upcomingBookings.length === 0 && upcomingCoaching.length === 0 ? (
                 <div className="flex flex-col items-center gap-4 py-12 text-center">
                   <p className="text-muted-foreground text-sm">No upcoming bookings</p>
@@ -202,115 +246,184 @@ const Bookings = () => {
                 </div>
               ) : (
                 <>
-                  {upcomingBookings.map((b) => (
-                    <div key={b.id} className="bg-card rounded-2xl border border-border/50 p-4 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-display font-bold text-sm text-foreground">
-                            {b.court_slots?.courts?.nickname || b.court_slots?.courts?.name || "Court"}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {b.court_slots?.courts?.courts_club?.club_name || ""}
-                          </p>
+                  {/* Group upcoming courts and coaching together */}
+                  {groupBookingsByDate([...upcomingBookings, ...upcomingCoaching], 'court').map(([dateStr, items]) => {
+                    const dateLabel = getDateLabel(dateStr);
+                    return (
+                      <div key={dateStr}>
+                        {/* Day Header */}
+                        <div className="flex items-baseline gap-[10px] px-[20px] py-[14px]">
+                          <h3 className="font-display text-[18px] font-black italic uppercase text-foreground">
+                            {dateLabel.label}
+                          </h3>
+                          <span className="text-[11px] text-muted-foreground/40 font-semibold">
+                            {dateLabel.subtitle}
+                          </span>
+                          <div className="ml-auto text-[10px] text-primary font-bold">
+                            ● {items.length} event{items.length !== 1 ? 's' : ''}
+                          </div>
                         </div>
-                        <span className="text-[9px] font-bold uppercase bg-primary/20 text-primary px-2 py-0.5 rounded-full">Court</span>
+
+                        {/* Timeline items */}
+                        {items.map((item) => {
+                          const isCourtBooking = 'court_slots' in item;
+                          const typeInfo = getItemType(item);
+                          const title = isCourtBooking
+                            ? (item as CourtBookingRow).court_slots?.courts?.nickname || (item as CourtBookingRow).court_slots?.courts?.name || "Court"
+                            : (item as CoachingEnrollmentRow).coaching_sessions?.title || "Coaching";
+                          const clubName = isCourtBooking
+                            ? (item as CourtBookingRow).court_slots?.courts?.courts_club?.club_name || ""
+                            : (item as CoachingEnrollmentRow).coaching_sessions?.clubs?.club_name || "";
+                          const timeStr = isCourtBooking
+                            ? formatInClubTz((item as CourtBookingRow).court_slots?.starts_at, "HH:mm", (item as CourtBookingRow).court_slots?.courts?.courts_club?.timezone)
+                            : formatInClubTz((item as CoachingEnrollmentRow).coaching_sessions?.starts_at, "HH:mm", (item as CoachingEnrollmentRow).coaching_sessions?.clubs?.timezone);
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex gap-[12px] px-[16px] py-[12px] border-b border-border/[0.05] group cursor-pointer hover:bg-muted/40 transition-colors"
+                              onClick={() => {
+                                if (isCourtBooking && (item as CourtBookingRow).status === "confirmed") {
+                                  handleCancelBooking(item.id);
+                                }
+                              }}
+                            >
+                              {/* Type badge */}
+                              <div className={cn(
+                                "w-9 h-9 rounded-[12px] flex items-center justify-center font-display text-[10px] font-black italic uppercase tracking-[0.05em] shrink-0",
+                                typeInfo.bgClass,
+                                typeInfo.textClass
+                              )}>
+                                {typeInfo.badge}
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-bold text-foreground truncate">
+                                  {title}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground/50 mt-[2px]">
+                                  {clubName} · {timeStr}
+                                </p>
+                              </div>
+
+                              {/* Chevron */}
+                              <ChevronRight className="w-[18px] h-[18px] text-muted-foreground/30 self-center shrink-0" />
+                            </div>
+                          );
+                        })}
                       </div>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatInClubTz(b.court_slots?.starts_at, "EEE d MMM, HH:mm", b.court_slots?.courts?.courts_club?.timezone)}
-                      </p>
-                      <button
-                        onClick={() => handleCancelBooking(b.id)}
-                        className="text-xs text-destructive font-bold"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ))}
-                  {upcomingCoaching.map((e) => (
-                    <div key={e.id} className="bg-card rounded-2xl border border-border/50 p-4 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-display font-bold text-sm text-foreground">{e.coaching_sessions?.title}</p>
-                          <p className="text-[10px] text-muted-foreground">{e.coaching_sessions?.clubs?.club_name}</p>
-                        </div>
-                        <span className="text-[9px] font-bold uppercase bg-accent/20 text-accent px-2 py-0.5 rounded-full">Coaching</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {formatInClubTz(e.coaching_sessions?.starts_at, "EEE d MMM, HH:mm", e.coaching_sessions?.clubs?.timezone)}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
             </div>
           )}
 
           {tab === "past" && (
-            <div className="space-y-3">
+            <div>
               {pastBookings.length === 0 && pastCoaching.length === 0 ? (
                 <p className="text-center text-muted-foreground text-sm py-8">No past bookings</p>
               ) : (
                 <>
-                  {pastBookings.map((b) => (
-                    <div key={b.id} className="bg-card rounded-2xl border border-border/50 p-4 opacity-60">
-                      <p className="font-display font-bold text-sm text-foreground">{b.court_slots?.courts?.nickname || b.court_slots?.courts?.name || "Court"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatInClubTz(b.court_slots?.starts_at, "EEE d MMM, HH:mm", b.court_slots?.courts?.courts_club?.timezone)} · {b.status}
-                      </p>
-                    </div>
-                  ))}
-                  {pastCoaching.map((e) => (
-                    <div key={e.id} className="bg-card rounded-2xl border border-border/50 p-4 opacity-60">
-                      <p className="font-display font-bold text-sm text-foreground">{e.coaching_sessions?.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatInClubTz(e.coaching_sessions?.starts_at, "EEE d MMM, HH:mm", e.coaching_sessions?.clubs?.timezone)} · {e.status}
-                      </p>
-                    </div>
-                  ))}
+                  {groupBookingsByDate([...pastBookings, ...pastCoaching], 'court').map(([dateStr, items]) => {
+                    const dateLabel = getDateLabel(dateStr);
+                    return (
+                      <div key={dateStr}>
+                        {/* Day Header */}
+                        <div className="flex items-baseline gap-[10px] px-[20px] py-[14px]">
+                          <h3 className="font-display text-[18px] font-black italic uppercase text-foreground">
+                            {dateLabel.label}
+                          </h3>
+                          <span className="text-[11px] text-muted-foreground/40 font-semibold">
+                            {dateLabel.subtitle}
+                          </span>
+                          <div className="ml-auto text-[10px] text-primary font-bold">
+                            ● {items.length} event{items.length !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+
+                        {/* Timeline items */}
+                        {items.map((item) => {
+                          const isCourtBooking = 'court_slots' in item;
+                          const typeInfo = getItemType(item);
+                          const title = isCourtBooking
+                            ? (item as CourtBookingRow).court_slots?.courts?.nickname || (item as CourtBookingRow).court_slots?.courts?.name || "Court"
+                            : (item as CoachingEnrollmentRow).coaching_sessions?.title || "Coaching";
+                          const clubName = isCourtBooking
+                            ? (item as CourtBookingRow).court_slots?.courts?.courts_club?.club_name || ""
+                            : (item as CoachingEnrollmentRow).coaching_sessions?.clubs?.club_name || "";
+                          const timeStr = isCourtBooking
+                            ? formatInClubTz((item as CourtBookingRow).court_slots?.starts_at, "HH:mm", (item as CourtBookingRow).court_slots?.courts?.courts_club?.timezone)
+                            : formatInClubTz((item as CoachingEnrollmentRow).coaching_sessions?.starts_at, "HH:mm", (item as CoachingEnrollmentRow).coaching_sessions?.clubs?.timezone);
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="flex gap-[12px] px-[16px] py-[12px] border-b border-border/[0.05] opacity-60"
+                            >
+                              {/* Type badge */}
+                              <div className={cn(
+                                "w-9 h-9 rounded-[12px] flex items-center justify-center font-display text-[10px] font-black italic uppercase tracking-[0.05em] shrink-0",
+                                typeInfo.bgClass,
+                                typeInfo.textClass
+                              )}>
+                                {typeInfo.badge}
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] font-bold text-foreground truncate">
+                                  {title}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground/50 mt-[2px]">
+                                  {clubName} · {timeStr}
+                                </p>
+                              </div>
+
+                              {/* Chevron */}
+                              <ChevronRight className="w-[18px] h-[18px] text-muted-foreground/30 self-center shrink-0" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </>
               )}
             </div>
           )}
 
           {tab === "memberships" && (
-            <div className="space-y-3">
+            <div>
               {memberships.length === 0 ? (
                 <p className="text-center text-muted-foreground text-sm py-8">No active memberships</p>
               ) : (
                 memberships.map((m) => {
                   const tier = m.membership_tiers;
                   return (
-                    <div key={m.id} className="bg-card rounded-2xl border border-primary/30 p-4 space-y-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-display font-bold text-sm text-foreground">{m.clubs?.club_name}</p>
-                          <p className="text-xs text-primary font-semibold">{tier?.name || m.role}</p>
-                        </div>
-                        <span className="text-[9px] font-bold uppercase bg-primary/20 text-primary px-2 py-0.5 rounded-full">Active</span>
+                    <div
+                      key={m.id}
+                      className="flex gap-[12px] px-[16px] py-[12px] border-b border-border/[0.05] group cursor-pointer hover:bg-muted/40 transition-colors"
+                      onClick={() => handleCancelMembership(m.id)}
+                    >
+                      {/* Type badge */}
+                      <div className="w-9 h-9 rounded-[12px] flex items-center justify-center font-display text-[10px] font-black italic uppercase tracking-[0.05em] shrink-0 bg-amber-500/15 text-amber-400">
+                        MBR
                       </div>
-                      {tier && (
-                        <div className="space-y-1 text-[11px] text-muted-foreground">
-                          {tier.price_cents > 0 && (
-                            <p>£{(tier.price_cents / 100).toFixed(2)}/{tier.billing_period === "annual" ? "year" : "month"}</p>
-                          )}
-                          {tier.court_discount > 0 && <p>✓ {tier.court_discount}% off courts</p>}
-                          {tier.coaching_discount > 0 && <p>✓ {tier.coaching_discount}% off coaching</p>}
-                          {tier.advance_booking_days > 0 && <p>✓ Book {tier.advance_booking_days} days ahead</p>}
-                        </div>
-                      )}
-                      {m.expires_at && (
-                        <p className="text-xs text-muted-foreground">
-                          Renews: {format(new Date(m.expires_at), "d MMM yyyy")}
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-bold text-foreground">
+                          {m.clubs?.club_name}
                         </p>
-                      )}
-                      <button
-                        onClick={() => handleCancelMembership(m.id)}
-                        className="text-xs text-destructive font-bold"
-                      >
-                        Cancel Membership
-                      </button>
+                        <p className="text-[10px] text-muted-foreground/50 mt-[2px]">
+                          {tier?.name || m.role}{tier?.price_cents ? ` · £${(tier.price_cents / 100).toFixed(2)}` : ""}
+                        </p>
+                      </div>
+
+                      {/* Chevron */}
+                      <ChevronRight className="w-[18px] h-[18px] text-muted-foreground/30 self-center shrink-0" />
                     </div>
                   );
                 })

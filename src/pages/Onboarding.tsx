@@ -77,11 +77,11 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         <Sparkles className="w-10 h-10 text-primary" />
       </motion.div>
 
-      <h1 className="font-display text-3xl font-bold text-foreground mb-4">
+      <h1 className="font-display text-[32px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
         Welcome to<br />XPLAY
       </h1>
 
-      <p className="text-muted-foreground text-sm leading-relaxed max-w-xs mb-2">
+      <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs mb-3">
         XPLAY is a community where players can create matches, join games, chat with other players, and compete using XPLAY Points (XP) and stakes.
       </p>
 
@@ -106,55 +106,73 @@ function QuizStep({
   selectedAnswer: number | null;
 }) {
   const q = QUESTIONS[questionIndex];
+  const letters = ["A", "B", "C", "D", "E"];
+
   return (
     <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" key={`q-${questionIndex}`} className="px-6 py-8 min-h-[80vh] flex flex-col">
-      {/* Progress */}
-      <div className="flex gap-1.5 mb-8">
-        {QUESTIONS.map((_, i) => (
-          <div
-            key={i}
-            className={`h-1 rounded-full flex-1 transition-all duration-300 ${
-              i < questionIndex ? "bg-primary" : i === questionIndex ? "bg-primary animate-pulse" : "bg-muted"
-            }`}
-          />
-        ))}
+      {/* STEP INDICATOR */}
+      <div className="flex items-end justify-between mb-10">
+        <div className="flex items-baseline gap-1">
+          <div className="font-display text-[40px] font-black italic text-primary leading-[0.9]">
+            {questionIndex + 1}
+          </div>
+          <div className="text-[18px] font-bold text-muted-foreground/35 font-display leading-[0.9]">
+            / 0{QUESTIONS.length}
+          </div>
+        </div>
+        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em]">
+          Level Check
+        </div>
       </div>
 
-      <p className="text-[10px] uppercase tracking-widest font-bold text-primary mb-2">
-        Question {questionIndex + 1} of {QUESTIONS.length}
-      </p>
-
-      <h2 className="font-display text-xl font-bold text-foreground mb-6 leading-snug">
+      {/* QUESTION DISPLAY */}
+      <h2 className="font-display text-[28px] font-black italic uppercase text-foreground leading-[0.95] tracking-[-0.02em] mb-[10px]">
         {q.question}
       </h2>
+      <p className="text-[12px] text-muted-foreground leading-[1.5] mb-6">
+        {/* Optional subtitle - customize per question if needed */}
+      </p>
 
-      <div className="space-y-2.5 flex-1">
-        {q.options.map((opt) => {
+      {/* ANSWER OPTIONS - A/B/C/D/E lettered */}
+      <div className="flex-1 space-y-2">
+        {q.options.map((opt, idx) => {
           const isSelected = selectedAnswer === opt.value;
+          const letter = letters[idx];
           return (
             <motion.button
               key={opt.value}
               whileTap={{ scale: 0.97 }}
               onClick={() => onAnswer(opt.value)}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+              className={`w-full text-left p-[14px_16px] rounded-[16px] mb-2 flex items-center gap-3 border transition-all duration-200 ${
                 isSelected
-                  ? "border-primary bg-primary/10 shadow-md shadow-primary/10"
-                  : "border-border bg-card hover:border-muted-foreground/30"
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card/40 text-foreground border-border/[0.07]"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
-                }`}>
-                  {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
-                </div>
-                <span className={`text-sm font-medium ${isSelected ? "text-foreground" : "text-muted-foreground"}`}>
-                  {opt.label}
-                </span>
+              <div className={`font-display text-[18px] font-black italic opacity-35 w-[22px] flex-shrink-0 ${
+                isSelected ? "opacity-100 text-primary-foreground" : ""
+              }`}>
+                {letter}
               </div>
+              <span className="text-[14px] font-bold flex-1">
+                {opt.label}
+              </span>
+              {isSelected && (
+                <div className="text-[14px] font-black flex-shrink-0">✓</div>
+              )}
             </motion.button>
           );
         })}
+      </div>
+
+      {/* BOTTOM NAV */}
+      <div className="flex items-center gap-4 mt-8 justify-between">
+        <button className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform">
+          ← Back
+        </button>
+        <button className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform">
+          Skip for now
+        </button>
       </div>
     </motion.div>
   );
@@ -186,11 +204,11 @@ function LevelStep({
         <BarChart3 className="w-8 h-8 text-primary" />
       </div>
 
-      <h2 className="font-display text-2xl font-bold text-foreground mb-2 text-center">
+      <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-3 text-center leading-[0.95]">
         Recommended Level
       </h2>
 
-      <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
+      <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
         Based on your answers, we recommend starting at:
       </p>
 
@@ -260,15 +278,15 @@ function CourtSideStep({
         <Trophy className="w-8 h-8 text-primary" />
       </div>
 
-      <h2 className="font-display text-2xl font-bold text-foreground mb-2 text-center">
+      <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-3 text-center leading-[0.95]">
         Preferred Court Side
       </h2>
 
-      <p className="text-sm text-muted-foreground text-center mb-8 max-w-xs">
+      <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
         Which side of the court do you usually play on?
       </p>
 
-      <div className="w-full max-w-xs space-y-2.5 mb-8">
+      <div className="w-full max-w-xs space-y-2 mb-8">
         {sides.map((s) => {
           const isSelected = selectedSide === s.value;
           return (
@@ -276,24 +294,24 @@ function CourtSideStep({
               key={s.value}
               whileTap={{ scale: 0.97 }}
               onClick={() => onSelect(s.value)}
-              className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+              className={`w-full text-left p-[14px_16px] rounded-[16px] border transition-all duration-200 flex items-center gap-3 ${
                 isSelected
-                  ? "border-primary bg-primary/10 shadow-md shadow-primary/10"
-                  : "border-border bg-card hover:border-muted-foreground/30"
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card/40 text-foreground border-border/[0.07]"
               }`}
             >
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
-                }`}>
-                  {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
-                </div>
-                <div>
-                  <span className={`text-sm font-medium block ${isSelected ? "text-foreground" : "text-muted-foreground"}`}>
-                    {s.label}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground/70">{s.desc}</span>
-                </div>
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                isSelected ? "border-primary-foreground bg-primary-foreground" : "border-muted-foreground/30"
+              }`}>
+                {isSelected && <Check className="w-3 h-3 text-primary" />}
+              </div>
+              <div className="flex-1">
+                <span className={`text-[14px] font-bold block ${isSelected ? "text-primary-foreground" : "text-foreground"}`}>
+                  {s.label}
+                </span>
+                <span className={`text-[11px] ${isSelected ? "text-primary-foreground/70" : "text-muted-foreground/70"}`}>
+                  {s.desc}
+                </span>
               </div>
             </motion.button>
           );
@@ -330,27 +348,27 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
         <Trophy className="w-8 h-8 text-primary" />
       </motion.div>
 
-      <h2 className="font-display text-2xl font-bold text-foreground mb-3">
+      <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
         Welcome to<br />XPLAY
       </h2>
 
-      <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-8">
+      <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs mb-8">
         XPLAY helps players connect and compete. The more you play and grow the community, the more XPLAY Points (XP) you earn.
       </p>
 
-      <div className="w-full max-w-xs space-y-3 mb-10">
+      <div className="w-full max-w-xs space-y-2.5 mb-10">
         {features.map((f, i) => (
           <motion.div
             key={f.label}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 + i * 0.1 }}
-            className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/50 text-left"
+            className="flex items-center gap-3 p-[12px_14px] rounded-[14px] bg-card/30 border border-border/[0.07] text-left"
           >
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <f.icon className="w-4.5 h-4.5 text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <f.icon className="w-4 h-4 text-primary" />
             </div>
-            <span className="text-sm font-medium text-foreground">{f.label}</span>
+            <span className="text-[13px] font-bold text-foreground">{f.label}</span>
           </motion.div>
         ))}
       </div>
@@ -400,13 +418,13 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="space-y-3 mb-10"
+        className="space-y-4 mb-10"
       >
-        <h2 className="font-display text-2xl font-bold">Welcome Bonus!</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">
+        <h2 className="font-display text-[28px] font-black italic uppercase leading-[0.95]">Welcome Bonus!</h2>
+        <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
           50 XPLAY Points have been added to your wallet. Use them to stake on matches and win more.
         </p>
-        <p className="text-xs text-muted-foreground/60">
+        <p className="text-[11px] text-muted-foreground/60">
           1 XP = £0.10 · Stake smart, win big.
         </p>
       </motion.div>

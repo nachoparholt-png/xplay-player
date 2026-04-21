@@ -1,12 +1,13 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
-import { Plus, Upload, Search, Users, Clock as ClockIcon, Building2 } from "lucide-react";
+import { Upload, Clock as ClockIcon, Building2, Users, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 import MatchCard from "@/components/MatchCard";
 import CreateMatchModal from "@/components/CreateMatchModal";
@@ -190,27 +191,8 @@ const Matches = () => {
   const [showCreateMatch, setShowCreateMatch] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [highlightMatchId, setHighlightMatchId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [fabExpanded, setFabExpanded] = useState(true);
   const [topTab, setTopTab] = useState<TopTab>("matches");
   const [activeBetMatch, setActiveBetMatch] = useState<EnrichedMatch | null>(null);
-  const lastScrollY = useRef(0);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentY = window.scrollY;
-      if (currentY < 10) {
-        setFabExpanded(true);
-      } else if (currentY > lastScrollY.current + 5) {
-        setFabExpanded(false);
-      } else if (currentY < lastScrollY.current - 5) {
-        setFabExpanded(true);
-      }
-      lastScrollY.current = currentY;
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const enrichMatches = useCallback(async (matchData: MatchRow[]): Promise<EnrichedMatch[]> => {
     if (!matchData.length || !user) return [];
@@ -407,269 +389,360 @@ const Matches = () => {
 
   const emptyState = TAB_EMPTY_STATES[tab];
   const pendingIds = new Set(pendingMatches.map((m) => m.id));
-  let displayedMatches = matches.filter((m) => !pendingIds.has(m.id));
+  const displayedMatches = matches.filter((m) => !pendingIds.has(m.id));
 
-  // Filter by search
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    displayedMatches = displayedMatches.filter(
-      (m) =>
-        (m.club ?? "").toLowerCase().includes(q) ||
-        m.players.some((p) => p.name.toLowerCase().includes(q))
-    );
-  }
+  // Helper to calculate distance display
+  const getDistanceText = (match: EnrichedMatch): string => {
+    // Placeholder - actual distance would need geo calculation
+    return "5.2km away";
+  };
 
   return (
-    <div className="px-6 py-6 space-y-6 overflow-x-hidden">
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="px-4 py-5 space-y-6">
 
-      {/* Top-level toggle: Matches | Clubs */}
-      <div className="flex gap-1 bg-surface-container-low rounded-xl p-1">
-        <button
-          onClick={() => setTopTab("matches")}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-            topTab === "matches" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Matches
-        </button>
-        <button
-          onClick={() => setTopTab("clubs")}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-            topTab === "clubs" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          Clubs
-        </button>
-      </div>
-
-      {topTab === "clubs" ? (
-        <ClubsExplorer />
-      ) : (
-      <>
-      <div className="flex gap-1 bg-card rounded-xl p-1">
-        {tabs.map((t) => (
+        {/* TOP-LEVEL TOGGLE: Matches | Clubs */}
+        <div className="flex gap-4 border-b border-border/20">
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-              tab === t.key ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+            onClick={() => setTopTab("matches")}
+            className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
+              topTab === "matches"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground"
             }`}
           >
-            {t.icon}
-            {t.label}
+            Matches
           </button>
-        ))}
-      </div>
-
-      {/* Section Label */}
-      <div className="flex justify-between items-end">
-        <h2 className="font-display font-black text-muted-foreground text-[12px] tracking-[0.2em] uppercase">
-          {tab === "my_matches" ? "MY MATCHES" : "UPCOMING MATCHES"}
-        </h2>
-        <span className="text-primary font-bold text-xs cursor-pointer">View All</span>
-      </div>
-
-      {/* FAB */}
-      <motion.button
-        onClick={() => setShowCreateMatch(true)}
-        className="fixed bottom-24 right-5 lg:bottom-8 lg:right-8 z-40 flex items-center justify-center bg-primary text-primary-foreground font-display font-black text-sm overflow-hidden h-14"
-        style={{ minWidth: 56 }}
-        whileTap={{ scale: 0.9 }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{
-          scale: 1,
-          opacity: 1,
-          width: fabExpanded ? 180 : 56,
-          borderRadius: 9999,
-          paddingLeft: fabExpanded ? 20 : 0,
-          paddingRight: fabExpanded ? 20 : 0,
-        }}
-        transition={{ duration: 0.25, ease: "easeInOut" }}
-      >
-        <Plus className="w-6 h-6 flex-shrink-0" />
-        <AnimatePresence>
-          {fabExpanded && (
-            <motion.span
-              key="label"
-              initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-              animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
-              exit={{ width: 0, opacity: 0, marginLeft: 0 }}
-              transition={{ duration: 0.2 }}
-              className="whitespace-nowrap overflow-hidden uppercase tracking-widest text-xs"
-            >
-              Post Match
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
-
-      {/* Match Cards — Vertical Stack */}
-      {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="rounded-2xl bg-card border border-border/40 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-24 rounded" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-              </div>
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <Skeleton className="h-3 w-6 rounded" />
-                <Skeleton className="h-10 w-10 rounded-full" />
-              </div>
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-32 rounded" />
-                <Skeleton className="h-8 w-20 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : displayedMatches.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center py-16 space-y-4"
-        >
-          <div className="flex justify-center">{emptyState.icon}</div>
-          <div>
-            <p className="font-display font-bold text-foreground">{emptyState.title}</p>
-            <p className="text-sm text-muted-foreground mt-1">{emptyState.subtitle}</p>
-          </div>
           <button
-            onClick={() => setShowCreateMatch(true)}
-            className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-black text-xs uppercase tracking-widest mt-2 active:scale-95 transition-transform"
+            onClick={() => setTopTab("clubs")}
+            className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
+              topTab === "clubs"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground"
+            }`}
           >
-            Create a match
+            Clubs
           </button>
-        </motion.div>
-      ) : (
-        <MatchCarousel
-          matches={displayedMatches}
-          highlightMatchId={highlightMatchId}
-          user={user}
-          navigate={navigate}
-          onBet={(match) => setActiveBetMatch(match)}
-        />
-      )}
+        </div>
 
-      {/* Pending Actions */}
-      {pendingMatches.length > 0 && (() => {
-        const actionNeeded = pendingMatches.filter((m) => !m.userActionDone);
-        const waitingValidation = pendingMatches.filter((m) => m.userActionDone);
-        const allPending = [...actionNeeded, ...waitingValidation];
-
-        return (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10">
-                <Upload className="w-4 h-4 text-primary" />
-              </div>
+        {topTab === "clubs" ? (
+          <ClubsExplorer />
+        ) : (
+          <>
+            {/* HEADER */}
+            <div className="flex items-start justify-between">
               <div>
-                <p className="font-display font-bold text-sm">Action Required</p>
-                <p className="text-[11px] text-muted-foreground">
-                  {actionNeeded.length > 0
-                    ? `${actionNeeded.length} match${actionNeeded.length > 1 ? "es" : ""} need${actionNeeded.length === 1 ? "s" : ""} your input`
-                    : "All actions submitted — waiting for review"}
-                </p>
+                <div className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase mb-2">
+                  {format(new Date(), "EEEE · d MMMM").toUpperCase()}
+                </div>
+                <h1 className="font-display text-[26px] font-black italic uppercase text-foreground leading-tight">
+                  Matches
+                </h1>
               </div>
+
+              {/* CREATE BUTTON */}
+              <button
+                onClick={() => setShowCreateMatch(true)}
+                className="w-10 h-10 rounded-[14px] bg-primary text-primary-foreground flex items-center justify-center text-2xl font-black hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                +
+              </button>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {allPending.map((match, i) => {
-                const isDone = match.userActionDone;
-                const actionLabel = isDone
-                  ? "Under Review"
-                  : match.status === "awaiting_score"
-                  ? "Upload Score"
-                  : match.status === "review_requested"
-                  ? "Review Needed"
-                  : "Submit Review";
+            {/* NEXT MATCH HERO (if user has matches) */}
+            {tab === "my_matches" && !loading && matches.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-[22px] bg-primary p-5 space-y-2"
+              >
+                <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
+                  ● YOUR NEXT · IN {(() => {
+                    const nextMatch = matches[0];
+                    if (!nextMatch.match_date || !nextMatch.match_time) return "TBD";
+                    const matchDt = new Date(nextMatch.match_date + "T" + nextMatch.match_time);
+                    const now = new Date();
+                    const diff = matchDt.getTime() - now.getTime();
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    return `${hours}H ${mins}M`;
+                  })()}
+                </div>
+                <div className="font-display text-[26px] font-black italic uppercase text-primary-foreground leading-tight">
+                  {matches[0].match_time?.slice(0, 5) ?? "TBD"} · COURT {matches[0].court || "?"}
+                </div>
+                <div className="text-[11px] font-semibold text-primary-foreground/75">
+                  {matches[0].club} · {matches[0].format} · {matches[0].playerCount} confirmed
+                </div>
+              </motion.div>
+            )}
 
-                return (
-                  <motion.div
+            {/* TABS (my_matches | open) */}
+            <div className="flex gap-6 border-b border-border/20">
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
+                    tab === t.key
+                      ? "border-b-2 border-primary text-foreground"
+                      : "border-b-2 border-transparent text-muted-foreground"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* FILTER ROW */}
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+              <button
+                className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap"
+              >
+                Tonight
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:bg-muted/30"
+              >
+                My Level
+              </button>
+              <button
+                className="px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:bg-muted/30"
+              >
+                ≤ 5km
+              </button>
+              <div className="flex-1" />
+              <button
+                className="px-3 py-1.5 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:text-foreground"
+              >
+                Filters ↓
+              </button>
+            </div>
+
+            {/* LOADING STATE */}
+            {loading && (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="rounded-[18px] bg-card border border-border/[0.07] p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <Skeleton className="h-8 w-24 rounded" />
+                      <div className="flex gap-1">
+                        {[0, 1, 2, 3].map(j => (
+                          <Skeleton key={j} className="w-2 h-2 rounded-full" />
+                        ))}
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-48 rounded" />
+                    <Skeleton className="h-3 w-32 rounded" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* EMPTY STATE */}
+            {!loading && displayedMatches.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center py-16 space-y-4"
+              >
+                <div className="flex justify-center">{emptyState.icon}</div>
+                <div>
+                  <p className="font-display font-bold text-foreground">{emptyState.title}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{emptyState.subtitle}</p>
+                </div>
+                <button
+                  onClick={() => setShowCreateMatch(true)}
+                  className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-black text-xs uppercase tracking-widest mt-2 active:scale-95 transition-transform"
+                >
+                  Create a match
+                </button>
+              </motion.div>
+            )}
+
+            {/* MATCH CARDS (my_matches — carousel list style) */}
+            {!loading && displayedMatches.length > 0 && tab === "my_matches" && (
+              <MatchCarousel
+                matches={displayedMatches}
+                highlightMatchId={highlightMatchId}
+                user={user}
+                navigate={navigate}
+                onBet={(match) => setActiveBetMatch(match)}
+              />
+            )}
+
+            {/* MATCH CARDS (open — grid/list style) */}
+            {!loading && displayedMatches.length > 0 && tab === "open" && (
+              <div className="space-y-3">
+                {displayedMatches.map((match) => (
+                  <motion.button
                     key={match.id}
+                    onClick={() => navigate(`/matches/${match.id}`)}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
+                    className="w-full text-left rounded-[18px] p-4 bg-card border border-border/[0.07] hover:bg-muted/50 transition-colors relative overflow-hidden"
                   >
-                    <button
-                      onClick={() => navigate(`/matches/${match.id}`)}
-                      className={`w-full rounded-2xl border p-4 text-left transition-colors ${
-                        isDone
-                          ? "border-border/50 bg-card hover:bg-surface-container-high"
-                          : "border-primary/30 bg-card hover:bg-primary/5"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-sm font-semibold truncate ${isDone ? "text-muted-foreground" : "text-foreground"}`}>
-                            {match.club}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            {match.match_date ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMM") : "TBD"} • {match.match_time?.slice(0, 5) ?? ""}
-                          </p>
+                    {/* TOP ROW: Time + Availability Dots */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-display text-[28px] font-black italic text-foreground leading-[0.95]">
+                          {match.match_time?.slice(0, 5) ?? "TBD"}
                         </div>
-                        {isDone ? (
-                          <ClockIcon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                        ) : (
-                          <Upload className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-0.5">
+                          {getDistanceText(match)} · 60 min
+                        </div>
+                      </div>
+
+                      {/* AVAILABILITY DOTS (4 dots) */}
+                      <div className="flex gap-1.5">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "w-2 h-2 rounded-full",
+                              i < match.spotsLeft ? "bg-primary" : "bg-muted"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* BOTTOM ROW: Club + Details */}
+                    <div className="space-y-1.5">
+                      <div className="text-[13px] font-bold text-foreground">
+                        {match.club}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                        <span>{match.format}</span>
+                        <span>Level {match.level_min}-{match.level_max}</span>
+                        {match.price_per_player && (
+                          <span className="text-amber-400 font-semibold">
+                            {Math.ceil((match.price_per_player ?? 0) * 10)} XP
+                          </span>
                         )}
                       </div>
-                      <div className="mt-3">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                          isDone
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-primary/20 text-primary"
-                        }`}>
-                          {actionLabel}
+                    </div>
+
+                    {/* SPOTS LEFT BADGE */}
+                    {match.spotsLeft <= 2 && (
+                      <div className="absolute top-4 right-4">
+                        <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full">
+                          {match.spotsLeft} SPOT{match.spotsLeft === 1 ? "" : "S"}
                         </span>
                       </div>
-                    </button>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-        );
-      })()}
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            )}
 
-      <CreateMatchModal
-        open={showCreateMatch}
-        onOpenChange={(open) => {
-          setShowCreateMatch(open);
-          if (!open) {
-            fetchMatches();
-            fetchPendingMatches();
-          }
-        }}
-        onCreated={(matchId) => {
-          setHighlightMatchId(matchId);
-          setTimeout(() => setHighlightMatchId(null), 3500);
-        }}
-      />
-      <MatchJoinModal
-        matchId={selectedMatchId}
-        open={!!selectedMatchId}
-        onOpenChange={(o) => { if (!o) { setSelectedMatchId(null); fetchMatches(); } }}
-      />
-      <MatchBetSheet
-        open={!!activeBetMatch}
-        onClose={() => setActiveBetMatch(null)}
-        match={activeBetMatch ? {
-          matchId: activeBetMatch.id,
-          club: activeBetMatch.club,
-          date: activeBetMatch.match_date ? format(new Date(activeBetMatch.match_date + "T00:00:00"), "EEE d MMMM") : "TBD",
-          time: activeBetMatch.match_time?.slice(0, 5) ?? "",
-          teamALabel: activeBetMatch.players.filter(p => p.team === "team_a").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
-          teamBLabel: activeBetMatch.players.filter(p => p.team === "team_b").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
-          teamAOdds: activeBetMatch.market?.team_a_multiplier ?? 1.8,
-          teamBOdds: activeBetMatch.market?.team_b_multiplier ?? 1.8,
-        } : null}
-        onBetPlaced={() => fetchMatches()}
-      />
-      </>
-      )}
+            {/* SECTION LABEL: Pending Actions */}
+            {pendingMatches.length > 0 && (
+              <div className="text-[10px] font-black tracking-[0.16em] text-muted-foreground uppercase px-1 pt-4">
+                Pending Actions
+              </div>
+            )}
+
+            {/* PENDING ACTIONS */}
+            {pendingMatches.length > 0 && (() => {
+              const actionNeeded = pendingMatches.filter((m) => !m.userActionDone);
+              const waitingValidation = pendingMatches.filter((m) => m.userActionDone);
+              const allPending = [...actionNeeded, ...waitingValidation];
+
+              return (
+                <div className="flex flex-col gap-3">
+                  {allPending.map((match, i) => {
+                    const isDone = match.userActionDone;
+                    const actionLabel = isDone
+                      ? "Under Review"
+                      : match.status === "awaiting_score"
+                      ? "Upload Score"
+                      : match.status === "review_requested"
+                      ? "Review Needed"
+                      : "Submit Review";
+
+                    return (
+                      <motion.button
+                        key={match.id}
+                        onClick={() => navigate(`/matches/${match.id}`)}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className={`w-full rounded-[18px] border p-4 text-left transition-colors ${
+                          isDone
+                            ? "border-border/[0.07] bg-card hover:bg-muted/50"
+                            : "border-primary/30 bg-card hover:bg-primary/5"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-[13px] font-bold ${isDone ? "text-muted-foreground" : "text-foreground"}`}>
+                              {match.club}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {match.match_date ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMM") : "TBD"} • {match.match_time?.slice(0, 5) ?? ""}
+                            </p>
+                          </div>
+                          {isDone ? (
+                            <ClockIcon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                          ) : (
+                            <Upload className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                          )}
+                        </div>
+                        <div className="mt-3">
+                          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-block ${
+                            isDone
+                              ? "bg-muted text-muted-foreground"
+                              : "bg-primary/20 text-primary"
+                          }`}>
+                            {actionLabel}
+                          </span>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* MODALS */}
+            <CreateMatchModal
+              open={showCreateMatch}
+              onOpenChange={(open) => {
+                setShowCreateMatch(open);
+                if (!open) {
+                  fetchMatches();
+                  fetchPendingMatches();
+                }
+              }}
+              onCreated={(matchId) => {
+                setHighlightMatchId(matchId);
+                setTimeout(() => setHighlightMatchId(null), 3500);
+              }}
+            />
+            <MatchJoinModal
+              matchId={selectedMatchId}
+              open={!!selectedMatchId}
+              onOpenChange={(o) => { if (!o) { setSelectedMatchId(null); fetchMatches(); } }}
+            />
+            <MatchBetSheet
+              open={!!activeBetMatch}
+              onClose={() => setActiveBetMatch(null)}
+              match={activeBetMatch ? {
+                matchId: activeBetMatch.id,
+                club: activeBetMatch.club,
+                date: activeBetMatch.match_date ? format(new Date(activeBetMatch.match_date + "T00:00:00"), "EEE d MMMM") : "TBD",
+                time: activeBetMatch.match_time?.slice(0, 5) ?? "",
+                teamALabel: activeBetMatch.players.filter(p => p.team === "team_a").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
+                teamBLabel: activeBetMatch.players.filter(p => p.team === "team_b").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
+                teamAOdds: activeBetMatch.market?.team_a_multiplier ?? 1.8,
+                teamBOdds: activeBetMatch.market?.team_b_multiplier ?? 1.8,
+              } : null}
+              onBetPlaced={() => fetchMatches()}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 };
