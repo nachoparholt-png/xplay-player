@@ -86,18 +86,33 @@ export function useGooglePlaces(
     });
 
     // ── Mobile fix ────────────────────────────────────────────────────────────
-    // On iOS WebView (Capacitor), tapping a PAC suggestion fires touchstart on
-    // the dropdown item, which blurs the input, collapses the dropdown, and
-    // silently swallows the selection — place_changed never fires.
-    // Intercepting touchstart at capture phase and calling preventDefault()
-    // keeps the input focused so the tap can complete and place_changed fires.
-    const handlePacTouch = (e: TouchEvent) => {
+    // On iOS WebView (Capacitor), tapping a PAC suggestion fires touchstart →
+    // input blurs → dropdown collapses → place_changed never fires.
+    //
+    // Step 1: touchstart preventDefault keeps the input focused (dropdown stays open).
+    // Step 2: touchend explicitly calls .click() on the pac-item because
+    //         preventDefault on touchstart suppresses the browser's synthetic click.
+    const handlePacTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".pac-container")) {
         e.preventDefault();
       }
     };
-    document.addEventListener("touchstart", handlePacTouch, {
+
+    const handlePacTouchEnd = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      const item = target?.closest?.(".pac-item") as HTMLElement | null;
+      if (item) {
+        e.preventDefault();
+        item.click();
+      }
+    };
+
+    document.addEventListener("touchstart", handlePacTouchStart, {
+      capture: true,
+      passive: false,
+    });
+    document.addEventListener("touchend", handlePacTouchEnd, {
       capture: true,
       passive: false,
     });
@@ -105,9 +120,8 @@ export function useGooglePlaces(
     return () => {
       window.google.maps.event.clearInstanceListeners(ac);
       autocompleteRef.current = null;
-      document.removeEventListener("touchstart", handlePacTouch, {
-        capture: true,
-      });
+      document.removeEventListener("touchstart", handlePacTouchStart, { capture: true });
+      document.removeEventListener("touchend", handlePacTouchEnd, { capture: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, inputRef]);
