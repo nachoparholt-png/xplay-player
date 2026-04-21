@@ -62,14 +62,14 @@ class ErrorBoundary extends React.Component<Props, State> {
             </p>
           </div>
 
-          {/* Dev-only error detail */}
-          {isDev && (
-            <div className="text-left rounded-xl border border-destructive/20 bg-destructive/5 p-4">
-              <p className="text-[11px] font-mono text-destructive break-all leading-relaxed">
-                {this.state.error.message}
-              </p>
-            </div>
-          )}
+          {/* Error detail — always shown temporarily for debugging */}
+          <div className="text-left rounded-xl border border-destructive/20 bg-destructive/5 p-4">
+            <p className="text-[11px] font-mono text-destructive break-all leading-relaxed">
+              {this.state.error.message}
+              {'\n\n'}
+              {this.state.error.stack?.split('\n').slice(0, 5).join('\n')}
+            </p>
+          </div>
 
           {/* Actions */}
           <div className="flex gap-3 justify-center">
