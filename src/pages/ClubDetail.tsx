@@ -139,63 +139,60 @@ const ClubDetail = () => {
   const fetchClubData = async () => {
     if (!clubId) return;
     setLoading(true);
-    const [clubRes, courtsRes] = await Promise.all([
+
+    // ── Round trip 1: all club-level data in parallel ──────────────────────
+    const [clubRes, courtsRes, tiersRes, sessRes, eventsRes, hoursRes, memRes] = await Promise.all([
       supabase.from("clubs").select("*").eq("id", clubId).maybeSingle(),
       supabase.from("courts").select("*").eq("club_id", clubId).eq("active", true),
+      supabase.from("membership_tiers").select("*").eq("club_id", clubId).eq("active", true).order("sort_order"),
+      supabase.from("coaching_sessions").select("*").eq("club_id", clubId).eq("status", "scheduled").gte("starts_at", new Date().toISOString()).order("starts_at"),
+      supabase.from("club_events").select("*").eq("club_id", clubId).eq("status", "published").gte("starts_at", new Date().toISOString()).order("starts_at"),
+      supabase.from("club_operating_hours").select("*").eq("club_id", clubId).order("day_of_week"),
+      user
+        ? supabase.from("club_memberships").select("*").eq("user_id", user.id).eq("club_id", clubId).eq("active", true).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
     ]);
+
     if (clubRes.error) { setLoading(false); return; }
     setClub(clubRes.data as ClubRow);
     setCourts(courtsRes.data || []);
+    setTiers(tiersRes.data || []);
+    setSessions(sessRes.data || []);
+    setEvents(eventsRes.data || []);
+    setOperatingHours(hoursRes.data || []);
+    setMyMembership((memRes.data as ClubMembershipRow | null) ?? null);
 
-    const { data: tiersData } = await supabase.from("membership_tiers").select("*").eq("club_id", clubId).eq("active", true).order("sort_order");
-    setTiers(tiersData || []);
-
-    const { data: sessData } = await supabase.from("coaching_sessions").select("*").eq("club_id", clubId).eq("status", "scheduled").gte("starts_at", new Date().toISOString()).order("starts_at");
-    setSessions(sessData || []);
-
-    const { data: eventsData } = await supabase.from("club_events").select("*").eq("club_id", clubId).eq("status", "published").gte("starts_at", new Date().toISOString()).order("starts_at");
-    setEvents(eventsData || []);
-
-    // Fetch structured operating hours
-    const { data: hoursData } = await supabase.from("club_operating_hours").select("*").eq("club_id", clubId).order("day_of_week");
-    setOperatingHours(hoursData || []);
-
+    // ── Round trip 2: attendee / enrollment counts in parallel ─────────────
     if (user) {
-      // `club_memberships` IS in generated types — chain directly without `as any`
-      const { data: mem } = await supabase
-        .from("club_memberships")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("club_id", clubId!)
-        .eq("active", true)
-        .maybeSingle();
-      setMyMembership(mem as ClubMembershipRow | null);
+      const eventIds = (eventsRes.data || []).map((e: any) => e.id);
+      const sessIds  = (sessRes.data  || []).map((s: any) => s.id);
 
-      if (eventsData?.length) {
-        const eventIds = eventsData.map((e) => e.id);
-        const { data: attendees } = await supabase.from("club_event_attendees").select("event_id, user_id").in("event_id", eventIds).eq("status", "signed_up");
-        const counts: Record<string, number> = {};
-        const mySigs = new Set<string>();
-        (attendees || []).forEach((a) => {
-          counts[a.event_id] = (counts[a.event_id] || 0) + 1;
-          if (a.user_id === user.id) mySigs.add(a.event_id);
-        });
-        setEventAttendees(counts);
-        setMyEventSignups(mySigs);
-      }
+      const [attendeesRes, enrollRes] = await Promise.all([
+        eventIds.length > 0
+          ? supabase.from("club_event_attendees").select("event_id, user_id").in("event_id", eventIds).eq("status", "signed_up")
+          : Promise.resolve({ data: [] }),
+        sessIds.length > 0
+          ? supabase.from("coaching_enrollments").select("coaching_session_id, player_id").in("coaching_session_id", sessIds).eq("status", "confirmed")
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      if (sessData?.length) {
-        const sessIds = sessData.map((s) => s.id);
-        const { data: enrollData } = await supabase.from("coaching_enrollments").select("coaching_session_id, player_id").in("coaching_session_id", sessIds).eq("status", "confirmed");
-        const eCounts: Record<string, number> = {};
-        const myE = new Set<string>();
-        (enrollData || []).forEach((e) => {
-          eCounts[e.coaching_session_id] = (eCounts[e.coaching_session_id] || 0) + 1;
-          if (e.player_id === user.id) myE.add(e.coaching_session_id);
-        });
-        setEnrollments(eCounts);
-        setMyEnrollments(myE);
-      }
+      const counts: Record<string, number> = {};
+      const mySigs = new Set<string>();
+      (attendeesRes.data || []).forEach((a: any) => {
+        counts[a.event_id] = (counts[a.event_id] || 0) + 1;
+        if (a.user_id === user.id) mySigs.add(a.event_id);
+      });
+      setEventAttendees(counts);
+      setMyEventSignups(mySigs);
+
+      const eCounts: Record<string, number> = {};
+      const myE = new Set<string>();
+      (enrollRes.data || []).forEach((e: any) => {
+        eCounts[e.coaching_session_id] = (eCounts[e.coaching_session_id] || 0) + 1;
+        if (e.player_id === user.id) myE.add(e.coaching_session_id);
+      });
+      setEnrollments(eCounts);
+      setMyEnrollments(myE);
     }
 
     setLoading(false);
@@ -375,9 +372,9 @@ const ClubDetail = () => {
   const tabs: { key: ClubTab; label: string }[] = [
     { key: "info", label: "Info" },
     { key: "courts", label: "Courts" },
+    { key: "memberships", label: `Memberships${tiers.length > 0 ? ` (${tiers.length})` : ""}` },
     { key: "events", label: `Events${events.length > 0 ? ` (${events.length})` : ""}` },
     { key: "rankings", label: "Rankings" },
-    { key: "shop", label: "Shop" },
   ];
 
   if (loading) {
@@ -436,8 +433,13 @@ const ClubDetail = () => {
               </div>
             )}
           </div>
-          <div className="space-y-1">
-            <h1 className="font-display font-black text-2xl text-foreground">{club.club_name}</h1>
+          <div className="space-y-1.5">
+            <h1
+              className="font-display font-black text-foreground uppercase leading-none tracking-tight"
+              style={{ fontSize: 'clamp(28px, 8vw, 40px)', fontStyle: 'italic' }}
+            >
+              {club.club_name}
+            </h1>
             {(club.city || club.location) && (
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
                 <MapPin className="w-3 h-3 text-primary" />

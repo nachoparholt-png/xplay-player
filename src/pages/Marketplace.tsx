@@ -74,6 +74,12 @@ const Marketplace = () => {
 
   const userPoints = profile?.padel_park_points ?? 0;
 
+  // Featured product: first in-stock item, only when not filtering/searching
+  const featuredProduct = useMemo(() => {
+    if (!shopifyProducts || debouncedSearch || activeCategory) return null;
+    return shopifyProducts.find((p) => shopifyInStock(p)) ?? null;
+  }, [shopifyProducts, debouncedSearch, activeCategory]);
+
   return (
     <>
     <div className="p-4 space-y-6">
@@ -121,6 +127,52 @@ const Marketplace = () => {
           ))}
         </div>
       )}
+
+      {/* Editor's Pick hero — shown when not filtering */}
+      {featuredProduct && !shopifyLoading && (() => {
+        const local = localProductMap.get(featuredProduct.node.id);
+        const xpPrice = resolveXpPrice(featuredProduct, local?.point_price);
+        const heroImage = featuredProduct.node.images.edges[0]?.node;
+        const price = featuredProduct.node.priceRange.minVariantPrice;
+        return (
+          <button
+            className="w-full text-left rounded-2xl overflow-hidden border border-border/20 relative cursor-pointer active:scale-[0.98] transition-transform"
+            style={{ background: "linear-gradient(135deg, #1e2d3d 0%, #2d4055 60%, #1a2533 100%)" }}
+            onClick={() => {
+              setQuickViewProduct(featuredProduct);
+              setQuickViewMeta({ pointPrice: xpPrice, stock: shopifyInStock(featuredProduct) ? 1 : 0, localProductId: local?.id });
+            }}
+          >
+            {heroImage && (
+              <div className="h-44 w-full overflow-hidden relative">
+                <img src={heroImage.url} alt={heroImage.altText || featuredProduct.node.title} className="w-full h-full object-cover opacity-60" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#1e2d3d] via-transparent to-transparent" />
+              </div>
+            )}
+            <div className="p-4 flex items-end justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1.5">Editor's Pick</div>
+                <h3
+                  className="font-display font-black text-white uppercase leading-tight"
+                  style={{ fontSize: "clamp(18px, 5vw, 24px)", fontStyle: "italic" }}
+                >
+                  {featuredProduct.node.title}
+                </h3>
+              </div>
+              <div className="text-right shrink-0">
+                {price.amount && (
+                  <div className="font-display font-black text-white text-xl" style={{ fontStyle: "italic" }}>
+                    {new Intl.NumberFormat("en-GB", { style: "currency", currency: price.currencyCode || "GBP", maximumFractionDigits: 0 }).format(parseFloat(price.amount))}
+                  </div>
+                )}
+                {xpPrice && (
+                  <div className="text-[11px] font-bold text-primary mt-0.5">{xpPrice.toLocaleString()} XP</div>
+                )}
+              </div>
+            </div>
+          </button>
+        );
+      })()}
 
       {/* Product grid */}
       {shopifyLoading ? (

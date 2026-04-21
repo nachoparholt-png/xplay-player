@@ -132,6 +132,21 @@ const Rewards = () => {
   const inStockRewards = availableRewards.filter(
     (r) => r.stock_status === "in_stock" && r.status === "active" && (r.current_stock === null || r.current_stock > 0)
   );
+
+  // Sort by affordability: redeemable first, then ascending by cost
+  const sortedInStockRewards = [...inStockRewards].sort((a, b) => {
+    const aAfford = userPoints >= a.points_cost;
+    const bAfford = userPoints >= b.points_cost;
+    if (aAfford && !bAfford) return -1;
+    if (!aAfford && bAfford) return 1;
+    return a.points_cost - b.points_cost;
+  });
+
+  // Next reward the user can't yet afford — used for progress bar
+  const nextLockedReward = [...inStockRewards]
+    .filter((r) => userPoints < r.points_cost)
+    .sort((a, b) => a.points_cost - b.points_cost)[0] ?? null;
+
   const outOfStockRewards = availableRewards.filter(
     (r) => r.stock_status === "out_of_stock" || (r.current_stock !== null && r.current_stock <= 0 && r.stock_status !== "coming_soon")
   );
@@ -268,6 +283,26 @@ const Rewards = () => {
         onEarn={() => scrollTo(earnRef)}
       />
 
+      {/* Progress to next unlock */}
+      {nextLockedReward && (
+        <div className="space-y-2">
+          <div className="flex justify-between items-baseline gap-2">
+            <p className="text-xs text-muted-foreground leading-snug">
+              <span className="font-bold text-primary">{(nextLockedReward.points_cost - userPoints).toLocaleString()} XP</span>
+              {" "}until{" "}
+              <span className="font-semibold text-foreground">{nextLockedReward.name}</span>
+            </p>
+            <span className="text-xs font-bold text-muted-foreground shrink-0">{nextLockedReward.points_cost.toLocaleString()} XP</span>
+          </div>
+          <div className="h-2 w-full bg-muted/40 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, (userPoints / nextLockedReward.points_cost) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* My Rewards History */}
       <MyRewardsSection />
 
@@ -278,9 +313,9 @@ const Rewards = () => {
           <ArrowRight className="w-5 h-5 text-muted-foreground" />
         </div>
 
-        {inStockRewards.length > 0 ? (
+        {sortedInStockRewards.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
-            {inStockRewards.map((reward, i) => (
+            {sortedInStockRewards.map((reward, i) => (
               <motion.div
                 key={reward.id}
                 initial={{ opacity: 0, y: 10 }}

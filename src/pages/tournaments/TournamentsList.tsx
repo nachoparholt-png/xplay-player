@@ -83,6 +83,7 @@ const TournamentsList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [fabExpanded, setFabExpanded] = useState(true);
   const [activeBetTournament, setActiveBetTournament] = useState<Tournament | null>(null);
+  const [filterOpen, setFilterOpen] = useState(false);
   const lastScrollY = useRef(0);
 
   // FAB scroll behaviour
@@ -208,8 +209,18 @@ const TournamentsList = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <button className="bg-card h-12 w-12 rounded-full flex items-center justify-center active:scale-95 transition-transform border border-border/30">
-          <SlidersHorizontal className="w-4 h-4 text-primary" />
+        <button
+          onClick={() => setFilterOpen(!filterOpen)}
+          className={`h-12 w-12 rounded-full flex items-center justify-center active:scale-95 transition-transform border relative ${
+            skillFilter !== "all"
+              ? "bg-primary/15 border-primary/30"
+              : "bg-card border-border/30"
+          }`}
+        >
+          <SlidersHorizontal className={`w-4 h-4 ${skillFilter !== "all" ? "text-primary" : "text-primary"}`} />
+          {skillFilter !== "all" && (
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-primary" />
+          )}
         </button>
       </div>
 
@@ -286,22 +297,35 @@ const TournamentsList = () => {
         </motion.div>
       )}
 
-      {/* Skill Level Filter Chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
-        {SKILL_CHIPS.map((chip) => (
-          <button
-            key={chip.key}
-            onClick={() => setSkillFilter(chip.key)}
-            className={`whitespace-nowrap text-xs font-bold px-3.5 py-1.5 rounded-full border transition-colors ${
-              skillFilter === chip.key
-                ? "bg-primary/15 text-primary border-primary/30"
-                : "bg-card text-muted-foreground border-border/30 hover:text-foreground"
-            }`}
+      {/* Skill filter panel — shown when filter button is active */}
+      <AnimatePresence>
+        {filterOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+            className="bg-card rounded-2xl p-4 border border-border/30 space-y-3"
           >
-            {chip.label}
-          </button>
-        ))}
-      </div>
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Skill Level</p>
+            <div className="flex flex-wrap gap-2">
+              {SKILL_CHIPS.map((chip) => (
+                <button
+                  key={chip.key}
+                  onClick={() => { setSkillFilter(chip.key); setFilterOpen(false); }}
+                  className={`whitespace-nowrap text-xs font-bold px-3.5 py-2 rounded-full border transition-colors ${
+                    skillFilter === chip.key
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : "bg-muted/30 text-muted-foreground border-border/30 hover:text-foreground"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Section Label */}
       <div className="flex justify-between items-end">
