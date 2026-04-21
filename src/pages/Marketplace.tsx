@@ -136,8 +136,7 @@ const Marketplace = () => {
         const price = featuredProduct.node.priceRange.minVariantPrice;
         return (
           <button
-            className="w-full text-left rounded-2xl overflow-hidden border border-border/20 relative cursor-pointer active:scale-[0.98] transition-transform"
-            style={{ background: "linear-gradient(135deg, #1e2d3d 0%, #2d4055 60%, #1a2533 100%)" }}
+            className="w-full text-left rounded-2xl overflow-hidden border border-border/30 bg-card relative cursor-pointer active:scale-[0.98] transition-transform"
             onClick={() => {
               setQuickViewProduct(featuredProduct);
               setQuickViewMeta({ pointPrice: xpPrice, stock: shopifyInStock(featuredProduct) ? 1 : 0, localProductId: local?.id });
@@ -145,8 +144,8 @@ const Marketplace = () => {
           >
             {heroImage && (
               <div className="h-44 w-full overflow-hidden relative">
-                <img src={heroImage.url} alt={heroImage.altText || featuredProduct.node.title} className="w-full h-full object-cover opacity-60" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#1e2d3d] via-transparent to-transparent" />
+                <img src={heroImage.url} alt={heroImage.altText || featuredProduct.node.title} className="w-full h-full object-cover opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
               </div>
             )}
             <div className="p-4 flex items-end justify-between gap-3">
