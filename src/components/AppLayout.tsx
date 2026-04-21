@@ -1,18 +1,32 @@
 import React, { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Swords, MessageSquare, Gift, User, Shield, Trophy } from "lucide-react";
+import { MessageSquare, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
 import AppTour from "@/components/AppTour";
 import xplayLogo from "@/assets/xplay-logo-full.png";
+import {
+  IconMatches,
+  IconTournaments,
+  IconRewards,
+  IconProfile,
+} from "@/components/icons/XPlayIcons";
 
 const navItems = [
-  { path: "/matches", icon: Swords, label: "Matches" },
-  { path: "/tournaments", icon: Trophy, label: "Tourneys" },
-  { path: "/rewards", icon: Gift, label: "Rewards" },
+  { path: "/matches", icon: IconMatches, label: "Matches" },
+  { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
+  { path: "/rewards", icon: IconRewards, label: "Rewards" },
+  { path: "/profile", icon: IconProfile, label: "Profile" },
+];
+
+// Full list including Messages — used for desktop sidebar only
+const sidebarItems = [
+  { path: "/matches", icon: IconMatches, label: "Matches" },
+  { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
+  { path: "/rewards", icon: IconRewards, label: "Rewards" },
   { path: "/messages", icon: MessageSquare, label: "Messages" },
-  { path: "/profile", icon: User, label: "Profile" },
+  { path: "/profile", icon: IconProfile, label: "Profile" },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
@@ -32,7 +46,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
         </div>
 
         <nav className="flex-1 space-y-1">
-          {navItems.map((item) => {
+          {sidebarItems.map((item) => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
             return (
               <button
@@ -77,12 +91,25 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           >
             <img src={xplayLogo} alt="X Play" className="h-8 w-auto object-contain" />
           </button>
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => navigate("/messages")}
+              className={`p-2 rounded-xl transition-colors active:scale-95 ${
+                location.pathname.startsWith("/messages")
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-label="Messages"
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+            <NotificationBell />
+          </div>
         </div>
 
         {/* Scrollable content area */}
         <div
-          className={`flex-1 overflow-y-scroll overflow-x-hidden ${location.pathname.startsWith('/messages/') ? '' : 'pb-32'}`}
+          className={`flex-1 overflow-y-scroll overflow-x-hidden ${location.pathname.startsWith('/messages/') ? '' : 'pb-36'}`}
           style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         >
           <div className="max-w-4xl mx-auto">{children}</div>
@@ -95,9 +122,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {/* Mobile Bottom Nav - hidden on chat threads */}
       <nav
         className={`lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-white/5 ${location.pathname.startsWith('/messages/') ? 'hidden' : ''}`}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
       >
-        <div className="flex items-center justify-around px-2 pt-4 pb-2">
+        <div className="flex items-center justify-around px-2 pt-4 pb-3">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
             return (
