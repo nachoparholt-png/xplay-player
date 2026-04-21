@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from "react";
+import React, { useState, lazy, Suspense, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +16,32 @@ import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
 import AdminRoute from "./components/AdminRoute";
 
+// ── Chunk-load resilience ───────────────────────────────────────────────────
+// After a Vercel redeploy the old chunk URLs are gone. This wrapper catches
+// the "Failed to fetch dynamically imported module" error at the promise level
+// and forces a page reload (once per session) so users get the new bundle.
+const CHUNK_RELOAD_KEY = "xplay_chunk_reload";
+function lazyWithRetry<T extends ComponentType<unknown>>(
+  importFn: () => Promise<{ default: T }>
+) {
+  return lazy(async () => {
+    try {
+      return await importFn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Failed to fetch dynamically imported module") ||
+          msg.includes("Importing a module script failed") ||
+          msg.includes("error loading dynamically imported module")) {
+        if (!sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+          window.location.reload();
+        }
+      }
+      throw err;
+    }
+  });
+}
+
 // ── Eagerly loaded (critical path — always needed immediately) ──────────────
 import Matches from "./pages/Matches";
 import Auth from "./pages/Auth";
@@ -24,41 +50,41 @@ import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 // ── Lazy loaded (loaded on demand when user navigates there) ────────────────
-const CreateMatch         = lazy(() => import("./pages/CreateMatch"));
-const MatchDetail         = lazy(() => import("./pages/MatchDetail"));
-const PostMatchStats      = lazy(() => import("./pages/PostMatchStats"));
-const ActiveStakes        = lazy(() => import("./pages/ActiveStakes"));
-const Messages            = lazy(() => import("./pages/Messages"));
-const ChatThread          = lazy(() => import("./pages/ChatThread"));
-const Rewards             = lazy(() => import("./pages/Rewards"));
-const Marketplace         = lazy(() => import("./pages/Marketplace"));
-const ProductDetail       = lazy(() => import("./pages/ProductDetail"));
-const Orders              = lazy(() => import("./pages/Orders"));
-const PaymentSuccess      = lazy(() => import("./pages/PaymentSuccess"));
-const Profile             = lazy(() => import("./pages/Profile"));
-const ProfileSettings     = lazy(() => import("./pages/ProfileSettings"));
-const PointsStore         = lazy(() => import("./pages/PointsStore"));
-const ClubDetail          = lazy(() => import("./pages/ClubDetail"));
-const Bookings            = lazy(() => import("./pages/Bookings"));
-const TournamentsList     = lazy(() => import("./pages/tournaments/TournamentsList"));
-const TournamentWizard    = lazy(() => import("./pages/tournaments/TournamentWizard"));
-const TournamentDetail    = lazy(() => import("./pages/tournaments/TournamentDetail"));
-const TournamentLive      = lazy(() => import("./pages/tournaments/TournamentLive"));
-const TournamentBetConfig = lazy(() => import("./pages/tournaments/TournamentBetConfig"));
+const CreateMatch         = lazyWithRetry(() => import("./pages/CreateMatch"));
+const MatchDetail         = lazyWithRetry(() => import("./pages/MatchDetail"));
+const PostMatchStats      = lazyWithRetry(() => import("./pages/PostMatchStats"));
+const ActiveStakes        = lazyWithRetry(() => import("./pages/ActiveStakes"));
+const Messages            = lazyWithRetry(() => import("./pages/Messages"));
+const ChatThread          = lazyWithRetry(() => import("./pages/ChatThread"));
+const Rewards             = lazyWithRetry(() => import("./pages/Rewards"));
+const Marketplace         = lazyWithRetry(() => import("./pages/Marketplace"));
+const ProductDetail       = lazyWithRetry(() => import("./pages/ProductDetail"));
+const Orders              = lazyWithRetry(() => import("./pages/Orders"));
+const PaymentSuccess      = lazyWithRetry(() => import("./pages/PaymentSuccess"));
+const Profile             = lazyWithRetry(() => import("./pages/Profile"));
+const ProfileSettings     = lazyWithRetry(() => import("./pages/ProfileSettings"));
+const PointsStore         = lazyWithRetry(() => import("./pages/PointsStore"));
+const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
+const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
+const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
+const TournamentWizard    = lazyWithRetry(() => import("./pages/tournaments/TournamentWizard"));
+const TournamentDetail    = lazyWithRetry(() => import("./pages/tournaments/TournamentDetail"));
+const TournamentLive      = lazyWithRetry(() => import("./pages/tournaments/TournamentLive"));
+const TournamentBetConfig = lazyWithRetry(() => import("./pages/tournaments/TournamentBetConfig"));
 
 // Admin (lazily loaded — players rarely visit admin routes)
-const AdminPlayers            = lazy(() => import("./pages/admin/AdminPlayers"));
-const AdminPlayerDetail       = lazy(() => import("./pages/admin/AdminPlayerDetail"));
-const AdminActivityLog        = lazy(() => import("./pages/admin/AdminActivityLog"));
-const AdminSettings           = lazy(() => import("./pages/admin/AdminSettings"));
-const AdminClubs              = lazy(() => import("./pages/admin/AdminClubs"));
-const AdminRatingSettings     = lazy(() => import("./pages/admin/AdminRatingSettings"));
-const AdminRewardsSettings    = lazy(() => import("./pages/admin/AdminRewardsSettings"));
-const AdminRewardCodes        = lazy(() => import("./pages/admin/AdminRewardCodes"));
-const AdminProducts           = lazy(() => import("./pages/admin/AdminProducts"));
-const AdminStores             = lazy(() => import("./pages/admin/AdminStores"));
-const AdminBettingSettings    = lazy(() => import("./pages/admin/AdminBettingSettings"));
-const AdminTournamentCategories = lazy(() => import("./pages/admin/AdminTournamentCategories"));
+const AdminPlayers            = lazyWithRetry(() => import("./pages/admin/AdminPlayers"));
+const AdminPlayerDetail       = lazyWithRetry(() => import("./pages/admin/AdminPlayerDetail"));
+const AdminActivityLog        = lazyWithRetry(() => import("./pages/admin/AdminActivityLog"));
+const AdminSettings           = lazyWithRetry(() => import("./pages/admin/AdminSettings"));
+const AdminClubs              = lazyWithRetry(() => import("./pages/admin/AdminClubs"));
+const AdminRatingSettings     = lazyWithRetry(() => import("./pages/admin/AdminRatingSettings"));
+const AdminRewardsSettings    = lazyWithRetry(() => import("./pages/admin/AdminRewardsSettings"));
+const AdminRewardCodes        = lazyWithRetry(() => import("./pages/admin/AdminRewardCodes"));
+const AdminProducts           = lazyWithRetry(() => import("./pages/admin/AdminProducts"));
+const AdminStores             = lazyWithRetry(() => import("./pages/admin/AdminStores"));
+const AdminBettingSettings    = lazyWithRetry(() => import("./pages/admin/AdminBettingSettings"));
+const AdminTournamentCategories = lazyWithRetry(() => import("./pages/admin/AdminTournamentCategories"));
 
 // ── React Query client with caching ────────────────────────────────────────
 const queryClient = new QueryClient({

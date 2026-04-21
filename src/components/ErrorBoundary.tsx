@@ -6,22 +6,46 @@ interface Props {
 
 interface State {
   error: Error | null;
+  isChunkError: boolean;
 }
+
+/** Returns true for "Failed to fetch dynamically imported module" errors — these happen
+ *  after a Vercel deployment when the browser has an old bundle referencing chunks
+ *  that no longer exist at those URLs. The fix is a silent page reload. */
+const isChunkLoadError = (error: Error) =>
+  error.message.includes("Failed to fetch dynamically imported module") ||
+  error.message.includes("Importing a module script failed") ||
+  error.message.includes("error loading dynamically imported module");
+
+/** Session-storage key to prevent infinite reload loops. */
+const CHUNK_RELOAD_KEY = "xplay_chunk_reload";
 
 /**
  * Catches uncaught runtime errors in the component tree below it.
  * Mount with a `key` equal to the current pathname so that navigating
  * to a different route resets the boundary automatically.
+ *
+ * Special case: chunk-load failures (stale deployment) trigger a silent
+ * page reload instead of showing the error screen.
  */
 class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, isChunkError: false };
 
   static getDerivedStateFromError(error: Error): State {
-    return { error };
+    return { error, isChunkError: isChunkLoadError(error) };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+
+    // Auto-reload on stale chunk errors, but only once per session to avoid loops.
+    if (isChunkLoadError(error)) {
+      const alreadyReloaded = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      if (!alreadyReloaded) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+        window.location.reload();
+      }
+    }
   }
 
   private handleGoBack = () => {
@@ -35,6 +59,16 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children;
+
+    // For chunk-load errors: show a silent "updating" spinner while the page reloads.
+    if (this.state.isChunkError) {
+      return (
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Updating app…</p>
+        </div>
+      );
+    }
 
     const isDev = import.meta.env.DEV;
 
