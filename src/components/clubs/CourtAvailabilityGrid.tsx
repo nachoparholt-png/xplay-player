@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getBookingWindow } from "@/lib/clubs/bookingWindow";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Zap, Lock } from "lucide-react";
+import { Zap } from "lucide-react";
 import DateStrip from "./DateStrip";
 import BookingSlotModal, { BookingSlot } from "./BookingSlotModal";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
@@ -103,12 +103,28 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
     return () => { supabase.removeChannel(channel); };
   }, [selectedDate, courts, clubId]);
 
-  // Helper: find pricing window for a given slot
+  // Index slots by courtId+time for O(1) lookup during render
+  const slotIndex = useMemo(() => {
+    const index: Record<string, any> = {};
+    slots.forEach((s) => {
+      const key = `${s.court_id}__${format(new Date(s.starts_at), "HH:mm")}`;
+      index[key] = s;
+    });
+    return index;
+  }, [slots]);
+
+  // Pre-sort pricing windows by priority descending so first match wins
+  const sortedPricingWindows = useMemo(
+    () => [...pricingWindows].sort((a, b) => b.priority - a.priority),
+    [pricingWindows]
+  );
+
+  // Helper: find pricing window for a given slot — O(p) per call, p = pricing window count
   const getPricingWindow = useMemo(() => {
     return (slot: any): PricingWindow | null => {
       const slotTime = format(new Date(slot.starts_at), "HH:mm");
-      const dayOfWeek = getDay(new Date(slot.starts_at)); // 0=Sun
-      for (const pw of pricingWindows) {
+      const dayOfWeek = getDay(new Date(slot.starts_at));
+      for (const pw of sortedPricingWindows) {
         if (
           pw.days_of_week.includes(dayOfWeek) &&
           slotTime >= pw.start_time &&
@@ -119,7 +135,7 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
       }
       return null;
     };
-  }, [pricingWindows]);
+  }, [sortedPricingWindows]);
 
   const handleSlotClick = (slot: any, court: any) => {
     const startTime = new Date(slot.starts_at);
@@ -193,9 +209,6 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
       <div className="flex items-center justify-between bg-card border border-border/50 rounded-2xl px-4 py-3">
         <p className="text-[11px] text-muted-foreground">
           You can book <span className="font-semibold text-foreground">{maxDays} days</span> ahead
-          {!memberTierName && (
-            <> · <span className="text-primary font-semibold">Upgrade to see more →</span></>
-          )}
         </p>
         <Zap className="w-4 h-4 text-primary flex-shrink-0" />
       </div>
@@ -216,7 +229,10 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
       ) : (
         <div className="space-y-6 divide-y divide-border/30">
           {courts.map((court) => {
-            const courtSlots = slots.filter((s) => s.court_id === court.id);
+            // Use index for O(1) per slot instead of filtering the full array per court
+            const courtSlots = allTimes
+              .map((t) => slotIndex[`${court.id}__${t}`])
+              .filter(Boolean);
             const now = new Date();
             const hasLive = courtSlots.some(
               (s) => new Date(s.starts_at) <= now && new Date(s.ends_at) > now && s.status === "booked"
@@ -240,7 +256,7 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
 
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-1">
                   {allTimes.map((time) => {
-                    const slot = courtSlots.find((s) => format(new Date(s.starts_at), "HH:mm") === time);
+                    const slot = slotIndex[`${court.id}__${time}`];
 
                     if (!slot) {
                       return (
@@ -320,19 +336,6 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
         </div>
       )}
 
-      {/* Upsell card — only shown to non-members */}
-      {!memberTierName && (
-        <div className="bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 rounded-2xl p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-primary" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Unlock Peak Hours</p>
-          </div>
-          <p className="text-xs text-muted-foreground">Get early access to court bookings and 15% discount on clinic sessions with XPLAY Pro.</p>
-          <button className="text-[11px] font-display font-bold uppercase tracking-wider text-primary hover:underline">
-            Upgrade Now →
-          </button>
-        </div>
-      )}
 
       <BookingSlotModal
         open={modalOpen}

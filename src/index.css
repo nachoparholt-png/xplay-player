@@ -6,25 +6,33 @@
 
 @layer base {
   :root {
-    --background: 261 70% 8%;
+    /* ── XPLAY brand palette ──────────────────────────────
+       #CDFF65 lime    → hsl(80, 100%, 70%)   --primary
+       #FFBF00 amber   → hsl(45, 100%, 50%)   --secondary
+       #5924C6 purple  → hsl(260, 69%, 46%)   --accent
+       #1A2833 navy    → hsl(206, 33%, 15%)   --background
+       #ADBFF0 sky     → hsl(224, 69%, 81%)   --silver / glow-cyan
+    ─────────────────────────────────────────────────────── */
+
+    --background: 206 33% 15%;
     --foreground: 30 100% 99%;
 
-    --card: 261 50% 12%;
+    --card: 206 33% 19%;
     --card-foreground: 30 100% 99%;
 
-    --popover: 261 50% 12%;
+    --popover: 206 33% 19%;
     --popover-foreground: 30 100% 99%;
 
-    --primary: 79 100% 70%;
-    --primary-foreground: 261 70% 8%;
-    --primary-container: 79 90% 58%;
-    --primary-dim: 79 100% 50%;
+    --primary: 80 100% 70%;
+    --primary-foreground: 206 33% 15%;
+    --primary-container: 80 90% 58%;
+    --primary-dim: 80 100% 50%;
 
-    --secondary: 45 100% 52%;
-    --secondary-foreground: 261 70% 8%;
+    --secondary: 45 100% 50%;
+    --secondary-foreground: 206 33% 15%;
 
-    --muted: 261 30% 16%;
-    --muted-foreground: 224 30% 75%;
+    --muted: 206 25% 22%;
+    --muted-foreground: 224 69% 81%;
 
     --accent: 260 69% 46%;
     --accent-foreground: 30 100% 99%;
@@ -32,10 +40,10 @@
     --destructive: 12 90% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 261 25% 15%;
-    --input: 261 25% 15%;
-    --ring: 79 100% 70%;
-    --outline-variant: 261 15% 29%;
+    --border: 206 25% 22%;
+    --input: 206 25% 22%;
+    --ring: 80 100% 70%;
+    --outline-variant: 206 20% 30%;
 
     --radius: 1rem;
 
@@ -43,40 +51,40 @@
     --win-foreground: 0 0% 100%;
     --loss: 0 45% 50%;
     --loss-foreground: 0 0% 100%;
-    --gold: 45 100% 52%;
-    --gold-foreground: 261 70% 8%;
-    --silver: 224 73% 81%;
+    --gold: 45 100% 50%;
+    --gold-foreground: 206 33% 15%;
+    --silver: 224 69% 81%;
     --bronze: 25 60% 50%;
-    --elite: 79 100% 70%;
+    --elite: 80 100% 70%;
 
     --card-light: 30 50% 96%;
-    --card-light-foreground: 261 70% 8%;
+    --card-light-foreground: 206 33% 15%;
 
     /* Surface hierarchy */
-    --surface-dim: 261 70% 8%;
-    --surface-container-lowest: 261 80% 4%;
-    --surface-container-low: 261 55% 10%;
-    --surface-container: 261 50% 12%;
-    --surface-container-high: 261 40% 15%;
-    --surface-container-highest: 261 35% 18%;
-    --surface-bright: 261 30% 20%;
+    --surface-dim: 206 33% 15%;
+    --surface-container-lowest: 206 35% 9%;
+    --surface-container-low: 206 33% 12%;
+    --surface-container: 206 33% 18%;
+    --surface-container-high: 206 30% 21%;
+    --surface-container-highest: 206 28% 24%;
+    --surface-bright: 206 25% 28%;
 
-    --sidebar-background: 261 70% 7%;
-    --sidebar-foreground: 224 40% 85%;
-    --sidebar-primary: 79 100% 70%;
-    --sidebar-primary-foreground: 261 70% 8%;
-    --sidebar-accent: 261 40% 14%;
-    --sidebar-accent-foreground: 224 40% 85%;
-    --sidebar-border: 261 25% 15%;
-    --sidebar-ring: 79 100% 70%;
+    --sidebar-background: 206 35% 12%;
+    --sidebar-foreground: 224 69% 81%;
+    --sidebar-primary: 80 100% 70%;
+    --sidebar-primary-foreground: 206 33% 15%;
+    --sidebar-accent: 206 30% 19%;
+    --sidebar-accent-foreground: 224 69% 81%;
+    --sidebar-border: 206 25% 20%;
+    --sidebar-ring: 80 100% 70%;
 
     /* Custom tokens */
-    --glow-primary: 79 100% 70%;
-    --glow-cyan: 224 73% 81%;
+    --glow-primary: 80 100% 70%;
+    --glow-cyan: 224 69% 81%;
     --glow-green: 150 100% 50%;
-    --gradient-primary: linear-gradient(45deg, hsl(79, 100%, 70%), hsl(79, 90%, 58%));
-    --shadow-glow: 0 4px 20px -4px hsl(79 100% 70% / 0.08);
-    --shadow-glow-strong: 0 8px 32px -4px hsl(79 100% 70% / 0.2);
+    --gradient-primary: linear-gradient(45deg, hsl(80, 100%, 70%), hsl(80, 90%, 58%));
+    --shadow-glow: 0 4px 20px -4px hsl(80 100% 70% / 0.08);
+    --shadow-glow-strong: 0 8px 32px -4px hsl(80 100% 70% / 0.2);
   }
 }
 

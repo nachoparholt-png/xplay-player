@@ -25,7 +25,13 @@ export function formatPrice(amount: string | number, currencyCode: string): stri
 }
 
 const SHOPIFY_API_VERSION = '2025-07';
-const SHOPIFY_STORE_PERMANENT_DOMAIN = import.meta.env.VITE_SHOPIFY_DOMAIN || 'yhgvza-00.myshopify.com';
+// Strip any accidental https:// prefix, trailing path, or whitespace from the env var
+// (the Vercel env var was previously set to the full URL instead of just the domain)
+const _rawDomain = (import.meta.env.VITE_SHOPIFY_DOMAIN || 'yhgvza-00.myshopify.com') as string;
+const SHOPIFY_STORE_PERMANENT_DOMAIN = _rawDomain
+  .trim()
+  .replace(/^https?:\/\//, '')   // remove protocol if present
+  .replace(/\/.*$/, '');          // remove any path if present
 const SHOPIFY_STOREFRONT_URL = `https://${SHOPIFY_STORE_PERMANENT_DOMAIN}/api/${SHOPIFY_API_VERSION}/graphql.json`;
 const SHOPIFY_STOREFRONT_TOKEN = import.meta.env.VITE_SHOPIFY_STOREFRONT_TOKEN || 'e7481a8ed1952f5ac9bda0f4be9828be';
 

@@ -263,35 +263,6 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           </div>
         </div>
 
-        {/* Tagline typewriter */}
-        <div
-          style={{
-            minHeight: "2em",
-            display: "flex",
-            alignItems: "center",
-            opacity: showTagline ? 1 : 0,
-            transition: "opacity 0.3s ease-out",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'Lexend', sans-serif",
-              fontWeight: 700,
-              fontSize: "clamp(13px, 3.6vw, 22px)",
-              color: "#CDFF65",
-              letterSpacing: "0.28em",
-              textTransform: "uppercase",
-            }}
-          >
-            {TAGLINE.slice(0, tagChars)}
-            {showTagline && tagChars < TAGLINE.length && (
-              <span style={{ color: "#FFBF00", opacity: cursorOn ? 1 : 0 }}>|</span>
-            )}
-            {showTagline && tagChars >= TAGLINE.length && (
-              <span style={{ color: "#FFBF00", opacity: cursorOn ? 1 : 0 }}>|</span>
-            )}
-          </span>
-        </div>
       </div>
 
       {/* Bottom glow line */}
