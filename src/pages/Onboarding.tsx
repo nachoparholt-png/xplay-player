@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Sparkles, Trophy, MessageSquare, Zap, Gift, Check, BarChart3 } from "lucide-react";
+import { IconMatches } from "@/components/icons/XPlayIcons";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
@@ -331,7 +332,7 @@ function CourtSideStep({
 
 function IntroStep({ onFinish }: { onFinish: () => void }) {
   const features = [
-    { icon: Trophy, label: "Create or join matches" },
+    { icon: IconMatches, label: "Create or join matches" },
     { icon: MessageSquare, label: "Chat with players in match groups" },
     { icon: Zap, label: "Stake points and compete" },
     { icon: Gift, label: "Earn rewards and redeem gift cards" },

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MessageSquare, Users, Swords, Search, UserPlus, Calendar, Clock, MapPin, Check, X } from "lucide-react";
+import { MessageSquare, Users, Search, UserPlus, Calendar, Clock, MapPin, Check, X } from "lucide-react";
+import { IconMatches } from "@/components/icons/XPlayIcons";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMatchChat } from "@/hooks/useMatchChat";
@@ -390,7 +391,7 @@ const Messages = () => {
   const matchConvs = conversations.filter((c) => c.type === "match");
 
   const tabs = [
-    { key: "matches" as const, label: "Match Chats", icon: Swords },
+    { key: "matches" as const, label: "Match Chats", icon: IconMatches },
     { key: "contacts" as const, label: "Contacts", icon: MessageSquare },
     { key: "players" as const, label: "Players", icon: Users },
   ];
@@ -609,7 +610,7 @@ function MatchChatList({
     return (
       <div className="text-center py-12 space-y-3">
         <div className="w-16 h-16 mx-auto rounded-2xl bg-muted flex items-center justify-center">
-          <Swords className="w-8 h-8 text-muted-foreground" />
+          <IconMatches className="w-8 h-8 text-muted-foreground" />
         </div>
         <p className="text-muted-foreground text-sm">
           No match chats yet. Create or join a match to get started!
@@ -629,7 +630,7 @@ function MatchChatList({
           className="w-full flex items-start gap-3 p-3.5 rounded-xl hover:bg-muted/50 transition-colors text-left card-elevated"
         >
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <Swords className="w-5 h-5 text-primary" />
+            <IconMatches className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">

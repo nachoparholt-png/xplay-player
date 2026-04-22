@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Swords, Users, Info } from "lucide-react";
+import { ArrowLeft, Send, Users, Info } from "lucide-react";
+import { IconMatches } from "@/components/icons/XPlayIcons";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -313,7 +314,7 @@ const ChatThread = () => {
           convInfo.type === "match" ? "bg-primary/10" : "bg-muted"
         }`}>
           {convInfo.type === "match" ? (
-            <Swords className="w-5 h-5 text-primary" />
+            <IconMatches className="w-5 h-5 text-primary" />
           ) : convInfo.other_user_avatar ? (
             <img src={convInfo.other_user_avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
           ) : (
