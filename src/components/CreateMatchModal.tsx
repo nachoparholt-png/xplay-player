@@ -174,7 +174,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     if (error) {
       toast({ title: "Error creating match", description: error.message, variant: "destructive" });
     } else {
-      await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "team_a" });
+      const { error: joinErr } = await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
+      if (joinErr) console.error("Host auto-join failed:", joinErr.message);
       const chatTitle = `${clubName}${courtValue ? ` — ${courtValue}` : ""}`;
       await getOrCreateMatchChat(data.id, chatTitle);
 
@@ -209,7 +210,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-0 bg-card border-border/50 rounded-t-3xl">
+        <DialogContent className="fixed bottom-0 left-0 right-0 top-auto w-full max-w-none translate-x-0 translate-y-0 max-h-[90dvh] overflow-y-auto p-0 bg-card border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0">
           {/* Custom handle bar */}
           <div className="flex justify-center pt-3 pb-2">
             <div className="w-10 h-1 rounded-full bg-border" />

@@ -85,13 +85,25 @@ export function useGooglePlaces(
       });
     });
 
-    // ── Mobile fix ────────────────────────────────────────────────────────────
-    // On iOS WebView (Capacitor), tapping a PAC suggestion fires touchstart →
-    // input blurs → dropdown collapses → place_changed never fires.
+    // ── Desktop + Mobile fix ──────────────────────────────────────────────────
+    // When the Places input lives inside a Dialog/modal, clicking a PAC suggestion
+    // fires mousedown outside the dialog → the Radix focus trap returns focus →
+    // the input blurs → the PAC dropdown collapses → place_changed never fires.
     //
-    // Step 1: touchstart preventDefault keeps the input focused (dropdown stays open).
-    // Step 2: touchend explicitly calls .click() on the pac-item because
-    //         preventDefault on touchstart suppresses the browser's synthetic click.
+    // Fix: preventDefault on mousedown inside .pac-container keeps the input
+    //      focused so place_changed fires normally. The click still reaches the
+    //      pac-item and Google's own handler fires the event.
+    //
+    // Mobile (iOS Capacitor) has the same blur problem via touchstart. We also
+    // synthesise a click on touchend because preventDefault on touchstart
+    // suppresses the browser's synthetic click.
+    const handlePacMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.(".pac-container")) {
+        e.preventDefault(); // keep focus on input → PAC stays open → place_changed fires
+      }
+    };
+
     const handlePacTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".pac-container")) {
@@ -108,6 +120,9 @@ export function useGooglePlaces(
       }
     };
 
+    document.addEventListener("mousedown", handlePacMouseDown, {
+      capture: true,
+    });
     document.addEventListener("touchstart", handlePacTouchStart, {
       capture: true,
       passive: false,
@@ -120,6 +135,7 @@ export function useGooglePlaces(
     return () => {
       window.google.maps.event.clearInstanceListeners(ac);
       autocompleteRef.current = null;
+      document.removeEventListener("mousedown", handlePacMouseDown, { capture: true });
       document.removeEventListener("touchstart", handlePacTouchStart, { capture: true });
       document.removeEventListener("touchend", handlePacTouchEnd, { capture: true });
     };

@@ -36,13 +36,13 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
   const { user } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [view, setView] = useState<View>("select");
-  const [selectedTeam, setSelectedTeam] = useState<"team_a" | "team_b" | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<"A" | "B" | null>(null);
   const [stake, setStake] = useState(0);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [placedBet, setPlacedBet] = useState<{ team: string; stake: number; potential: number } | null>(null);
-  const [playerTeam, setPlayerTeam] = useState<"team_a" | "team_b" | null>(null);
+  const [playerTeam, setPlayerTeam] = useState<"A" | "B" | null>(null);
   const [isPlayer, setIsPlayer] = useState(false);
 
   // Reset on open & detect player team
@@ -70,7 +70,7 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
       .eq("status", "confirmed")
       .maybeSingle();
     if (data?.team) {
-      const t = data.team as "team_a" | "team_b";
+      const t = data.team as "A" | "B";
       setPlayerTeam(t);
       setIsPlayer(true);
       setSelectedTeam(t); // auto-select their team
@@ -89,7 +89,7 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
 
   if (!match) return null;
 
-  const odds = selectedTeam === "team_a" ? match.teamAOdds : match.teamBOdds;
+  const odds = selectedTeam === "A" ? match.teamAOdds : match.teamBOdds;
   const potential = Math.round(stake * odds);
 
   const handlePlace = async () => {
@@ -118,7 +118,7 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
         return;
       }
 
-      const teamCode = selectedTeam === "team_a" ? "A" : "B";
+      const teamCode = selectedTeam === "A" ? "A" : "B";
 
       const { data, error } = await supabase.functions.invoke("place-match-bet", {
         body: {
@@ -133,7 +133,7 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
       if (data?.error) throw new Error(data.error);
 
       setPlacedBet({
-        team: selectedTeam === "team_a" ? match.teamALabel : match.teamBLabel,
+        team: selectedTeam === "A" ? match.teamALabel : match.teamBLabel,
         stake,
         potential,
       });
@@ -192,21 +192,21 @@ const MatchBetSheet = ({ open, onClose, match, onBetPlaced }: MatchBetSheetProps
                 {isPlayer ? "Your Team" : "Pick a Team"}
               </p>
               <div className="flex gap-3">
-                {(!isPlayer || playerTeam === "team_a") && (
+                {(!isPlayer || playerTeam === "A") && (
                   <TeamPickCard
                     label={match.teamALabel}
                     odds={match.teamAOdds}
-                    selected={selectedTeam === "team_a"}
-                    onSelect={() => !isPlayer && setSelectedTeam("team_a")}
+                    selected={selectedTeam === "A"}
+                    onSelect={() => !isPlayer && setSelectedTeam("A")}
                     avgRating={match.teamAAvgRating}
                   />
                 )}
-                {(!isPlayer || playerTeam === "team_b") && (
+                {(!isPlayer || playerTeam === "B") && (
                   <TeamPickCard
                     label={match.teamBLabel}
                     odds={match.teamBOdds}
-                    selected={selectedTeam === "team_b"}
-                    onSelect={() => !isPlayer && setSelectedTeam("team_b")}
+                    selected={selectedTeam === "B"}
+                    onSelect={() => !isPlayer && setSelectedTeam("B")}
                     avgRating={match.teamBAvgRating}
                   />
                 )}

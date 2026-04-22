@@ -15,7 +15,7 @@ interface SlotActionModalProps {
 }
 
 const SlotActionModal = ({ open, onOpenChange, team, onJoin, onInvite, onSwitchTeam, isJoined, isFull, isInOtherTeam }: SlotActionModalProps) => {
-  const teamLabel = team === "team_a" ? "Team A" : "Team B";
+  const teamLabel = team === "A" ? "Team A" : "Team B";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

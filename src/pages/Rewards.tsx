@@ -271,12 +271,12 @@ const Rewards = () => {
               </motion.div>
             ))}
           </div>
-        ) : (
+        ) : (!shopifyLoading && shopifyRewards.length === 0) ? (
           <div className="text-center py-6 text-muted-foreground">
             <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">No rewards available right now</p>
           </div>
-        )}
+        ) : null}
       </motion.div>
 
       {/* ── Shopify Rewards ── */}

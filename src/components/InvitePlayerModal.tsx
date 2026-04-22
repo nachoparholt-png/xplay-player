@@ -121,7 +121,7 @@ const InvitePlayerModal = ({
             Invite a Player
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            {matchClub} • {matchDate} • {matchTime.slice(0, 5)} • {team === "team_a" ? "Team A" : "Team B"}
+            {matchClub} • {matchDate} • {matchTime.slice(0, 5)} • {team === "A" ? "Team A" : "Team B"}
           </p>
         </DialogHeader>
 

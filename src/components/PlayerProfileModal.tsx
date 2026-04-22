@@ -159,8 +159,8 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
                   if (sub.result_type === "draw") {
                     draws++;
                   } else if (
-                    (sub.result_type === "team_a_win" && myTeam === "team_a") ||
-                    (sub.result_type === "team_b_win" && myTeam === "team_b")
+                    (sub.result_type === "team_a_win" && myTeam === "A") ||
+                    (sub.result_type === "team_b_win" && myTeam === "B")
                   ) {
                     wins++;
                     result = "win";
@@ -175,7 +175,7 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
                     club: matchInfo.club,
                     result,
                     score: score || (sub.result_type === "draw" ? "Draw" : "N/A"),
-                    myTeamLabel: myTeam === "team_a" ? "Team A" : "Team B",
+                    myTeamLabel: myTeam === "A" ? "Team A" : "Team B",
                   });
                 }
               });

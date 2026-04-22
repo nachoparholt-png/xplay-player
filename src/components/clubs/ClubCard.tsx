@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { MapPin, ChevronRight } from "lucide-react";
+import { MapPin, ChevronRight, Navigation } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { formatMiles } from "@/lib/distance";
 
 interface ClubCardProps {
   id: string;
@@ -10,9 +11,13 @@ interface ClubCardProps {
   logoUrl?: string | null;
   courtType: string;
   hasMembership?: boolean;
+  /** Miles from the user's current position. Null = not available / filter inactive. */
+  distanceMi?: number | null;
 }
 
-const ClubCard = ({ id, name, city, courtCount, logoUrl, courtType, hasMembership }: ClubCardProps) => {
+const ClubCard = ({
+  id, name, city, courtCount, logoUrl, courtType, hasMembership, distanceMi,
+}: ClubCardProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -46,10 +51,12 @@ const ClubCard = ({ id, name, city, courtCount, logoUrl, courtType, hasMembershi
               </span>
             )}
           </div>
+
           <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
             <MapPin className="w-3 h-3" /> {city ?? "—"} • {courtCount} court{courtCount !== 1 ? "s" : ""}
           </p>
-          <div className="flex items-center gap-1.5 mt-2">
+
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {courtTypes.map((type) => (
               <span
                 key={type}
@@ -58,6 +65,14 @@ const ClubCard = ({ id, name, city, courtCount, logoUrl, courtType, hasMembershi
                 {type}
               </span>
             ))}
+
+            {/* Distance badge — only shown when Near Me filter is active */}
+            {distanceMi != null && (
+              <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 flex items-center gap-0.5 ml-auto">
+                <Navigation className="w-2.5 h-2.5" />
+                {formatMiles(distanceMi)}
+              </span>
+            )}
           </div>
         </div>
 

@@ -55,8 +55,8 @@ const ScoreReviewModal = ({ matchId, submission, open, onOpenChange, players, on
 
   if (!submission) return null;
 
-  const teamA = players.filter((p) => p.team === "team_a");
-  const teamB = players.filter((p) => p.team === "team_b");
+  const teamA = players.filter((p) => p.team === "A");
+  const teamB = players.filter((p) => p.team === "B");
 
   const sets = [
     submission.team_a_set_1 !== null ? { a: submission.team_a_set_1, b: submission.team_b_set_1 } : null,

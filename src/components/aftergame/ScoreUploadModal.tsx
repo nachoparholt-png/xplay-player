@@ -40,8 +40,8 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
     { a: null, b: null },
   ]);
 
-  const teamA = players.filter((p) => p.team === "team_a");
-  const teamB = players.filter((p) => p.team === "team_b");
+  const teamA = players.filter((p) => p.team === "A");
+  const teamB = players.filter((p) => p.team === "B");
 
   const isValidSet = (s: SetScore): boolean => {
     if (s.a === null || s.b === null) return false;

@@ -315,7 +315,7 @@ const MatchCard = ({
         <div className="mb-4 flex items-center gap-2 bg-primary/10 border border-primary/20 rounded-xl px-3 py-2">
           <Zap className="w-3 h-3 text-primary fill-primary" />
           <span className="text-[10px] font-bold text-primary">
-            You staked {userStake.points} pts on {userStake.team === "team_a" ? "Team A" : "Team B"}
+            You staked {userStake.points} pts on {userStake.team === "A" ? "Team A" : "Team B"}
           </span>
         </div>
       )}

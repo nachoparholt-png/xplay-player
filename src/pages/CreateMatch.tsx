@@ -197,7 +197,7 @@ const CreateMatch = () => {
     if (error) {
       toast({ title: "Error creating match", description: error.message, variant: "destructive" });
     } else {
-      await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "team_a" });
+      await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
 
       // Block the court slot to prevent double-booking
       if (selectedCourtId && selectedSlot && selectedSlotDate) {

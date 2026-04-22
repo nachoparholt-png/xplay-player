@@ -295,7 +295,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     setJoining(true);
     const teamACnt = slots.slice(0, 2).filter(Boolean).length;
     const teamBCnt = slots.slice(2).filter(Boolean).length;
-    const team = teamACnt <= teamBCnt ? "team_a" : "team_b";
+    const team = teamACnt <= teamBCnt ? "A" : "B";
     const { error } = await supabase
       .from("match_players")
       .update({ status: "confirmed", team })

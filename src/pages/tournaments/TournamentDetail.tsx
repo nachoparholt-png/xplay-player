@@ -276,7 +276,7 @@ const TournamentDetail = () => {
   const confirmedPlayers = players.filter(p => p.status === "confirmed");
 
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-80">
       {/* Header with back button and status badges */}
       <div className="sticky top-0 z-10 bg-background border-b border-border/[0.07] px-4 py-3 flex items-center justify-between">
         <button

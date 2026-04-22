@@ -125,7 +125,7 @@ const MatchDetail = () => {
     display_name: string | null; padel_level: number | null; approvals: string[];
   }[]>([]);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
-  const [inviteTarget, setInviteTarget] = useState<{ team: string; slotIndex: number }>({ team: "team_a", slotIndex: 0 });
+  const [inviteTarget, setInviteTarget] = useState<{ team: string; slotIndex: number }>({ team: "A", slotIndex: 0 });
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(null);
 
   const fetchMatch = useCallback(async () => {
@@ -294,7 +294,7 @@ const MatchDetail = () => {
   }, [id, fetchMatch]);
 
   // Handle switching team
-  const handleSwitchTeam = async (targetTeam: "team_a" | "team_b") => {
+  const handleSwitchTeam = async (targetTeam: "A" | "B") => {
     if (!user || !match) return;
     const targetCount = confirmedPlayers.filter(p => p.team === targetTeam).length;
     if (targetCount >= 2) {
@@ -309,7 +309,7 @@ const MatchDetail = () => {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Switched to ${targetTeam === "team_a" ? "Team A" : "Team B"} 🔄` });
+      toast({ title: `Switched to ${targetTeam === "A" ? "Team A" : "Team B"} 🔄` });
       fetchMatch();
     }
     setSlotAction(null);
@@ -397,12 +397,12 @@ const MatchDetail = () => {
     match?.status === "pending_review" && userTeam !== submitterTeam
   );
 
-  const teamAPlayers = confirmedPlayers.filter((p) => p.team === "team_a").map((p) => ({
+  const teamAPlayers = confirmedPlayers.filter((p) => p.team === "A").map((p) => ({
     user_id: p.user_id,
     display_name: p.profiles?.display_name || null,
     team: p.team,
   }));
-  const teamBPlayers = confirmedPlayers.filter((p) => p.team === "team_b").map((p) => ({
+  const teamBPlayers = confirmedPlayers.filter((p) => p.team === "B").map((p) => ({
     user_id: p.user_id,
     display_name: p.profiles?.display_name || null,
     team: p.team,
@@ -432,9 +432,9 @@ const MatchDetail = () => {
     const status = isFull ? "waitlist" : "confirmed";
 
     // Auto-assign team
-    const teamACnt = confirmedPlayers.filter((p) => p.team === "team_a").length;
-    const teamBCnt = confirmedPlayers.filter((p) => p.team === "team_b").length;
-    const team = teamACnt <= teamBCnt ? "team_a" : "team_b";
+    const teamACnt = confirmedPlayers.filter((p) => p.team === "A").length;
+    const teamBCnt = confirmedPlayers.filter((p) => p.team === "B").length;
+    const team = teamACnt <= teamBCnt ? "A" : "B";
 
     const { error } = await supabase.from("match_players").insert({
       match_id: match.id,
@@ -601,9 +601,9 @@ const MatchDetail = () => {
     const newApprovals = [...request.approvals, user.id];
     const allApproved = confirmedPlayers.every((p) => newApprovals.includes(p.user_id));
     if (allApproved) {
-      const teamACnt = confirmedPlayers.filter((p) => p.team === "team_a").length;
-      const teamBCnt = confirmedPlayers.filter((p) => p.team === "team_b").length;
-      const team = teamACnt <= teamBCnt ? "team_a" : "team_b";
+      const teamACnt = confirmedPlayers.filter((p) => p.team === "A").length;
+      const teamBCnt = confirmedPlayers.filter((p) => p.team === "B").length;
+      const team = teamACnt <= teamBCnt ? "A" : "B";
       await supabase.from("match_players").insert({ match_id: match.id, user_id: request.user_id, status: "confirmed", team });
       await supabase.from("match_join_requests").update({ status: "approved" }).eq("id", request.id);
       await supabase.rpc("create_notification_for_user", {
@@ -651,10 +651,10 @@ const MatchDetail = () => {
   const isPreGame = !isAfterGame && !["cancelled", "completed"].includes(match.status);
 
   const teamALevel = confirmedPlayers
-    .filter(p => p.team === "team_a" && p.profiles?.padel_level)
+    .filter(p => p.team === "A" && p.profiles?.padel_level)
     .reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0);
   const teamBLevel = confirmedPlayers
-    .filter(p => p.team === "team_b" && p.profiles?.padel_level)
+    .filter(p => p.team === "B" && p.profiles?.padel_level)
     .reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0);
   const totalLevel = teamALevel + teamBLevel || 1;
 
@@ -669,7 +669,7 @@ const MatchDetail = () => {
     }
   };
 
-  const renderPlayerSlot = (team: "team_a" | "team_b", index: number) => {
+  const renderPlayerSlot = (team: "A" | "B", index: number) => {
     const teamPlayers = confirmedPlayers.filter(p => p.team === team);
     const player = teamPlayers[index];
 
@@ -813,14 +813,14 @@ const MatchDetail = () => {
           {/* Player rows */}
           <div className="grid grid-cols-2 divide-x divide-border/30">
             <div className="px-3 py-1 space-y-0.5">
-              {renderPlayerSlot("team_a", 0)}
+              {renderPlayerSlot("A", 0)}
               <div className="border-t border-border/20" />
-              {renderPlayerSlot("team_a", 1)}
+              {renderPlayerSlot("A", 1)}
             </div>
             <div className="px-3 py-1 space-y-0.5">
-              {renderPlayerSlot("team_b", 0)}
+              {renderPlayerSlot("B", 0)}
               <div className="border-t border-border/20" />
-              {renderPlayerSlot("team_b", 1)}
+              {renderPlayerSlot("B", 1)}
             </div>
           </div>
 
@@ -894,7 +894,7 @@ const MatchDetail = () => {
         {isPreGame && id && match?.format !== "social" && (
           <MatchBettingSection
             matchId={id}
-            userTeam={currentPlayerEntry?.team === "team_a" ? "A" : currentPlayerEntry?.team === "team_b" ? "B" : null}
+            userTeam={currentPlayerEntry?.team === "A" ? "A" : currentPlayerEntry?.team === "B" ? "B" : null}
             matchStatus={match?.status}
             matchDateTime={`${match?.match_date}T${match?.match_time}`}
           />
@@ -1162,7 +1162,7 @@ const MatchDetail = () => {
       <SlotActionModal
         open={!!slotAction}
         onOpenChange={(o) => { if (!o) setSlotAction(null); }}
-        team={slotAction?.team || "team_a"}
+        team={slotAction?.team || "A"}
         onJoin={() => { if (slotAction) handleSlotJoin(slotAction.team); }}
         onInvite={() => {
           if (slotAction) {
@@ -1171,7 +1171,7 @@ const MatchDetail = () => {
             setShowInviteModal(true);
           }
         }}
-        onSwitchTeam={isJoined && slotAction ? () => handleSwitchTeam(slotAction.team as "team_a" | "team_b") : undefined}
+        onSwitchTeam={isJoined && slotAction ? () => handleSwitchTeam(slotAction.team as "A" | "B") : undefined}
         isJoined={isJoined}
         isFull={isFull}
         isInOtherTeam={isJoined && slotAction ? currentPlayerEntry?.team !== slotAction.team : false}

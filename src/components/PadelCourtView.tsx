@@ -14,8 +14,8 @@ interface PadelCourtViewProps {
   teamB: CourtPlayer[];
   interactive?: boolean;
   currentUserId?: string;
-  onEmptySlotClick?: (team: "team_a" | "team_b", slotIndex: number) => void;
-  onSwitchTeam?: (toTeam: "team_a" | "team_b") => void;
+  onEmptySlotClick?: (team: "A" | "B", slotIndex: number) => void;
+  onSwitchTeam?: (toTeam: "A" | "B") => void;
 }
 
 const PlayerBubble = ({
@@ -167,13 +167,13 @@ const PadelCourtView = ({ teamA, teamB, interactive, currentUserId, onEmptySlotC
                   color="primary"
                   isCurrentUser={player.user_id === currentUserId}
                   canSwitch={player.user_id === currentUserId && teamBHasSpace && !!onSwitchTeam}
-                  onSwitchClick={() => onSwitchTeam?.("team_b")}
+                  onSwitchClick={() => onSwitchTeam?.("B")}
                 />
               ) : (
                 <EmptySlot
                   key={i}
                   interactive={interactive}
-                  onClick={() => onEmptySlotClick?.("team_a", teamA.length + i)}
+                  onClick={() => onEmptySlotClick?.("A", teamA.length + i)}
                 />
               )
             )}
@@ -194,13 +194,13 @@ const PadelCourtView = ({ teamA, teamB, interactive, currentUserId, onEmptySlotC
                   color="secondary"
                   isCurrentUser={player.user_id === currentUserId}
                   canSwitch={player.user_id === currentUserId && teamAHasSpace && !!onSwitchTeam}
-                  onSwitchClick={() => onSwitchTeam?.("team_a")}
+                  onSwitchClick={() => onSwitchTeam?.("A")}
                 />
               ) : (
                 <EmptySlot
                   key={i}
                   interactive={interactive}
-                  onClick={() => onEmptySlotClick?.("team_b", teamB.length + i)}
+                  onClick={() => onEmptySlotClick?.("B", teamB.length + i)}
                 />
               )
             )}

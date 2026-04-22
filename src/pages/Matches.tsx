@@ -141,8 +141,8 @@ const MatchCarousel = ({
                   maxPlayers={match.max_players}
                   spotsLeft={match.spotsLeft}
                   status={toStatus(match.status)}
-                  teamA={match.players.filter(p => p.team === "team_a").map(p => ({ name: p.name, avatar: p.avatar, rating: p.rating, isCreator: p.isCreator }))}
-                  teamB={match.players.filter(p => p.team === "team_b").map(p => ({ name: p.name, avatar: p.avatar, rating: p.rating, isCreator: p.isCreator }))}
+                  teamA={match.players.filter(p => p.team === "A").map(p => ({ name: p.name, avatar: p.avatar, rating: p.rating, isCreator: p.isCreator }))}
+                  teamB={match.players.filter(p => p.team === "B").map(p => ({ name: p.name, avatar: p.avatar, rating: p.rating, isCreator: p.isCreator }))}
                   totalPointsStaked={match.totalPointsStaked}
                   teamAOdds={match.market?.team_a_multiplier ?? 0}
                   teamBOdds={match.market?.team_b_multiplier ?? 0}
@@ -733,8 +733,8 @@ const Matches = () => {
                 club: activeBetMatch.club,
                 date: activeBetMatch.match_date ? format(new Date(activeBetMatch.match_date + "T00:00:00"), "EEE d MMMM") : "TBD",
                 time: activeBetMatch.match_time?.slice(0, 5) ?? "",
-                teamALabel: activeBetMatch.players.filter(p => p.team === "team_a").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
-                teamBLabel: activeBetMatch.players.filter(p => p.team === "team_b").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
+                teamALabel: activeBetMatch.players.filter(p => p.team === "A").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
+                teamBLabel: activeBetMatch.players.filter(p => p.team === "B").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
                 teamAOdds: activeBetMatch.market?.team_a_multiplier ?? 1.8,
                 teamBOdds: activeBetMatch.market?.team_b_multiplier ?? 1.8,
               } : null}
