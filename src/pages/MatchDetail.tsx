@@ -41,6 +41,7 @@ type Match = {
   status: string;
   organizer_id: string;
   deadline_at: string | null;
+  cancelled_reason: string | null;
 };
 
 type MatchPlayer = {
@@ -647,6 +648,103 @@ const MatchDetail = () => {
       </div>
     );
   }
+
+  // ── Cancelled tombstone ────────────────────────────────────────────────────
+  if (match.status === "cancelled") {
+    const wasAutoCancel = match.cancelled_reason === "auto_cancelled_unfilled";
+    const wasPlayer = players.some((p) => p.user_id === user?.id);
+    const matchDateStr = match.match_date
+      ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMMM")
+      : "TBD";
+
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Header */}
+        <div className="flex items-center px-4 py-4">
+          <button
+            onClick={() => navigate("/matches")}
+            className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 flex flex-col items-center justify-center px-6 pb-16 text-center space-y-6"
+        >
+          {/* Icon */}
+          <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+            <XCircle className="w-10 h-10 text-destructive/70" />
+          </div>
+
+          {/* Heading */}
+          <div className="space-y-1.5">
+            <h2 className="font-display text-2xl font-black italic uppercase text-foreground leading-tight">
+              Match Cancelled
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {wasAutoCancel
+                ? "This match didn't reach the minimum number of players and was automatically cancelled."
+                : "This match was cancelled by the organiser."}
+            </p>
+          </div>
+
+          {/* Match details tombstone card */}
+          <div className="w-full max-w-sm rounded-2xl border border-border/40 bg-card p-4 space-y-3 text-left">
+            <div className="flex items-center gap-2 text-muted-foreground/60">
+              <div className="w-1 h-full self-stretch rounded-full bg-destructive/30" />
+              <div className="flex-1 space-y-1">
+                <p className="text-[13px] font-bold text-foreground/70 line-through">{match.club}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {matchDateStr} · {match.match_time?.slice(0, 5) ?? ""}
+                </p>
+                <p className="text-[11px] text-muted-foreground capitalize">
+                  {match.format} · Level {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}
+                </p>
+              </div>
+            </div>
+
+            {wasAutoCancel && (
+              <div className="flex items-start gap-2 pt-1 border-t border-border/30">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-400/90">
+                  No charges applied — any payments have been fully refunded.
+                </p>
+              </div>
+            )}
+
+            {wasPlayer && !wasAutoCancel && (
+              <div className="flex items-start gap-2 pt-1 border-t border-border/30">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-400/90">
+                  You were enrolled. Any stakes or payments have been refunded.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* CTA */}
+          <div className="w-full max-w-sm space-y-2">
+            <Button
+              onClick={() => navigate("/matches")}
+              className="w-full h-13 rounded-2xl font-bold text-sm gap-2"
+            >
+              Find Another Match
+            </Button>
+            <button
+              onClick={() => navigate("/matches")}
+              className="w-full text-center text-xs text-muted-foreground py-2 hover:text-foreground transition-colors"
+            >
+              Back to all matches
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const isPreGame = !isAfterGame && !["cancelled", "completed"].includes(match.status);
 

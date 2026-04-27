@@ -6,7 +6,10 @@ import {
   MessageSquare,
   Crown,
   Trophy,
+  Clock,
+  AlertTriangle,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 /* ── Types ── */
 
@@ -55,6 +58,8 @@ export interface MatchCardProps {
   isJoined: boolean;
   isEligible: boolean;
   duration?: string;
+  deadlineAt?: string | null;
+  visibility?: string;
   onClick?: () => void;
   onJoin?: () => void;
   onBet?: () => void;
@@ -76,6 +81,46 @@ const calcOdds = (teamAAvg: number, teamBAvg: number) => {
   if (Math.abs(diff) < 0.1) return { a: base, b: base };
   if (diff > 0) return { a: +(base - shift).toFixed(1), b: +(base + shift).toFixed(1) };
   return { a: +(base + shift).toFixed(1), b: +(base - shift).toFixed(1) };
+};
+
+/* ── Deadline Chip ── */
+
+function useDeadlineCountdown(deadlineAt?: string | null) {
+  const [label, setLabel] = useState<string | null>(null);
+  const [urgent, setUrgent] = useState(false);
+
+  useEffect(() => {
+    if (!deadlineAt) return;
+    const update = () => {
+      const diff = new Date(deadlineAt).getTime() - Date.now();
+      if (diff <= 0) { setLabel(null); return; }
+      const totalMins = Math.floor(diff / 60000);
+      const hours = Math.floor(totalMins / 60);
+      const mins  = totalMins % 60;
+      setUrgent(diff <= 4 * 60 * 60 * 1000); // urgent within 4 h
+      setLabel(hours > 0 ? `Fills in ${hours}h ${mins}m` : `Fills in ${mins}m`);
+    };
+    update();
+    const id = setInterval(update, 30_000);
+    return () => clearInterval(id);
+  }, [deadlineAt]);
+
+  return { label, urgent };
+}
+
+const DeadlineChip = ({ deadlineAt }: { deadlineAt?: string | null }) => {
+  const { label, urgent } = useDeadlineCountdown(deadlineAt);
+  if (!label) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+      urgent
+        ? "bg-red-500/15 text-red-400 border border-red-500/20"
+        : "bg-primary/10 text-primary/70 border border-primary/15"
+    }`}>
+      {urgent ? <AlertTriangle className="w-2.5 h-2.5" /> : <Clock className="w-2.5 h-2.5" />}
+      {label.toUpperCase()}
+    </span>
+  );
 };
 
 /* ── Status Badge Config ── */
@@ -189,6 +234,8 @@ const MatchCard = ({
   userStake,
   isJoined,
   isEligible,
+  deadlineAt,
+  visibility,
   onClick,
   onJoin,
   onBet,
@@ -247,6 +294,12 @@ const MatchCard = ({
           <MapPin className="w-3.5 h-3.5" />
           <span className="text-xs font-semibold">{[club, court, city].filter(Boolean).join(" · ")}</span>
         </div>
+        {/* Deadline chip — only on open public matches with spots left */}
+        {status === "open" && visibility !== "private" && spotsLeft > 0 && deadlineAt && (
+          <div className="mt-2">
+            <DeadlineChip deadlineAt={deadlineAt} />
+          </div>
+        )}
       </div>
 
       {/* Teams Display */}

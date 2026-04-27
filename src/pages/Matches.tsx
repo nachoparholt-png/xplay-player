@@ -29,6 +29,8 @@ type MatchRow = {
   price_per_player: number | null;
   status: string;
   organizer_id: string;
+  deadline_at: string | null;
+  visibility: string;
 };
 
 type PlayerInfo = {
@@ -151,6 +153,8 @@ const MatchCarousel = ({
                   userStake={match.userStake ? { points: match.userStake.points_staked, team: match.userStake.team } : null}
                   isJoined={match.players.some(p => p.user_id === user?.id)}
                   isEligible={true}
+                  deadlineAt={match.deadline_at}
+                  visibility={match.visibility}
                   onClick={() => navigate(`/matches/${match.id}`)}
                   onJoin={() => navigate(`/matches/${match.id}`)}
                   onBet={() => onBet(match)}
@@ -539,8 +543,8 @@ const Matches = () => {
               </div>
             )}
 
-            {/* EMPTY STATE */}
-            {!loading && displayedMatches.length === 0 && (
+            {/* EMPTY STATE (open tab only) */}
+            {!loading && tab === "open" && displayedMatches.length === 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -561,15 +565,96 @@ const Matches = () => {
             )}
 
             {/* MATCH CARDS (my_matches — carousel list style) */}
-            {!loading && displayedMatches.length > 0 && tab === "my_matches" && (
-              <MatchCarousel
-                matches={displayedMatches}
-                highlightMatchId={highlightMatchId}
-                user={user}
-                navigate={navigate}
-                onBet={(match) => setActiveBetMatch(match)}
-              />
-            )}
+            {!loading && tab === "my_matches" && (() => {
+              // Split: matches that still need players vs confirmed/full
+              const needsPlayers = displayedMatches.filter(
+                (m) => m.status === "open" && m.spotsLeft > 0 && m.visibility !== "private"
+              );
+              const confirmed = displayedMatches.filter(
+                (m) => !(m.status === "open" && m.spotsLeft > 0 && m.visibility !== "private")
+              );
+
+              return (
+                <>
+                  {confirmed.length > 0 && (
+                    <MatchCarousel
+                      matches={confirmed}
+                      highlightMatchId={highlightMatchId}
+                      user={user}
+                      navigate={navigate}
+                      onBet={(match) => setActiveBetMatch(match)}
+                    />
+                  )}
+
+                  {needsPlayers.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 pt-2">
+                        <div className="text-[10px] font-black tracking-[0.16em] text-amber-400 uppercase px-1">
+                          ⚠ Needs Players
+                        </div>
+                        <div className="flex-1 h-px bg-amber-400/20" />
+                      </div>
+                      <div className="space-y-3">
+                        {needsPlayers.map((match) => {
+                          const spotsNeeded = match.spotsLeft;
+                          return (
+                            <motion.button
+                              key={match.id}
+                              onClick={() => navigate(`/matches/${match.id}`)}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="w-full rounded-[18px] border border-amber-400/25 bg-amber-400/5 p-4 text-left hover:bg-amber-400/10 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[13px] font-bold text-foreground">{match.club}</p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {match.match_date ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMM") : "TBD"} · {match.match_time?.slice(0, 5) ?? ""}
+                                  </p>
+                                </div>
+                                <span className="text-[9px] font-black text-amber-400 bg-amber-400/15 px-2 py-1 rounded-full shrink-0">
+                                  {spotsNeeded} SPOT{spotsNeeded !== 1 ? "S" : ""} LEFT
+                                </span>
+                              </div>
+                              <div className="mt-3 flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-amber-400 bg-amber-400/15 px-2.5 py-1 rounded-full">
+                                  Share to fill
+                                </span>
+                                {match.deadline_at && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Deadline: {new Date(match.deadline_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  {confirmed.length === 0 && needsPlayers.length === 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-16 space-y-4"
+                    >
+                      <div className="flex justify-center">{emptyState.icon}</div>
+                      <div>
+                        <p className="font-display font-bold text-foreground">{emptyState.title}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{emptyState.subtitle}</p>
+                      </div>
+                      <button
+                        onClick={() => setShowCreateMatch(true)}
+                        className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-black text-xs uppercase tracking-widest mt-2 active:scale-95 transition-transform"
+                      >
+                        Create a match
+                      </button>
+                    </motion.div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* MATCH CARDS (open — grid/list style) */}
             {!loading && displayedMatches.length > 0 && tab === "open" && (

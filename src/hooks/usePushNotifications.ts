@@ -47,8 +47,25 @@ export function usePushNotifications() {
           (action) => {
             if (!mounted) return;
             const data = action.notification.data as Record<string, string> | undefined;
-            if (data?.route) {
-              navigate(data.route);
+            const type = data?.type;
+            // match_id may come as an explicit field, or we extract it from the link/route
+            const route = data?.route ?? data?.link ?? "";
+            const matchIdFromRoute = route.match(/\/matches\/([a-f0-9-]{36})/)?.[1];
+            const matchId = data?.match_id ?? matchIdFromRoute ?? null;
+
+            // Type-aware routing for match lifecycle notifications
+            if (type === "match_auto_cancelled") {
+              // Match was cancelled — go to the matches list so they can find another
+              navigate("/matches");
+            } else if (type === "match_deadline_warning" && matchId) {
+              // Organiser warned about deadline — take them to the specific match to share/promote
+              navigate(`/matches/${matchId}`);
+            } else if (type === "match_reminder" && matchId) {
+              // Pre-match reminder — deep link to match detail
+              navigate(`/matches/${matchId}`);
+            } else if (route) {
+              // Legacy / generic fallback: use explicit route from payload
+              navigate(route);
             } else {
               navigate("/matches");
             }
