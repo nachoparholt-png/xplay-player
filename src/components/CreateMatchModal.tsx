@@ -75,6 +75,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   // Free-text court fallback (used when XPLAY club has no courts in DB, or "other" mode)
   const [courtFallback, setCourtFallback] = useState("");
 
+  // Manual court fee for private matches without a pre-priced slot (total cost in £)
+  const [courtFeeInput, setCourtFeeInput] = useState("");
+
   // Auto-calculated level range
   const playerLevel = profile?.padel_level ?? 3.0;
   const suggestedMax = Math.min(7.0, playerLevel + 1.0);
@@ -248,11 +251,16 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       currency: string;
     } | null = null;
 
-    if (requiresPayment && selectedSlot) {
+    if (requiresPayment) {
       // Step 1: Create PaymentIntent server-side
+      // Use slot-based flow if the selected slot has a club-set price; otherwise use manual fee
+      const piBody = slotHasPrice && selectedSlot
+        ? { court_slot_id: selectedSlot.id, max_players: 4 }
+        : { court_price_cents: Math.round(manualFeeAmount * 100), currency: "gbp", max_players: 4 };
+
       const { data: piData, error: piError } = await supabase.functions.invoke(
         "create-private-match-payment-intent",
-        { body: { court_slot_id: selectedSlot.id, max_players: 4 } }
+        { body: piBody }
       );
 
       if (piError || piData?.error) {
@@ -399,11 +407,11 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   );
 
   // Whether a Stripe payment is required (private + XPLAY court slot with price)
+  const slotHasPrice = selectedSlot !== null && Number(selectedSlot.price ?? 0) > 0;
+  const manualFeeAmount = Number(courtFeeInput) || 0; // £ as float
   const requiresPayment =
     visibility === "private" &&
-    venueMode === "xplay" &&
-    selectedSlot !== null &&
-    Number(selectedSlot.price ?? 0) > 0;
+    (slotHasPrice || manualFeeAmount > 0);
 
   // Whether we're in "smart slot" mode
   const useSmartSlots = venueMode === "xplay" && courts.length > 0;
@@ -805,7 +813,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                 {(["public", "private"] as const).map((v) => (
                   <button
                     key={v}
-                    onClick={() => setVisibility(v)}
+                    onClick={() => { setVisibility(v); if (v === "public") setCourtFeeInput(""); }}
                     className={cn(
                       "flex-1 py-2 rounded-lg text-xs font-semibold transition-colors border capitalize",
                       visibility === v
@@ -819,10 +827,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               </div>
             </div>
 
-            {/* ── Private match escrow preview ─────────────────────────────── */}
-            {visibility === "private" && venueMode === "xplay" && selectedSlot && (
+            {/* ── Private match: court fee input + escrow preview ───────────── */}
+            {visibility === "private" && (
               <div className={cn(
-                "rounded-xl border p-3.5 space-y-2",
+                "rounded-xl border p-3.5 space-y-3",
                 requiresPayment
                   ? "bg-amber-500/10 border-amber-500/30"
                   : "bg-muted/40 border-border/30"
@@ -833,7 +841,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     {requiresPayment ? "Private match — payment required" : "Private match"}
                   </span>
                 </div>
-                {requiresPayment && selectedSlot.price ? (
+
+                {/* Slot-based price (club-set) */}
+                {slotHasPrice && selectedSlot?.price ? (
                   <>
                     <div className="text-[11px] text-muted-foreground space-y-0.5">
                       <div className="flex justify-between">
@@ -851,9 +861,51 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     </div>
                   </>
                 ) : (
-                  <p className="text-[11px] text-muted-foreground">
-                    No court fee set — match will be created without payment.
-                  </p>
+                  /* Manual fee entry — shown when no pre-priced slot */
+                  <>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground mb-1.5 block">
+                        Court fee total (£) — optional
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className="absolute left-3 text-sm text-muted-foreground pointer-events-none">£</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="1"
+                          value={courtFeeInput}
+                          onChange={(e) => setCourtFeeInput(e.target.value)}
+                          placeholder="e.g. 80"
+                          className="w-full h-10 rounded-xl bg-muted border border-border/50 pl-7 pr-3 text-sm outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/20"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Enter the total court booking cost. You pay upfront and get refunded as players join.
+                      </p>
+                    </div>
+                    {manualFeeAmount > 0 && (
+                      <div className="text-[11px] text-muted-foreground space-y-0.5 border-t border-amber-500/20 pt-2">
+                        <div className="flex justify-between">
+                          <span>Court cost</span>
+                          <span className="text-foreground font-medium">£{manualFeeAmount.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Per spot (÷4)</span>
+                          <span className="text-foreground font-medium">£{(manualFeeAmount / 4).toFixed(2)}</span>
+                        </div>
+                        <p className="text-[10px] text-amber-200/80 mt-1 leading-relaxed">
+                          You pay £{manualFeeAmount.toFixed(0)} now and get refunded £{(manualFeeAmount / 4).toFixed(2)} per player who joins.
+                        </p>
+                      </div>
+                    )}
+                    {manualFeeAmount === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Leave blank to create a free private match.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}

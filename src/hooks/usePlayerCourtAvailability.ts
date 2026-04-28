@@ -79,7 +79,13 @@ export function usePlayerCourtAvailability(
       const closeMins = timeToMins(closeTime);
       const windows: AvailableWindow[] = [];
 
+      // If the selected date is today, don't show slots that have already started
+      const todayStr = new Date().toISOString().split('T')[0];
+      const now      = new Date();
+      const nowMins  = date === todayStr ? now.getHours() * 60 + now.getMinutes() : 0;
+
       for (let t = openMins; t + durationMins <= closeMins; t += 30) {
+        if (t < nowMins) continue; // skip past slots when viewing today
         const windowEnd = t + durationMins;
         const overlaps  = occupied.some(o => t < o.end && windowEnd > o.start);
         if (!overlaps) windows.push({ start: minsToTime(t), end: minsToTime(windowEnd) });
