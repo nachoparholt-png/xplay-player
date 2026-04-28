@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+/**
+ * useGooglePlaces
+ *
+ * Uses the Google Places AutocompleteService + PlacesService (not the DOM widget)
+ * so the dropdown is fully under our control — no .pac-container focus-trap issues
+ * inside Radix dialogs, no broken tap-to-select on iOS Capacitor.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
-// Singleton script loader — only loads once per page session
+// ── Singleton script loader ───────────────────────────────────────────────────
 let scriptState: "idle" | "loading" | "ready" | "error" = "idle";
 const readyCallbacks: Array<() => void> = [];
 const errorCallbacks: Array<() => void> = [];
@@ -31,8 +39,6 @@ function loadScript(onReady: () => void, onError: () => void) {
   };
   document.head.appendChild(script);
 
-  // Timeout fallback — if script hasn't loaded in 8s, treat as error
-  // (handles cases where the script loads but gmap blocks silently, e.g. Capacitor origin)
   setTimeout(() => {
     if (scriptState === "loading") {
       scriptState = "error";
@@ -42,105 +48,105 @@ function loadScript(onReady: () => void, onError: () => void) {
   }, 8000);
 }
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 export type PlaceResult = {
-  name: string;       // venue / place name
-  address: string;    // formatted address
+  name: string;
+  address: string;
 };
 
-/**
- * Attaches a Google Places Autocomplete to the provided input ref.
- * Returns the currently selected place (or null) and a ready flag.
- */
-export function useGooglePlaces(
-  inputRef: React.RefObject<HTMLInputElement>,
-  onSelect: (place: PlaceResult) => void
-) {
-  // If no API key is configured, skip the script entirely and fall back immediately
+export type Prediction = {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+};
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+export function useGooglePlaces(onSelect: (place: PlaceResult) => void) {
   const noKey = !GOOGLE_MAPS_KEY;
   const [ready, setReady] = useState(!noKey && scriptState === "ready");
   const [failed, setFailed] = useState(noKey || scriptState === "error");
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
 
+  const acServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  // PlacesService needs a DOM attribution node
+  const attrDivRef = useRef<HTMLDivElement | null>(null);
+
+  // Load Google Maps script
   useEffect(() => {
-    if (noKey) return; // nothing to load
+    if (noKey) return;
     loadScript(() => setReady(true), () => setFailed(true));
   }, [noKey]);
 
+  // Initialise services once script is ready
   useEffect(() => {
-    if (!ready || !inputRef.current || autocompleteRef.current) return;
-
-    const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
-      types: ["establishment", "geocode"],
-      fields: ["name", "formatted_address"],
-    });
-
-    autocompleteRef.current = ac;
-
-    ac.addListener("place_changed", () => {
-      const place = ac.getPlace();
-      if (!place) return;
-      onSelect({
-        name: place.name ?? "",
-        address: place.formatted_address ?? "",
-      });
-    });
-
-    // ── Desktop + Mobile fix ──────────────────────────────────────────────────
-    // When the Places input lives inside a Dialog/modal, clicking a PAC suggestion
-    // fires mousedown outside the dialog → the Radix focus trap returns focus →
-    // the input blurs → the PAC dropdown collapses → place_changed never fires.
-    //
-    // Fix: preventDefault on mousedown inside .pac-container keeps the input
-    //      focused so place_changed fires normally. The click still reaches the
-    //      pac-item and Google's own handler fires the event.
-    //
-    // Mobile (iOS Capacitor) has the same blur problem via touchstart. We also
-    // synthesise a click on touchend because preventDefault on touchstart
-    // suppresses the browser's synthetic click.
-    const handlePacMouseDown = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.(".pac-container")) {
-        e.preventDefault(); // keep focus on input → PAC stays open → place_changed fires
+    if (!ready) return;
+    if (!acServiceRef.current) {
+      acServiceRef.current = new window.google.maps.places.AutocompleteService();
+    }
+    if (!placesServiceRef.current) {
+      if (!attrDivRef.current) {
+        attrDivRef.current = document.createElement("div");
+        document.body.appendChild(attrDivRef.current);
       }
-    };
+      placesServiceRef.current = new window.google.maps.places.PlacesService(attrDivRef.current);
+    }
+  }, [ready]);
 
-    const handlePacTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.(".pac-container")) {
-        e.preventDefault();
+  // Fetch predictions for a text query
+  const fetchPredictions = useCallback((input: string) => {
+    if (!acServiceRef.current || !input.trim()) {
+      setPredictions([]);
+      return;
+    }
+    acServiceRef.current.getPlacePredictions(
+      { input, types: ["establishment", "geocode"] },
+      (preds, status) => {
+        if (
+          status === window.google.maps.places.PlacesServiceStatus.OK &&
+          preds && preds.length > 0
+        ) {
+          setPredictions(
+            preds.slice(0, 5).map((p) => ({
+              placeId: p.place_id,
+              mainText: p.structured_formatting.main_text,
+              secondaryText: p.structured_formatting.secondary_text ?? "",
+            }))
+          );
+        } else {
+          setPredictions([]);
+        }
       }
-    };
+    );
+  }, []);
 
-    const handlePacTouchEnd = (e: TouchEvent) => {
-      const target = e.target as HTMLElement | null;
-      const item = target?.closest?.(".pac-item") as HTMLElement | null;
-      if (item) {
-        e.preventDefault();
-        item.click();
-      }
-    };
+  // Resolve a prediction to a full PlaceResult and call onSelect
+  const selectPrediction = useCallback(
+    (prediction: Prediction) => {
+      if (!placesServiceRef.current) return;
+      setPredictions([]); // close dropdown immediately
+      placesServiceRef.current.getDetails(
+        { placeId: prediction.placeId, fields: ["name", "formatted_address"] },
+        (place, status) => {
+          if (
+            status === window.google.maps.places.PlacesServiceStatus.OK &&
+            place
+          ) {
+            onSelect({
+              name: place.name ?? prediction.mainText,
+              address: place.formatted_address ?? prediction.secondaryText,
+            });
+          } else {
+            // Fallback: use the prediction text directly
+            onSelect({ name: prediction.mainText, address: prediction.secondaryText });
+          }
+        }
+      );
+    },
+    [onSelect]
+  );
 
-    document.addEventListener("mousedown", handlePacMouseDown, {
-      capture: true,
-    });
-    document.addEventListener("touchstart", handlePacTouchStart, {
-      capture: true,
-      passive: false,
-    });
-    document.addEventListener("touchend", handlePacTouchEnd, {
-      capture: true,
-      passive: false,
-    });
+  const clearPredictions = useCallback(() => setPredictions([]), []);
 
-    return () => {
-      window.google.maps.event.clearInstanceListeners(ac);
-      autocompleteRef.current = null;
-      document.removeEventListener("mousedown", handlePacMouseDown, { capture: true });
-      document.removeEventListener("touchstart", handlePacTouchStart, { capture: true });
-      document.removeEventListener("touchend", handlePacTouchEnd, { capture: true });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, inputRef]);
-
-  return { ready, failed };
+  return { ready, failed, predictions, fetchPredictions, selectPrediction, clearPredictions };
 }
