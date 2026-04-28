@@ -41,6 +41,8 @@ type Match = {
   status: string;
   organizer_id: string;
   deadline_at: string | null;
+  score_deadline_at: string | null;
+  score_winner: string | null;
   cancelled_reason: string | null;
 };
 
@@ -103,7 +105,7 @@ const levelToCategory = (level: number | null): 1 | 2 | 3 | 4 | 5 => {
   return 5;
 };
 
-const AFTER_GAME_STATUSES = ["awaiting_score", "score_submitted", "pending_review", "review_requested", "confirmed", "draw", "closed_as_draw", "auto_closed"];
+const AFTER_GAME_STATUSES = ["awaiting_score", "score_submitted", "pending_review", "review_requested", "confirmed", "completed", "draw", "closed_as_draw", "auto_closed"];
 
 const MatchDetail = () => {
   const { id } = useParams();
@@ -456,6 +458,18 @@ const MatchDetail = () => {
 
   // Result summary for resolved matches
   const getResultSummary = () => {
+    const m = match as any;
+    // Prefer score_winner on the match (set by our new edge functions / cron)
+    if (m?.score_winner && m.score_winner !== "draw") {
+      const score = latestSubmission ? [
+        latestSubmission.team_a_set_1 !== null ? `${latestSubmission.team_a_set_1}-${latestSubmission.team_b_set_1}` : null,
+        latestSubmission.team_a_set_2 !== null ? `${latestSubmission.team_a_set_2}-${latestSubmission.team_b_set_2}` : null,
+        latestSubmission.team_a_set_3 !== null ? `${latestSubmission.team_a_set_3}-${latestSubmission.team_b_set_3}` : null,
+      ].filter(Boolean).join(" / ") : "";
+      return `Team ${m.score_winner} wins${score ? ` — ${score}` : ""}`;
+    }
+    if (m?.score_winner === "draw") return "Draw — 0-0";
+
     if (!latestSubmission) return null;
     const s = latestSubmission;
     const score = [
@@ -895,7 +909,7 @@ const MatchDetail = () => {
         {isAfterGame && (
           <AfterGameCard
             status={match.status}
-            deadlineAt={match.deadline_at}
+            deadlineAt={(match as any).score_deadline_at ?? match.deadline_at}
             isPlayerInMatch={isPlayerInMatch}
             canSubmitScore={canSubmitScore}
             canReviewScore={canReviewScore}

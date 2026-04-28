@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-
 import { CheckCircle, AlertTriangle, Trophy, Equal } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,25 +36,34 @@ interface ScoreReviewModalProps {
   onReviewed: () => void;
 }
 
-const REVIEW_REASONS = [
-  "Wrong set score",
-  "Wrong winner",
-  "Match should be draw",
-  "Third set missing",
-  "Score entered incorrectly",
+type SetScore = { a: number | null; b: number | null };
+
+const VALID_SCORES = [
+  [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [7, 5], [7, 6],
+  [0, 6], [1, 6], [2, 6], [3, 6], [4, 6], [5, 7], [6, 7],
 ];
+
+const isValidSet = (s: SetScore): boolean => {
+  if (s.a === null || s.b === null) return false;
+  return VALID_SCORES.some(([a, b]) => a === s.a && b === s.b);
+};
 
 const ScoreReviewModal = ({ matchId, submission, open, onOpenChange, players, onReviewed }: ScoreReviewModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
-  const [reviewNote, setReviewNote] = useState("");
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [showDisputeForm, setShowDisputeForm] = useState(false);
+  const [disputeSets, setDisputeSets] = useState<[SetScore, SetScore, SetScore]>([
+    { a: null, b: null },
+    { a: null, b: null },
+    { a: null, b: null },
+  ]);
 
   if (!submission) return null;
 
   const teamA = players.filter((p) => p.team === "A");
   const teamB = players.filter((p) => p.team === "B");
+  const userTeam = (players.find((p) => p.user_id === user?.id)?.team as "A" | "B") ?? "A";
 
   const sets = [
     submission.team_a_set_1 !== null ? { a: submission.team_a_set_1, b: submission.team_b_set_1 } : null,
@@ -64,95 +71,101 @@ const ScoreReviewModal = ({ matchId, submission, open, onOpenChange, players, on
     submission.team_a_set_3 !== null ? { a: submission.team_a_set_3, b: submission.team_b_set_3 } : null,
   ].filter(Boolean) as { a: number | null; b: number | null }[];
 
-  const handleValidate = async () => {
+  // Validate dispute sets
+  const d1Valid = isValidSet(disputeSets[0]);
+  const d2Valid = isValidSet(disputeSets[1]);
+  const d3Valid = disputeSets[2].a !== null && disputeSets[2].b !== null ? isValidSet(disputeSets[2]) : true;
+  const canDispute = d1Valid && d2Valid && d3Valid;
+
+  const handleAccept = async () => {
     if (!user || !submission) return;
     setSubmitting(true);
 
-    const { error } = await supabase.from("score_reviews").insert({
-      submission_id: submission.id,
-      reviewed_by: user.id,
-      action: "validated",
-      review_note: null,
+    const { data, error } = await supabase.functions.invoke("confirm-match-score", {
+      body: {
+        match_id: matchId,
+        submission_id: submission.id,
+        action: "accept",
+      },
     });
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Error", description: data?.error ?? error?.message, variant: "destructive" });
     } else {
-      // Update submission status
-      await supabase.from("score_submissions").update({ status: "validated" }).eq("id", submission.id);
-      // Update match status to confirmed or draw
-      const newStatus = submission.result_type === "draw" ? "draw" : "confirmed";
-      await supabase.from("matches").update({ status: newStatus }).eq("id", matchId);
-
-      // Settle points (old stake system)
-      const action = submission.result_type === "draw" ? "refund_draw" : "confirm_result";
-      await supabase.functions.invoke("settle-match", {
-        body: { match_id: matchId, action },
-      });
-
-      // Settle v2 match bets
-      const winner = submission.result_type === "team_a_win" ? "A" : submission.result_type === "team_b_win" ? "B" : "draw";
-      const { data: marketData } = await supabase
-        .from("match_bet_markets")
-        .select("id")
-        .eq("match_id", matchId)
-        .eq("status", "open")
-        .maybeSingle();
-
-      if (marketData) {
-        await supabase.functions.invoke("settle-match-market", {
-          body: { market_id: marketData.id, winner },
-        });
+      // Also settle match bets if applicable
+      const winner = data?.winner;
+      if (winner) {
+        const { data: marketData } = await supabase
+          .from("match_bet_markets")
+          .select("id")
+          .eq("match_id", matchId)
+          .eq("status", "open")
+          .maybeSingle();
+        if (marketData) {
+          await supabase.functions.invoke("settle-match-market", {
+            body: { market_id: marketData.id, winner },
+          });
+        }
       }
 
-      toast({ title: "Score validated! ✅", description: "Match result is now confirmed." });
+      toast({ title: "Score confirmed! ✅", description: "Match result is now confirmed." });
       onReviewed();
       onOpenChange(false);
     }
     setSubmitting(false);
   };
 
-  const handleRequestReview = async () => {
-    if (!user || !submission) return;
+  const handleDispute = async () => {
+    if (!user || !submission || !canDispute) return;
     setSubmitting(true);
 
-    const note = selectedReason
-      ? `${selectedReason}${reviewNote ? ": " + reviewNote : ""}`
-      : reviewNote || "Review requested";
-
-    const { error } = await supabase.from("score_reviews").insert({
-      submission_id: submission.id,
-      reviewed_by: user.id,
-      action: "review_requested",
-      review_note: note,
+    const { data, error } = await supabase.functions.invoke("confirm-match-score", {
+      body: {
+        match_id: matchId,
+        submission_id: submission.id,
+        action: "dispute",
+        submitted_team: userTeam,
+        team_a_set_1: disputeSets[0].a,
+        team_a_set_2: disputeSets[1].a,
+        team_a_set_3: disputeSets[2].a ?? null,
+        team_b_set_1: disputeSets[0].b,
+        team_b_set_2: disputeSets[1].b,
+        team_b_set_3: disputeSets[2].b ?? null,
+      },
     });
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Error", description: data?.error ?? error?.message, variant: "destructive" });
     } else {
-      await supabase.from("score_submissions").update({ status: "rejected" }).eq("id", submission.id);
-      await supabase.from("matches").update({ status: "review_requested" }).eq("id", matchId);
-
-      // Notify the submitting team
-      const userTeam = players.find((p) => p.user_id === user.id)?.team;
-      const opponents = players.filter((p) => p.team !== userTeam);
-      if (opponents.length > 0) {
-        await Promise.all(opponents.map((p) =>
-          supabase.rpc("create_notification_for_user", {
-            _user_id: p.user_id,
-            _type: "review_requested",
-            _title: "Review Requested ⚠️",
-            _body: `The other team requested a review of the score. Reason: ${note}`,
-            _link: `/matches/${matchId}`,
-          })
-        ));
-      }
-
-      toast({ title: "Review requested", description: "The other team will be notified." });
+      toast({ title: "Score disputed", description: "The other team will be asked to confirm your score." });
       onReviewed();
       onOpenChange(false);
     }
     setSubmitting(false);
+  };
+
+  const ScoreSelector = ({ value, onChange, label }: { value: number | null; onChange: (v: number) => void; label: string }) => {
+    const scores = [0, 1, 2, 3, 4, 5, 6, 7];
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
+        <div className="flex flex-wrap gap-1 justify-center">
+          {scores.map((s) => (
+            <button
+              key={s}
+              onClick={() => onChange(s)}
+              className={`w-8 h-8 rounded-lg font-bold text-sm transition-all ${
+                value === s
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -229,54 +242,91 @@ const ScoreReviewModal = ({ matchId, submission, open, onOpenChange, players, on
             <p className="text-sm text-muted-foreground italic border-l-2 border-border pl-3">{submission.comment}</p>
           )}
 
-          {/* Validate */}
-          <Button
-            onClick={handleValidate}
-            disabled={submitting}
-            className="w-full h-12 rounded-xl font-semibold gap-2"
-          >
-            <CheckCircle className="w-4 h-4" />
-            Validate Result
-          </Button>
+          {/* Accept */}
+          {!showDisputeForm && (
+            <>
+              <Button
+                onClick={handleAccept}
+                disabled={submitting}
+                className="w-full h-12 rounded-xl font-semibold gap-2"
+              >
+                <CheckCircle className="w-4 h-4" />
+                {submitting ? "Confirming..." : "Confirm Result"}
+              </Button>
 
-          {/* Request Review */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Or request a review</p>
+              <Button
+                variant="outline"
+                onClick={() => setShowDisputeForm(true)}
+                disabled={submitting}
+                className="w-full h-11 rounded-xl font-semibold gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                Dispute — Enter Different Score
+              </Button>
+            </>
+          )}
 
-            <div className="flex flex-wrap gap-1.5">
-              {REVIEW_REASONS.map((reason) => (
+          {/* Dispute score entry */}
+          {showDisputeForm && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4" />
+                  Enter the correct score
+                </p>
                 <button
-                  key={reason}
-                  onClick={() => setSelectedReason(selectedReason === reason ? null : reason)}
-                  className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
-                    selectedReason === reason
-                      ? "border-destructive/50 bg-destructive/10 text-destructive"
-                      : "border-border/50 bg-muted/30 text-muted-foreground hover:text-foreground"
-                  }`}
+                  onClick={() => setShowDisputeForm(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {reason}
+                  Cancel
                 </button>
-              ))}
+              </div>
+
+              {[0, 1, 2].map((i) => {
+                const set = disputeSets[i];
+                const valid = set.a !== null && set.b !== null ? isValidSet(set) : true;
+                return (
+                  <div key={i} className={`p-3 rounded-xl border ${!valid && set.a !== null ? "border-destructive/50 bg-destructive/5" : "border-border/50 bg-card"}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Set {i + 1} {i === 2 ? "(optional)" : ""}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <ScoreSelector
+                        label="Team A"
+                        value={set.a}
+                        onChange={(v) => {
+                          const ns = [...disputeSets] as [SetScore, SetScore, SetScore];
+                          ns[i] = { ...ns[i], a: v };
+                          setDisputeSets(ns);
+                        }}
+                      />
+                      <ScoreSelector
+                        label="Team B"
+                        value={set.b}
+                        onChange={(v) => {
+                          const ns = [...disputeSets] as [SetScore, SetScore, SetScore];
+                          ns[i] = { ...ns[i], b: v };
+                          setDisputeSets(ns);
+                        }}
+                      />
+                    </div>
+                    {!valid && set.a !== null && set.b !== null && (
+                      <p className="text-[10px] text-destructive mt-1.5 text-center">Invalid set score</p>
+                    )}
+                  </div>
+                );
+              })}
+
+              <Button
+                onClick={handleDispute}
+                disabled={submitting || !canDispute}
+                className="w-full h-12 rounded-xl font-semibold gap-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                {submitting ? "Submitting..." : "Submit Disputed Score"}
+              </Button>
             </div>
-
-            <Textarea
-              placeholder="Additional notes (optional)..."
-              value={reviewNote}
-              onChange={(e) => setReviewNote(e.target.value)}
-              className="rounded-xl bg-muted/50 border-border/50 text-sm resize-none"
-              rows={2}
-            />
-
-            <Button
-              variant="outline"
-              onClick={handleRequestReview}
-              disabled={submitting}
-              className="w-full h-11 rounded-xl font-semibold gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              Request Review
-            </Button>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

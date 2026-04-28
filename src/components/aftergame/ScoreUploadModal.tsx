@@ -78,22 +78,30 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
 
   const canSubmit = set1Valid && set2Valid && resultType !== null;
 
+  // Derive which team this player is on
+  const userTeam = (players.find((p) => p.user_id === user?.id)?.team as "A" | "B") ?? "A";
+
   const handleSubmitDraw = async () => {
     if (!user) return;
     setSubmitting(true);
-    const { error } = await supabase.from("score_submissions").insert({
-      match_id: matchId,
-      submitted_by: user.id,
-      result_type: "draw",
-      comment: "Marked as draw by player",
-      status: "pending",
+    // Submit a draw via the edge function using 0-0 scores
+    const { data, error } = await supabase.functions.invoke("submit-match-score", {
+      body: {
+        match_id: matchId,
+        submitted_team: userTeam,
+        team_a_set_1: 0,
+        team_a_set_2: 0,
+        team_b_set_1: 0,
+        team_b_set_2: 0,
+        team_a_set_3: null,
+        team_b_set_3: null,
+      },
     });
 
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Error", description: data?.error ?? error?.message, variant: "destructive" });
     } else {
-      await supabase.from("matches").update({ status: "pending_review" }).eq("id", matchId);
-      toast({ title: "Match marked as draw", description: "Waiting for opponent confirmation." });
+      toast({ title: "Draw submitted", description: "Waiting for opponent confirmation." });
       onSubmitted();
       onOpenChange(false);
     }
@@ -104,42 +112,22 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
     if (!user || !canSubmit) return;
     setSubmitting(true);
 
-    const payload = {
-      match_id: matchId,
-      submitted_by: user.id,
-      team_a_set_1: sets[0].a,
-      team_b_set_1: sets[0].b,
-      team_a_set_2: sets[1].a,
-      team_b_set_2: sets[1].b,
-      team_a_set_3: sets[2].a !== null ? sets[2].a : null,
-      team_b_set_3: sets[2].b !== null ? sets[2].b : null,
-      result_type: resultType,
-      comment: comment || null,
-      status: "pending",
-    };
+    const { data, error } = await supabase.functions.invoke("submit-match-score", {
+      body: {
+        match_id: matchId,
+        submitted_team: userTeam,
+        team_a_set_1: sets[0].a,
+        team_a_set_2: sets[1].a,
+        team_a_set_3: sets[2].a ?? null,
+        team_b_set_1: sets[0].b,
+        team_b_set_2: sets[1].b,
+        team_b_set_3: sets[2].b ?? null,
+      },
+    });
 
-    const { error } = await supabase.from("score_submissions").insert(payload);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (error || data?.error) {
+      toast({ title: "Error submitting score", description: data?.error ?? error?.message, variant: "destructive" });
     } else {
-      await supabase.from("matches").update({ status: "pending_review" }).eq("id", matchId);
-
-      // Notify opposing team
-      const userTeam = players.find((p) => p.user_id === user.id)?.team;
-      const opponents = players.filter((p) => p.team !== userTeam);
-      if (opponents.length > 0) {
-        await Promise.all(opponents.map((p) =>
-          supabase.rpc("create_notification_for_user", {
-            _user_id: p.user_id,
-            _type: "score_submitted",
-            _title: "Score Submitted 📋",
-            _body: "The opposing team submitted the match score. Please review it.",
-            _link: `/matches/${matchId}`,
-          })
-        ));
-      }
-
       toast({ title: "Score submitted! ✅", description: "Waiting for the opposing team to review." });
       onSubmitted();
       onOpenChange(false);

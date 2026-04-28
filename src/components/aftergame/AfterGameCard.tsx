@@ -62,6 +62,7 @@ const AfterGameCard = ({
           bg: "bg-gold/10 border-gold/20",
         };
       case "confirmed":
+      case "completed":
         return {
           icon: <Trophy className="w-5 h-5" />,
           title: "Match Confirmed",
@@ -82,7 +83,7 @@ const AfterGameCard = ({
         return {
           icon: <AlertTriangle className="w-5 h-5" />,
           title: "Auto-Closed as Draw",
-          subtitle: "No agreement was reached within 24 hours. Stakes refunded.",
+          subtitle: "No score was submitted within 24 hours. Recorded as 0-0 draw.",
           color: "text-muted-foreground",
           bg: "bg-muted/50 border-border/50",
         };
@@ -94,7 +95,7 @@ const AfterGameCard = ({
   const config = getStatusConfig();
   if (!config) return null;
 
-  const isResolved = ["confirmed", "draw", "closed_as_draw", "auto_closed"].includes(status);
+  const isResolved = ["confirmed", "completed", "draw", "closed_as_draw", "auto_closed"].includes(status);
 
   return (
     <motion.div
