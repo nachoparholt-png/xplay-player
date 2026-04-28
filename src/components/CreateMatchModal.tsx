@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfDay, isSameDay } from "date-fns";
-import { ClipboardPaste, ChevronRight } from "lucide-react";
+import { ClipboardPaste, ChevronRight, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
+import { Stripe, PaymentSheetEventsEnum } from "@capacitor-community/stripe";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +32,7 @@ interface CreateMatchModalProps {
   onCreated?: (matchId: string) => void;
 }
 
+// Fallback time slots used only for "other" venue mode
 const TIME_SLOTS = Array.from({ length: 36 }, (_, i) => {
   const hour = Math.floor(i / 2) + 6;
   const min = i % 2 === 0 ? "00" : "30";
@@ -47,7 +48,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [pasteLoading, setPasteLoading] = useState(false);
   const [clubPickerOpen, setClubPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [errors, setErrors] = useState<{ club?: boolean; date?: boolean; time?: boolean }>({});
+  const [errors, setErrors] = useState<{ club?: boolean; date?: boolean; time?: boolean; court?: boolean }>({});
   const [selectedClub, setSelectedClub] = useState<ClubSelection | null>(null);
   const [notes, setNotes] = useState("");
 
@@ -56,11 +57,23 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [customVenue, setCustomVenue] = useState<PlaceResult | null>(null);
   const [customCourt, setCustomCourt] = useState("");
 
-  const [court, setCourt] = useState("");
+  // XPLAY club courts (real DB courts)
+  const [courts, setCourts] = useState<any[]>([]);
+  const [courtsLoading, setCourtsLoading] = useState(false);
+  const [selectedCourtObj, setSelectedCourtObj] = useState<any | null>(null);
+
+  // XPLAY available slots for selected court + date
+  const [availableSlots, setAvailableSlots] = useState<any[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  // Shared form state
   const [matchDate, setMatchDate] = useState<Date | undefined>();
   const [matchTime, setMatchTime] = useState("");
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
+
+  // Free-text court fallback (used when XPLAY club has no courts in DB, or "other" mode)
+  const [courtFallback, setCourtFallback] = useState("");
 
   // Auto-calculated level range
   const playerLevel = profile?.padel_level ?? 3.0;
@@ -68,7 +81,61 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [levelMin, setLevelMin] = useState(Math.max(0.5, playerLevel - 1.0));
   const [showLevelEditor, setShowLevelEditor] = useState(false);
 
-  // Reset state when modal opens/closes
+  // ─── Fetch courts when XPLAY club is selected ───────────────────────────────
+  useEffect(() => {
+    if (venueMode !== "xplay" || !selectedClub) {
+      setCourts([]);
+      setSelectedCourtObj(null);
+      return;
+    }
+    setCourtsLoading(true);
+    supabase
+      .from("courts")
+      .select("*")
+      .eq("club_id", selectedClub.id)
+      .eq("active", true)
+      .order("name")
+      .then(({ data }) => {
+        setCourts(data || []);
+        setCourtsLoading(false);
+      });
+  }, [selectedClub, venueMode]);
+
+  // ─── Fetch available slots when court + date both selected ──────────────────
+  useEffect(() => {
+    if (venueMode !== "xplay" || !selectedCourtObj || !matchDate) {
+      setAvailableSlots([]);
+      return;
+    }
+    setSlotsLoading(true);
+    const dayStart = new Date(matchDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(matchDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    supabase
+      .from("court_slots")
+      .select("*")
+      .eq("court_id", selectedCourtObj.id)
+      .eq("status", "available")
+      .is("coaching_session_id", null)
+      .gte("starts_at", dayStart.toISOString())
+      .lte("starts_at", dayEnd.toISOString())
+      .order("starts_at")
+      .then(({ data }) => {
+        setAvailableSlots(data || []);
+        setSlotsLoading(false);
+        // Clear selected time if it's no longer in available slots
+        if (matchTime) {
+          const stillAvailable = (data || []).some(
+            (s) => format(new Date(s.starts_at), "HH:mm") === matchTime
+          );
+          if (!stillAvailable) setMatchTime("");
+        }
+      });
+  }, [selectedCourtObj, matchDate, venueMode]);
+
+  // ─── Reset state when modal opens/closes ────────────────────────────────────
   useEffect(() => {
     if (open) {
       const lvl = profile?.padel_level ?? 3.0;
@@ -76,7 +143,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     }
     if (!open) {
       setSelectedClub(null);
-      setCourt("");
+      setSelectedCourtObj(null);
+      setCourts([]);
+      setAvailableSlots([]);
+      setCourtFallback("");
       setCustomVenue(null);
       setCustomCourt("");
       setVenueMode("xplay");
@@ -90,6 +160,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     }
   }, [open, profile?.padel_level]);
 
+  // ─── Paste autofill from Playtomic ──────────────────────────────────────────
   const handlePasteAutofill = async () => {
     try {
       setPasteLoading(true);
@@ -138,13 +209,15 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     }
   };
 
+  // ─── Create match (with optional Stripe payment for private matches) ─────────
   const handleCreate = async () => {
     if (!user) return;
-    const newErrors: { club?: boolean; date?: boolean; time?: boolean } = {};
+    const newErrors: typeof errors = {};
     if (venueMode === "xplay" && !selectedClub) newErrors.club = true;
     if (venueMode === "other" && !customVenue?.name) newErrors.club = true;
     if (!matchDate) newErrors.date = true;
     if (!matchTime) newErrors.time = true;
+    if (venueMode === "xplay" && courts.length > 0 && !selectedCourtObj) newErrors.court = true;
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -152,10 +225,90 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     setErrors({});
 
     const clubName = venueMode === "xplay" ? selectedClub!.club_name : customVenue!.name;
-    const courtValue = venueMode === "xplay" ? (court || null) : (customCourt || null);
+    let courtValue: string | null = null;
+    if (venueMode === "xplay") {
+      courtValue = selectedCourtObj
+        ? (selectedCourtObj.nickname || selectedCourtObj.name)
+        : (courtFallback || null);
+    } else {
+      courtValue = customCourt || null;
+    }
 
     setLoading(true);
 
+    // ── Private match with a priced court slot → Stripe Payment Sheet ──────
+    let paymentIntentData: {
+      payment_intent_id: string;
+      stripe_customer_id: string;
+      total_cents: number;
+      organiser_share_cents: number;
+      per_spot_full_price_cents: number;
+      organiser_discount_pct: number;
+      spots_count: number;
+      currency: string;
+    } | null = null;
+
+    if (requiresPayment && selectedSlot) {
+      // Step 1: Create PaymentIntent server-side
+      const { data: piData, error: piError } = await supabase.functions.invoke(
+        "create-private-match-payment-intent",
+        { body: { court_slot_id: selectedSlot.id, max_players: 4 } }
+      );
+
+      if (piError || piData?.error) {
+        toast({
+          title: "Payment setup failed",
+          description: piData?.error ?? piError?.message ?? "Could not initialise payment.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: Create and present Stripe Payment Sheet
+      try {
+        await Stripe.createPaymentSheet({
+          paymentIntentClientSecret: piData.clientSecret,
+          merchantDisplayName: "XPLAY",
+          style: "alwaysDark",
+          withZipCode: false,
+        });
+
+        const { paymentResult } = await Stripe.presentPaymentSheet();
+
+        if (paymentResult !== PaymentSheetEventsEnum.Completed) {
+          // User cancelled or payment failed
+          toast({
+            title: paymentResult === PaymentSheetEventsEnum.Canceled ? "Payment cancelled" : "Payment failed",
+            description: "Your match was not created. No charge was made.",
+            variant: paymentResult === PaymentSheetEventsEnum.Canceled ? "default" : "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (stripeErr: any) {
+        toast({
+          title: "Payment error",
+          description: stripeErr?.message ?? "Payment could not be completed.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      paymentIntentData = {
+        payment_intent_id: piData.payment_intent_id,
+        stripe_customer_id: piData.stripe_customer_id,
+        total_cents: piData.total_cents,
+        organiser_share_cents: piData.organiser_share_cents,
+        per_spot_full_price_cents: piData.per_spot_full_price_cents,
+        organiser_discount_pct: piData.discount_pct,
+        spots_count: piData.max_players,
+        currency: piData.currency,
+      };
+    }
+
+    // ── Insert match ──────────────────────────────────────────────────────────
     const { data, error } = await supabase.from("matches").insert({
       organizer_id: user.id,
       club: clubName,
@@ -173,50 +326,99 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
 
     if (error) {
       toast({ title: "Error creating match", description: error.message, variant: "destructive" });
-    } else {
-      const { error: joinErr } = await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
-      if (joinErr) console.error("Host auto-join failed:", joinErr.message);
-      const chatTitle = `${clubName}${courtValue ? ` — ${courtValue}` : ""}`;
-      await getOrCreateMatchChat(data.id, chatTitle);
-
-      // Create betting market for competitive matches
-      if (matchFormat !== "social") {
-        try {
-          const { error: marketErr } = await supabase.functions.invoke("create-match-market", {
-            body: { match_id: data.id },
-          });
-          if (marketErr) {
-            console.error("create-match-market failed:", marketErr);
-            toast({ title: "Match created, but betting market setup failed", description: "You can still play — betting features may be unavailable for this match.", variant: "destructive" });
-          }
-        } catch (marketErr) {
-          console.error("create-match-market exception:", marketErr);
-        }
-      }
-
-      toast({
-        title: "Match successfully created.",
-        description: "You have been added to Team A.",
-      });
-      onCreated?.(data.id);
-      onOpenChange(false);
+      setLoading(false);
+      return;
     }
+
+    // Auto-join organiser
+    const { error: joinErr } = await supabase
+      .from("match_players")
+      .insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
+    if (joinErr) console.error("Host auto-join failed:", joinErr.message);
+
+    // Create match chat
+    const chatTitle = `${clubName}${courtValue ? ` — ${courtValue}` : ""}`;
+    await getOrCreateMatchChat(data.id, chatTitle);
+
+    // Betting market (competitive matches only)
+    if (matchFormat !== "social") {
+      try {
+        const { error: marketErr } = await supabase.functions.invoke("create-match-market", {
+          body: { match_id: data.id },
+        });
+        if (marketErr) {
+          console.error("create-match-market failed:", marketErr);
+          toast({
+            title: "Match created, but betting market setup failed",
+            description: "You can still play — betting features may be unavailable for this match.",
+            variant: "destructive",
+          });
+        }
+      } catch (marketErr) {
+        console.error("create-match-market exception:", marketErr);
+      }
+    }
+
+    // ── Record escrow after successful payment ─────────────────────────────
+    if (paymentIntentData) {
+      const { error: escrowErr } = await supabase.functions.invoke("record-private-match-escrow", {
+        body: {
+          match_id: data.id,
+          payment_intent_id: paymentIntentData.payment_intent_id,
+          per_spot_full_price_cents: paymentIntentData.per_spot_full_price_cents,
+          organiser_share_cents: paymentIntentData.organiser_share_cents,
+          organiser_discount_pct: paymentIntentData.organiser_discount_pct,
+          spots_count: paymentIntentData.spots_count,
+          total_charged_cents: paymentIntentData.total_cents,
+          stripe_customer_id: paymentIntentData.stripe_customer_id,
+          currency: paymentIntentData.currency,
+        },
+      });
+      if (escrowErr) {
+        console.error("Failed to record escrow:", escrowErr);
+        // Match is created + paid — escrow record failure is non-fatal for user
+        // but we log it so it can be reconciled manually
+      }
+    }
+
+    toast({
+      title: requiresPayment ? "Match created — payment confirmed!" : "Match successfully created.",
+      description: requiresPayment
+        ? `You'll be refunded as players join. You've been added to Team A.`
+        : "You have been added to Team A.",
+    });
+    onCreated?.(data.id);
+    onOpenChange(false);
     setLoading(false);
   };
 
-  // Generate next 7 days
+  // Derive the full slot object from the selected time
+  const selectedSlot = useMemo(
+    () => availableSlots.find((s) => format(new Date(s.starts_at), "HH:mm") === matchTime) ?? null,
+    [availableSlots, matchTime]
+  );
+
+  // Whether a Stripe payment is required (private + XPLAY court slot with price)
+  const requiresPayment =
+    visibility === "private" &&
+    venueMode === "xplay" &&
+    selectedSlot !== null &&
+    Number(selectedSlot.price ?? 0) > 0;
+
+  // Whether we're in "smart slot" mode
+  const useSmartSlots = venueMode === "xplay" && courts.length > 0;
   const nextSevenDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="fixed bottom-0 left-0 right-0 top-auto w-full max-w-none translate-x-0 translate-y-0 max-h-[90dvh] overflow-y-auto p-0 bg-card border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0">
-          {/* Custom handle bar */}
+          {/* Handle bar */}
           <div className="flex justify-center pt-3 pb-2">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
 
-          {/* Editorial header */}
+          {/* Header */}
           <div className="px-5 pt-2 pb-6 space-y-2">
             <div className="text-[10px] font-black tracking-[0.18em] text-primary uppercase">
               NEW MATCH
@@ -248,7 +450,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             </button>
 
-            {/* Venue block */}
+            {/* ── Venue block ────────────────────────────────────────────────── */}
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                 Venue
@@ -261,10 +463,14 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     onClick={() => {
                       setVenueMode(mode);
                       setSelectedClub(null);
-                      setCourt("");
+                      setSelectedCourtObj(null);
+                      setCourts([]);
+                      setAvailableSlots([]);
+                      setCourtFallback("");
                       setCustomVenue(null);
                       setCustomCourt("");
-                      setErrors(prev => ({ ...prev, club: undefined }));
+                      setMatchTime("");
+                      setErrors(prev => ({ ...prev, club: undefined, court: undefined, time: undefined }));
                       if (mode === "xplay") setClubPickerOpen(true);
                     }}
                     className={cn(
@@ -281,13 +487,14 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
 
               {venueMode === "xplay" ? (
                 <>
+                  {/* Club selector */}
                   <button
                     type="button"
                     onClick={() => setClubPickerOpen(true)}
                     className={cn(
                       "w-full h-11 rounded-xl bg-muted border px-4 flex items-center justify-between text-left transition-colors",
                       errors.club
-                        ? "border-destructive ring-1 ring-destructive/30 hover:border-destructive"
+                        ? "border-destructive ring-1 ring-destructive/30"
                         : "border-border/30 hover:border-primary/40"
                     )}
                   >
@@ -307,6 +514,67 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   </button>
                   {errors.club && <p className="text-[11px] text-destructive px-1">Please select a club</p>}
+
+                  {/* Court picker — real courts from DB */}
+                  {selectedClub && (
+                    <div className="space-y-1.5 pt-1">
+                      <label className={cn(
+                        "text-xs uppercase tracking-wider font-medium",
+                        errors.court ? "text-destructive" : "text-muted-foreground"
+                      )}>
+                        Court {courts.length > 0 ? "*" : "(optional)"}
+                      </label>
+
+                      {courtsLoading ? (
+                        <div className="flex items-center gap-2 py-2 px-1">
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs text-muted-foreground">Loading courts…</span>
+                        </div>
+                      ) : courts.length > 0 ? (
+                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                          {courts.map((c) => {
+                            const isSelected = selectedCourtObj?.id === c.id;
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCourtObj(isSelected ? null : c);
+                                  setMatchTime("");
+                                  setErrors(prev => ({ ...prev, court: undefined, time: undefined }));
+                                }}
+                                className={cn(
+                                  "flex-shrink-0 flex flex-col items-start rounded-xl px-3 py-2.5 border transition-colors text-left min-w-[90px]",
+                                  isSelected
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-muted border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30"
+                                )}
+                              >
+                                <span className="text-xs font-bold leading-tight">
+                                  {c.nickname || c.name}
+                                </span>
+                                {(c.court_type || c.surface) && (
+                                  <span className={cn("text-[9px] mt-0.5", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                                    {[c.court_type, c.surface].filter(Boolean).join(" · ")}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* Fallback free-text when club has no courts configured */
+                        <Input
+                          value={courtFallback}
+                          onChange={(e) => setCourtFallback(e.target.value)}
+                          placeholder="e.g. Court 1, Padel 3..."
+                          className="h-11 rounded-xl bg-muted border-border/30"
+                          style={{ fontSize: "16px" }}
+                        />
+                      )}
+                      {errors.court && <p className="text-[11px] text-destructive px-1">Please select a court</p>}
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -319,35 +587,24 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     hasError={errors.club}
                   />
                   {errors.club && <p className="text-[11px] text-destructive px-1">Please enter a venue</p>}
+
+                  <div>
+                    <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">
+                      Court (optional)
+                    </label>
+                    <Input
+                      value={customCourt}
+                      onChange={(e) => setCustomCourt(e.target.value)}
+                      placeholder="e.g. Court 3, Padel 2..."
+                      className="h-11 rounded-xl bg-muted border-border/30"
+                      style={{ fontSize: "16px" }}
+                    />
+                  </div>
                 </>
               )}
-
-              {/* Court field */}
-              <div>
-                <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">
-                  Court (optional)
-                </label>
-                {venueMode === "xplay" ? (
-                  <Input
-                    value={court}
-                    onChange={(e) => setCourt(e.target.value)}
-                    placeholder="e.g. Court 1, Padel 3..."
-                    className="h-11 rounded-xl bg-muted border-border/30"
-                    style={{ fontSize: "16px" }}
-                  />
-                ) : (
-                  <Input
-                    value={customCourt}
-                    onChange={(e) => setCustomCourt(e.target.value)}
-                    placeholder="e.g. Court 3, Padel 2..."
-                    className="h-11 rounded-xl bg-muted border-border/30"
-                    style={{ fontSize: "16px" }}
-                  />
-                )}
-              </div>
             </div>
 
-            {/* Date picker: horizontal chips + popover calendar */}
+            {/* ── Date picker ────────────────────────────────────────────────── */}
             <div className="space-y-2">
               <label className={cn("text-xs uppercase tracking-wider font-medium", errors.date ? "text-destructive" : "text-muted-foreground")}>
                 When *
@@ -358,6 +615,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     key={i}
                     onClick={() => {
                       setMatchDate(day);
+                      // Clear time when date changes in smart mode
+                      if (useSmartSlots) setMatchTime("");
                       setErrors(prev => ({ ...prev, date: undefined }));
                     }}
                     className={cn(
@@ -383,6 +642,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                       selected={matchDate}
                       onSelect={(date) => {
                         setMatchDate(date);
+                        if (useSmartSlots) setMatchTime("");
                         setDatePickerOpen(false);
                         setErrors(prev => ({ ...prev, date: undefined }));
                       }}
@@ -396,36 +656,103 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               {errors.date && <p className="text-[11px] text-destructive px-1">Please pick a date</p>}
             </div>
 
-            {/* Time picker: scrollable grid */}
+            {/* ── Time picker ─────────────────────────────────────────────────── */}
             <div className="space-y-2">
               <label className={cn("text-xs uppercase tracking-wider font-medium", errors.time ? "text-destructive" : "text-muted-foreground")}>
-                Time *
+                {useSmartSlots ? "Available Slots *" : "Time *"}
               </label>
-              <div className="bg-muted/40 border border-border/30 rounded-xl p-2 max-h-32 overflow-y-auto">
-                <div className="grid grid-cols-4 gap-2">
-                  {TIME_SLOTS.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        setMatchTime(t);
-                        setErrors(prev => ({ ...prev, time: undefined }));
-                      }}
-                      className={cn(
-                        "py-2 rounded-lg text-xs font-semibold transition-colors",
-                        matchTime === t
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted border border-border/30 text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {t}
-                    </button>
-                  ))}
+
+              {useSmartSlots ? (
+                /* Smart slot picker — only real available slots */
+                !selectedCourtObj || !matchDate ? (
+                  <div className="bg-muted/30 border border-border/20 rounded-xl p-4 flex items-center gap-3">
+                    <Lock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <p className="text-xs text-muted-foreground">
+                      {!selectedCourtObj ? "Select a court to see available slots." : "Select a date to see available slots."}
+                    </p>
+                  </div>
+                ) : slotsLoading ? (
+                  <div className="flex items-center gap-2 py-3 px-1">
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs text-muted-foreground">Loading available slots…</span>
+                  </div>
+                ) : availableSlots.length === 0 ? (
+                  <div className="bg-muted/30 border border-border/20 rounded-xl p-4 text-center space-y-1">
+                    <p className="text-xs font-semibold text-foreground">No slots available</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {selectedCourtObj.nickname || selectedCourtObj.name} has no open slots on this date. Try another day.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                    {availableSlots.map((slot) => {
+                      const time = format(new Date(slot.starts_at), "HH:mm");
+                      const endTime = new Date(slot.ends_at);
+                      const startTime = new Date(slot.starts_at);
+                      const durationMins = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+                      const price = slot.price
+                        ? `£${Number(slot.price).toFixed(0)}`
+                        : "Free";
+                      const isSelected = matchTime === time;
+
+                      return (
+                        <button
+                          key={slot.id}
+                          type="button"
+                          onClick={() => {
+                            setMatchTime(time);
+                            setErrors(prev => ({ ...prev, time: undefined }));
+                          }}
+                          className={cn(
+                            "flex-shrink-0 flex flex-col items-center rounded-xl px-3 py-2.5 border transition-all min-w-[72px]",
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                          )}
+                        >
+                          <span className="text-xs font-bold">{time}</span>
+                          <span className={cn("text-[9px]", isSelected ? "text-primary-foreground/70" : "text-emerald-400/70")}>
+                            {durationMins} min
+                          </span>
+                          <span className="text-[9px] font-semibold uppercase tracking-wide mt-0.5">
+                            {price}
+                          </span>
+                          {isSelected && (
+                            <CheckCircle2 className="w-3 h-3 mt-1 text-primary-foreground" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              ) : (
+                /* Generic time grid — for "other" venue or XPLAY clubs without DB courts */
+                <div className="bg-muted/40 border border-border/30 rounded-xl p-2 max-h-32 overflow-y-auto">
+                  <div className="grid grid-cols-4 gap-2">
+                    {TIME_SLOTS.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => {
+                          setMatchTime(t);
+                          setErrors(prev => ({ ...prev, time: undefined }));
+                        }}
+                        className={cn(
+                          "py-2 rounded-lg text-xs font-semibold transition-colors",
+                          matchTime === t
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted border border-border/30 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              {errors.time && <p className="text-[11px] text-destructive px-1">Please pick a time</p>}
+              )}
+              {errors.time && <p className="text-[11px] text-destructive px-1">Please pick a time slot</p>}
             </div>
 
-            {/* Format + Level + Visibility row */}
+            {/* ── Format + Level + Visibility ─────────────────────────────────── */}
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                 Type & Level
@@ -474,7 +801,6 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                 </div>
               )}
 
-              {/* Visibility toggle */}
               <div className="flex gap-2">
                 {(["public", "private"] as const).map((v) => (
                   <button
@@ -493,14 +819,58 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               </div>
             </div>
 
-            {/* CTA Button */}
+            {/* ── Private match escrow preview ─────────────────────────────── */}
+            {visibility === "private" && venueMode === "xplay" && selectedSlot && (
+              <div className={cn(
+                "rounded-xl border p-3.5 space-y-2",
+                requiresPayment
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-muted/40 border-border/30"
+              )}>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-amber-300">
+                    {requiresPayment ? "Private match — payment required" : "Private match"}
+                  </span>
+                </div>
+                {requiresPayment && selectedSlot.price ? (
+                  <>
+                    <div className="text-[11px] text-muted-foreground space-y-0.5">
+                      <div className="flex justify-between">
+                        <span>Court cost</span>
+                        <span className="text-foreground font-medium">£{Number(selectedSlot.price).toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Full price per spot (÷4)</span>
+                        <span className="text-foreground font-medium">£{(Number(selectedSlot.price) / 4).toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-500/20 pt-2 text-[11px] text-amber-200/80 leading-relaxed">
+                      You pay your share upfront and hold the remaining spots at full price.
+                      You're refunded for each player who joins.
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    No court fee set — match will be created without payment.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── CTA ─────────────────────────────────────────────────────────── */}
             <div className="space-y-2 pt-2">
               <Button
                 onClick={handleCreate}
                 disabled={loading}
                 className="w-full h-[50px] rounded-[14px] font-display font-black italic uppercase text-[15px]"
               >
-                {loading ? "Creating..." : `Post match${matchDate && matchTime ? ` · ${format(matchDate, "EEE")} ${matchTime}` : ""}`}
+                {loading
+                  ? (requiresPayment ? "Processing payment..." : "Creating...")
+                  : requiresPayment
+                    ? `Pay & Post · ${matchDate && matchTime ? `${format(matchDate, "EEE")} ${matchTime}` : "select time"}`
+                    : `Post match${matchDate && matchTime ? ` · ${format(matchDate, "EEE")} ${matchTime}` : ""}`
+                }
               </Button>
               <div className="text-[11px] text-muted-foreground text-center px-2">
                 You'll be added to Team A · {visibility === "public" ? "Public" : "Private"} · level {levelMin.toFixed(1)}–{suggestedMax.toFixed(1)}
@@ -521,8 +891,11 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
         onOpenChange={setClubPickerOpen}
         onSelect={(club) => {
           setSelectedClub(club);
-          setCourt("");
-          setErrors(prev => ({ ...prev, club: undefined }));
+          setSelectedCourtObj(null);
+          setAvailableSlots([]);
+          setMatchTime("");
+          setCourtFallback("");
+          setErrors(prev => ({ ...prev, club: undefined, court: undefined, time: undefined }));
         }}
       />
     </>

@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense, ComponentType } from "react";
+import React, { useState, useEffect, lazy, Suspense, ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
 import AdminRoute from "./components/AdminRoute";
+import { Stripe } from "@capacitor-community/stripe";
 
 // ── Chunk-load resilience ───────────────────────────────────────────────────
 // After a Vercel redeploy the old chunk URLs are gone. This wrapper catches
@@ -191,6 +192,16 @@ const AppRoutes = () => {
 
 const App = () => {
   const [splashDone, setSplashDone] = useState(false);
+
+  // Initialise Stripe SDK once on app load
+  useEffect(() => {
+    const pk = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+    if (pk) {
+      Stripe.initialize({ publishableKey: pk }).catch((e) =>
+        console.warn("Stripe init failed:", e)
+      );
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

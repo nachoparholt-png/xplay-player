@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, Calendar, DollarSign, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Zap, Globe, Lock, Share2, MapPin, User } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, DollarSign, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Zap, Globe, Lock, Share2, MapPin, User, ShieldCheck, Coins } from "lucide-react";
 import SlotActionModal from "@/components/SlotActionModal";
 import InvitePlayerModal from "@/components/InvitePlayerModal";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,17 @@ type Match = {
   deadline_at: string | null;
   cancelled_reason: string | null;
 };
+
+type EscrowLedger = {
+  id: string;
+  total_charged_cents: number;
+  total_refunded_cents: number;
+  per_spot_full_price_cents: number;
+  organiser_share_cents: number;
+  spots_count: number;
+  currency: string;
+  status: string;
+} | null;
 
 type MatchPlayer = {
   id: string;
@@ -128,6 +139,9 @@ const MatchDetail = () => {
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [inviteTarget, setInviteTarget] = useState<{ team: string; slotIndex: number }>({ team: "A", slotIndex: 0 });
   const [viewPlayerId, setViewPlayerId] = useState<string | null>(null);
+  const [escrow, setEscrow] = useState<EscrowLedger>(null);
+  // Private cancel window in hours — loaded from club config when available, fallback 12h
+  const [privateCancelWindowHours, setPrivateCancelWindowHours] = useState<number>(12);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -155,6 +169,19 @@ const MatchDetail = () => {
     }
 
     setMatch(matchData as Match);
+
+    // Fetch escrow ledger for private matches
+    if (matchData?.visibility === "private") {
+      const { data: escrowData } = await supabase
+        .from("match_escrow_ledger")
+        .select("id, total_charged_cents, total_refunded_cents, per_spot_full_price_cents, organiser_share_cents, spots_count, currency, status")
+        .eq("match_id", id)
+        .eq("status", "active")
+        .maybeSingle();
+      setEscrow((escrowData as EscrowLedger) ?? null);
+    } else {
+      setEscrow(null);
+    }
 
     // Fetch score submissions and reviews for after-game flow
     if (matchData && AFTER_GAME_STATUSES.includes(matchData.status)) {
@@ -370,8 +397,25 @@ const MatchDetail = () => {
     if (isAfterGame || ["cancelled", "completed"].includes(match.status)) return false;
     try {
       const matchStart = parseISO(`${match.match_date}T${match.match_time}`);
+      // Private matches: non-organisers are hard-blocked inside privateCancelWindowHours
+      if (match.visibility === "private" && !isOrganizer) {
+        const privateDeadline = addHours(matchStart, -privateCancelWindowHours);
+        if (!isBefore(new Date(), privateDeadline)) return false;
+      }
       const deadline = addHours(matchStart, -cancellationHours);
       return isBefore(new Date(), deadline);
+    } catch {
+      return false;
+    }
+  })();
+
+  // Whether we're inside the private cancellation window (for UI warnings)
+  const isInsidePrivateCancelWindow = (() => {
+    if (!match || match.visibility !== "private") return false;
+    try {
+      const matchStart = parseISO(`${match.match_date}T${match.match_time}`);
+      const privateDeadline = addHours(matchStart, -privateCancelWindowHours);
+      return !isBefore(new Date(), privateDeadline);
     } catch {
       return false;
     }
@@ -430,6 +474,30 @@ const MatchDetail = () => {
   const handleJoin = async () => {
     if (!user || !match) return;
     setJoining(true);
+
+    // ── Private match: use edge function to trigger escrow partial refund ──
+    if (match.visibility === "private" && escrow) {
+      const { data, error } = await supabase.functions.invoke("process-private-match-player-join", {
+        body: { match_id: match.id },
+      });
+      if (error || data?.error) {
+        toast({ title: "Could not join match", description: data?.error ?? error?.message, variant: "destructive" });
+        setJoining(false);
+        return;
+      }
+      toast({
+        title: "Joined private match!",
+        description: escrow.per_spot_full_price_cents > 0
+          ? `The organiser has been refunded £${(escrow.per_spot_full_price_cents / 100).toFixed(0)} for your spot.`
+          : "You've been added to the match.",
+      });
+      addPlayerToMatchChat(match.id, user.id);
+      fetchMatch();
+      setJoining(false);
+      return;
+    }
+
+    // ── Public / free private match: direct insert ─────────────────────────
     const status = isFull ? "waitlist" : "confirmed";
 
     // Auto-assign team
@@ -448,7 +516,6 @@ const MatchDetail = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: status === "waitlist" ? "Added to waitlist" : "Joined match!" });
-      // Auto-add to match chat when confirmed
       if (status === "confirmed") {
         addPlayerToMatchChat(match.id, user.id);
       }
@@ -458,7 +525,6 @@ const MatchDetail = () => {
       } else if (newCount >= match.max_players - 1) {
         await supabase.from("matches").update({ status: "almost_full" }).eq("id", match.id);
       }
-      // Recalculate betting odds
       if (status === "confirmed" && match.format !== "social") {
         await supabase.functions.invoke("update-match-factor", { body: { match_id: match.id } });
       }
@@ -1061,6 +1127,50 @@ const MatchDetail = () => {
           </div>
         )}
 
+        {/* Escrow summary — organiser of private match only */}
+        {isPreGame && isOrganizer && match.visibility === "private" && escrow && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Coins className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Escrow Summary</span>
+            </div>
+            <div className="space-y-1.5 text-[12px]">
+              {(() => {
+                const symbol = (escrow.currency ?? "gbp") === "eur" ? "€" : "£";
+                const charged = escrow.total_charged_cents / 100;
+                const refunded = escrow.total_refunded_cents / 100;
+                const remaining = charged - refunded;
+                const perSpot = escrow.per_spot_full_price_cents / 100;
+                const spotsJoined = escrow.per_spot_full_price_cents > 0
+                  ? Math.round(escrow.total_refunded_cents / escrow.per_spot_full_price_cents)
+                  : 0;
+                const spotsRemaining = (escrow.spots_count - 1) - spotsJoined;
+                return (
+                  <>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>You paid upfront</span>
+                      <span className="text-foreground font-medium">{symbol}{charged.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Refunded so far ({spotsJoined} {spotsJoined === 1 ? "player" : "players"} joined)</span>
+                      <span className="text-emerald-400 font-medium">− {symbol}{refunded.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold border-t border-amber-500/20 pt-1.5 mt-1">
+                      <span className="text-foreground">Still held in escrow</span>
+                      <span className="text-amber-300">{symbol}{remaining.toFixed(0)}</span>
+                    </div>
+                    {spotsRemaining > 0 && perSpot > 0 && (
+                      <p className="text-[11px] text-muted-foreground pt-0.5">
+                        {symbol}{perSpot.toFixed(0)} returned for each of the {spotsRemaining} remaining {spotsRemaining === 1 ? "spot" : "spots"}.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Pre-game action buttons (non-FAB ones) */}
         {isPreGame && (
           <div className="space-y-2">
@@ -1087,10 +1197,18 @@ const MatchDetail = () => {
                   <div className="rounded-xl border border-border/50 bg-card p-3.5 text-center space-y-1.5">
                     <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                      Cancellation window closed
+                      {isInsidePrivateCancelWindow && match.visibility === "private"
+                        ? "Cancellation not allowed"
+                        : "Cancellation window closed"
+                      }
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {!cancellationEnabled ? "Player cancellation is currently disabled." : "Contact an admin if you need to be removed."}
+                      {isInsidePrivateCancelWindow && match.visibility === "private"
+                        ? `You're inside the ${privateCancelWindowHours}h cancellation window for this private match. Contact the club to cancel.`
+                        : !cancellationEnabled
+                          ? "Player cancellation is currently disabled."
+                          : "Contact an admin if you need to be removed."
+                      }
                     </p>
                   </div>
                 ) : null}
@@ -1206,7 +1324,16 @@ const MatchDetail = () => {
 
       {/* Join Match FAB */}
       {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && userLevelFits && user && (
-        <div className="fixed bottom-20 left-0 right-0 px-4 z-40">
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-40 space-y-2">
+          {/* Private match joining warning */}
+          {match.visibility === "private" && isInsidePrivateCancelWindow && (
+            <div className="rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-2 flex items-start gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-amber-200 leading-relaxed">
+                You're inside the {privateCancelWindowHours}h window — if you join now you <strong>cannot cancel</strong>. Contact the club if you need to leave.
+              </p>
+            </div>
+          )}
           <Button
             onClick={handleJoin}
             disabled={joining}
