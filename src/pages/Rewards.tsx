@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShoppingCart, Package, Zap, ArrowRight, Loader2, Store, ChevronRight } from "lucide-react";
+import { ShoppingCart, Package, Zap, ArrowRight, Loader2, Store, ChevronRight, Building2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRewards, useRedeemReward, type Reward, type PointsPack } from "@/hooks/useRewards";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ interface ShopifyNodeWithTags {
   tags?: string[];
 }
 
+import ClubsMarketSection from "@/components/rewards/ClubsMarketSection";
 import RewardDetailModal from "@/components/rewards/RewardDetailModal";
 import RedeemConfirmModal from "@/components/rewards/RedeemConfirmModal";
 import RedemptionSuccessModal from "@/components/rewards/RedemptionSuccessModal";
@@ -59,6 +60,7 @@ const Rewards = () => {
   const [shopifyRewards, setShopifyRewards] = useState<ShopifyCollectionProduct[]>([]);
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
+  const [marketTab, setMarketTab] = useState<"xplay" | "clubs">("xplay");
 
   const catalogRef = useRef<HTMLDivElement>(null);
   const buyRef = useRef<HTMLDivElement>(null);
@@ -216,6 +218,33 @@ const Rewards = () => {
           <span className="text-xs font-bold text-muted-foreground">Shop</span>
         </button>
       </motion.div>
+
+      {/* ── Market tab switcher ── */}
+      <div className="grid grid-cols-2 gap-2 -mt-2">
+        {([
+          { key: "xplay", label: "XPLAY Market", icon: Zap },
+          { key: "clubs", label: "Clubs Market", icon: Building2 },
+        ] as const).map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setMarketTab(key)}
+            className={`flex items-center justify-center gap-2 h-10 rounded-xl text-xs font-bold transition-colors border ${
+              marketTab === key
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted border-border/30 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Clubs Market Tab ── */}
+      {marketTab === "clubs" && <ClubsMarketSection />}
+
+      {/* ── XPLAY Market content (hidden when clubs tab active) ── */}
+      {marketTab === "xplay" && <>
 
       {/* ── Progress to next reward ── */}
       {nextLockedReward && (
@@ -440,6 +469,9 @@ const Rewards = () => {
 
       {/* ── Transaction History ── */}
       <TransactionHistory transactions={transactions} />
+
+      {/* ── Close XPLAY content fragment ── */}
+      </>}
 
       {/* ── FAB: Buy Points ── */}
       <motion.button

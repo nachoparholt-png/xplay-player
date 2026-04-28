@@ -567,8 +567,9 @@ const Matches = () => {
             {/* MATCH CARDS (my_matches — carousel list style) */}
             {!loading && tab === "my_matches" && (() => {
               // Split: matches that still need players vs confirmed/full
+              const today = new Date().toISOString().split("T")[0];
               const needsPlayers = displayedMatches.filter(
-                (m) => m.status === "open" && m.spotsLeft > 0 && m.visibility !== "private"
+                (m) => m.status === "open" && m.spotsLeft > 0 && m.visibility !== "private" && m.match_date >= today
               );
               const confirmed = displayedMatches.filter(
                 (m) => !(m.status === "open" && m.spotsLeft > 0 && m.visibility !== "private")

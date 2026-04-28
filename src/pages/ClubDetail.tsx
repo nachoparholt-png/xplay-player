@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, MapPin, Clock, Phone, Mail, Globe, Car, Zap, Info, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
 import { getDay } from "date-fns";
@@ -11,6 +11,7 @@ import { Browser } from "@capacitor/browser";
 import CourtAvailabilityGrid from "@/components/clubs/CourtAvailabilityGrid";
 import MembershipCard from "@/components/clubs/MembershipCard";
 import EventCard from "@/components/clubs/EventCard";
+import ClubMarketTab from "@/components/clubs/ClubMarketTab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,6 +106,7 @@ const ClubDetail = () => {
   const { clubId } = useParams<{ clubId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
 
   // Smart back: go to the page that linked us here, or fall back to /matches
@@ -129,7 +131,8 @@ const ClubDetail = () => {
   const [enrollments, setEnrollments] = useState<Record<string, number>>({});
   const [myEnrollments, setMyEnrollments] = useState<Set<string>>(new Set());
   const [operatingHours, setOperatingHours] = useState<OperatingHourRow[]>([]);
-  const [tab, setTab] = useState<ClubTab>("courts");
+  const initialTab = (searchParams.get("tab") as ClubTab) ?? "courts";
+  const [tab, setTab] = useState<ClubTab>(initialTab);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [switchConfirm, setSwitchConfirm] = useState<{ tierId: string; tierName: string; isUpgrade: boolean; isDowngrade: boolean } | null>(null);
@@ -375,6 +378,7 @@ const ClubDetail = () => {
     { key: "memberships", label: `Memberships${tiers.length > 0 ? ` (${tiers.length})` : ""}` },
     { key: "events", label: `Events${events.length > 0 ? ` (${events.length})` : ""}` },
     { key: "rankings", label: "Rankings" },
+    { key: "shop", label: "Shop" },
   ];
 
   if (loading) {
@@ -753,10 +757,15 @@ const ClubDetail = () => {
 
         {/* ── SHOP TAB ── */}
         {tab === "shop" && (
-          <div className="text-center py-12 space-y-2">
-            <p className="text-sm text-muted-foreground">Club shop coming soon</p>
-            <p className="text-xs text-muted-foreground/60">Exclusive gear and merchandise</p>
-          </div>
+          <ClubMarketTab
+            clubId={clubId!}
+            clubName={club?.club_name ?? ""}
+            membershipDiscount={
+              myMembership?.tier_id
+                ? (tiers.find(t => t.id === myMembership.tier_id) as any)?.market_discount_pct ?? 0
+                : 0
+            }
+          />
         )}
       </motion.div>
       </div>
