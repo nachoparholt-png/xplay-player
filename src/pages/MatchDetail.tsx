@@ -591,8 +591,35 @@ const MatchDetail = () => {
     if (!user || !match || cancellingMatch) return;
     setCancellingMatch(true);
 
-    // Update match status to cancelled
-    await supabase.from("matches").update({ status: "cancelled" }).eq("id", match.id);
+    // ── Private match with escrow → edge function handles everything ────────
+    if (match.visibility === "private" && escrow) {
+      const { data, error } = await supabase.functions.invoke("private-match-cancel", {
+        body: { match_id: match.id },
+      });
+
+      if (error || data?.error) {
+        const msg = data?.error ?? error?.message ?? "Could not cancel match.";
+        toast({ title: data?.blocked ? "Cancellation blocked" : "Cancellation failed", description: msg, variant: "destructive" });
+        setCancellingMatch(false);
+        return;
+      }
+
+      const currency = data.currency ?? "gbp";
+      const symbol = currency === "eur" ? "€" : "£";
+      const refundDesc = data.refund_cents > 0
+        ? `${symbol}${(data.refund_cents / 100).toFixed(0)} refunded to your card.`
+        : data.inside_window
+          ? "No refund — cancelled inside the cancellation window."
+          : "No escrow remaining to refund.";
+
+      toast({ title: "Match cancelled", description: refundDesc });
+      setCancellingMatch(false);
+      navigate("/matches");
+      return;
+    }
+
+    // ── Public / non-escrow match: direct DB path ───────────────────────────
+    await supabase.from("matches").update({ status: "cancelled", cancelled_reason: "organiser_cancelled" }).eq("id", match.id);
 
     // Refund all active stakes
     const { data: stakes } = await supabase
@@ -644,9 +671,7 @@ const MatchDetail = () => {
       ));
     }
 
-    // System message in match chat
     await addSystemMessage(match.id, "Match cancelled by the organizer");
-
     toast({ title: "Match cancelled", description: "All players have been notified and stakes refunded." });
     setCancellingMatch(false);
     navigate("/matches");
