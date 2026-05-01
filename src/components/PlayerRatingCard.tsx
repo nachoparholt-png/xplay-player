@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -9,6 +9,8 @@ interface Props {
   currentLevel: number | null;
   reliabilityScore: number;
   matchesCounted: number;
+  initialLevelSource?: string | null;
+  externalPlatformMatches?: number | null;
 }
 
 type RatingEntry = {
@@ -20,7 +22,7 @@ type RatingEntry = {
   created_at: string;
 };
 
-const PlayerRatingCard = ({ userId, currentLevel, reliabilityScore, matchesCounted }: Props) => {
+const PlayerRatingCard = ({ userId, currentLevel, reliabilityScore, matchesCounted, initialLevelSource, externalPlatformMatches }: Props) => {
   const [history, setHistory] = useState<RatingEntry[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [provisionalThreshold, setProvisionalThreshold] = useState(10);
@@ -98,6 +100,16 @@ const PlayerRatingCard = ({ userId, currentLevel, reliabilityScore, matchesCount
         <span>{matchesCounted} rated match{matchesCounted !== 1 ? "es" : ""}</span>
         <span>Reliability: {reliabilityScore.toFixed(0)}%</span>
       </div>
+
+      {/* External platform disclaimer — shown when level was seeded from another platform */}
+      {initialLevelSource === "external_seeded" && (
+        <div className="flex items-center gap-1.5 pt-1 border-t border-border/20">
+          <Check className="w-3 h-3 text-muted-foreground shrink-0" />
+          <span className="text-[10px] text-muted-foreground">
+            {externalPlatformMatches ?? 0} match{(externalPlatformMatches ?? 0) !== 1 ? "es" : ""} on external platform
+          </span>
+        </div>
+      )}
 
       {/* Expandable history */}
       {history.length > 0 && (

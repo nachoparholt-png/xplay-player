@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Sparkles, Trophy, MessageSquare, Zap, Gift, Check, BarChart3 } from "lucide-react";
+import { ChevronRight, Sparkles, Trophy, MessageSquare, Zap, Gift, Check, BarChart3, Globe } from "lucide-react";
 import { IconMatches } from "@/components/icons/XPlayIcons";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -46,6 +46,13 @@ const QUESTIONS = [
     ],
   },
 ];
+
+function mapExternalToXPlayLevel(externalLevel: number): number {
+  // External platforms typically use a 0–10 scale; XPLAY uses 0.5–7.0
+  const clamped = Math.max(0, Math.min(10, externalLevel));
+  const mapped = (clamped / 10) * 7;
+  return Math.max(0.5, Math.min(7.0, Math.round(mapped * 2) / 2));
+}
 
 function calculateRecommendedLevel(answers: Record<string, number>): number {
   const total = Object.values(answers).reduce((s, v) => s + v, 0);
@@ -184,11 +191,13 @@ function LevelStep({
   selectedLevel,
   onLevelChange,
   onAccept,
+  levelSource,
 }: {
   recommendedLevel: number;
   selectedLevel: number;
   onLevelChange: (level: number) => void;
   onAccept: () => void;
+  levelSource: "quiz" | "external";
 }) {
   const levelLabel = (l: number) => {
     if (l <= 1.5) return "Beginner";
@@ -210,7 +219,9 @@ function LevelStep({
       </h2>
 
       <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
-        Based on your answers, we recommend starting at:
+        {levelSource === "external"
+          ? "Based on your ranking on other platforms, we suggest starting at:"
+          : "Based on your answers, we recommend starting at:"}
       </p>
 
       {/* Level display */}
@@ -381,6 +392,137 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
   );
 }
 
+/* ── External Platform Step ── */
+
+function ExternalPlatformStep({
+  onNext,
+}: {
+  onNext: (used: boolean, level: number | null, matches: number | null) => void;
+}) {
+  const [usesOtherPlatform, setUsesOtherPlatform] = useState<boolean | null>(null);
+  const [platformLevel, setPlatformLevel] = useState("");
+  const [platformMatches, setPlatformMatches] = useState("");
+
+  const canContinue =
+    usesOtherPlatform !== null &&
+    (!usesOtherPlatform || (platformLevel !== "" && platformMatches !== ""));
+
+  const handleContinue = () => {
+    if (!canContinue) return;
+    if (!usesOtherPlatform) {
+      onNext(false, null, null);
+    } else {
+      const level = parseFloat(platformLevel);
+      const matches = parseInt(platformMatches, 10);
+      onNext(true, isNaN(level) ? null : level, isNaN(matches) ? null : matches);
+    }
+  };
+
+  return (
+    <motion.div
+      variants={slideVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      className="px-6 py-8 min-h-[80vh] flex flex-col items-center"
+    >
+      <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mb-6">
+        <Globe className="w-8 h-8 text-primary" />
+      </div>
+
+      <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-3 text-center leading-[0.95]">
+        Other Platforms?
+      </h2>
+
+      <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
+        Do you already have a ranking on another padel platform?
+      </p>
+
+      {/* Yes / No toggle */}
+      <div className="w-full max-w-xs flex gap-3 mb-6">
+        {([{ label: "Yes, I do", value: true }, { label: "No, I don't", value: false }] as const).map((opt) => {
+          const isSelected = usesOtherPlatform === opt.value;
+          return (
+            <motion.button
+              key={String(opt.value)}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setUsesOtherPlatform(opt.value)}
+              className={`flex-1 p-4 rounded-[16px] border font-bold text-[14px] transition-all duration-200 ${
+                isSelected
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "bg-card/40 text-foreground border-border/[0.07]"
+              }`}
+            >
+              {opt.label}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Inputs — only shown when Yes */}
+      <AnimatePresence>
+        {usesOtherPlatform && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="w-full max-w-xs space-y-4 mb-6 overflow-hidden"
+          >
+            <div>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
+                Your level on that platform
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                placeholder="e.g. 6.5"
+                value={platformLevel}
+                onChange={(e) => setPlatformLevel(e.target.value)}
+                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[14px] font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
+                Matches played there
+              </label>
+              <input
+                type="number"
+                min="0"
+                placeholder="e.g. 47"
+                value={platformMatches}
+                onChange={(e) => setPlatformMatches(e.target.value)}
+                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[14px] font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-start gap-2 bg-primary/8 rounded-xl px-4 py-3"
+            >
+              <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+              <p className="text-[11px] text-primary/80 leading-[1.5]">
+                This gives you a more accurate starting rank right away — you're not starting from scratch.
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1" />
+
+      <Button
+        onClick={handleContinue}
+        disabled={!canContinue}
+        className="w-full max-w-xs h-12 rounded-xl font-bold text-base gap-2"
+      >
+        Continue <ChevronRight className="w-4 h-4" />
+      </Button>
+    </motion.div>
+  );
+}
+
 /* ── Welcome Bonus Celebration Step ── */
 
 function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
@@ -446,7 +588,7 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
 
 /* ── Main Onboarding Page ── */
 
-type Step = "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "level" | "court-side" | "intro" | "bonus";
+type Step = "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "external-platform" | "level" | "court-side" | "intro" | "bonus";
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -459,6 +601,10 @@ const Onboarding = () => {
   const [selectedLevel, setSelectedLevel] = useState(3.0);
   const [preferredSide, setPreferredSide] = useState("both");
   const [saving, setSaving] = useState(false);
+  const [levelSource, setLevelSource] = useState<"quiz" | "external">("quiz");
+  const [externalPlatformUsed, setExternalPlatformUsed] = useState(false);
+  const [externalPlatformLevel, setExternalPlatformLevel] = useState<number | null>(null);
+  const [externalPlatformMatches, setExternalPlatformMatches] = useState<number | null>(null);
 
   const handleQuizAnswer = (questionIndex: number, value: number) => {
     const qId = QUESTIONS[questionIndex].id;
@@ -470,12 +616,34 @@ const Onboarding = () => {
       if (questionIndex < QUESTIONS.length - 1) {
         setStep(`quiz-${questionIndex + 1}` as Step);
       } else {
+        // Pre-calculate quiz-based recommendation; may be overridden by external platform step
         const rec = calculateRecommendedLevel(newAnswers);
         setRecommendedLevel(rec);
         setSelectedLevel(rec);
-        setStep("level");
+        setStep("external-platform");
       }
     }, 300);
+  };
+
+  const handleExternalPlatform = (
+    used: boolean,
+    level: number | null,
+    matches: number | null
+  ) => {
+    setExternalPlatformUsed(used);
+    setExternalPlatformLevel(level);
+    setExternalPlatformMatches(matches);
+
+    if (used && level !== null) {
+      const xplayLevel = mapExternalToXPlayLevel(level);
+      setRecommendedLevel(xplayLevel);
+      setSelectedLevel(xplayLevel);
+      setLevelSource("external");
+    } else {
+      setLevelSource("quiz");
+    }
+
+    setStep("level");
   };
 
   const handleAcceptLevel = () => {
@@ -505,9 +673,14 @@ const Onboarding = () => {
           padel_level: selectedLevel,
           recommended_level: recommendedLevel,
           preferred_side: preferredSide,
-          initial_level_source: "quiz",
+          initial_level_source: externalPlatformUsed ? "external_seeded" : "quiz",
           initial_level_date: new Date().toISOString(),
           onboarding_completed: true,
+          ...(externalPlatformUsed && {
+            external_platform: true,
+            external_platform_level: externalPlatformLevel,
+            external_platform_matches: externalPlatformMatches,
+          }),
         })
         .eq("user_id", user.id);
 
@@ -549,6 +722,12 @@ const Onboarding = () => {
             onAnswer={(v) => handleQuizAnswer(quizIndex, v)}
           />
         )}
+        {step === "external-platform" && (
+          <ExternalPlatformStep
+            key="external-platform"
+            onNext={handleExternalPlatform}
+          />
+        )}
         {step === "level" && (
           <LevelStep
             key="level"
@@ -556,6 +735,7 @@ const Onboarding = () => {
             selectedLevel={selectedLevel}
             onLevelChange={setSelectedLevel}
             onAccept={handleAcceptLevel}
+            levelSource={levelSource}
           />
         )}
         {step === "court-side" && (

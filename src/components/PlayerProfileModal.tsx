@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMatchChat } from "@/hooks/useMatchChat";
-import { MapPin, Bolt, Crosshair, Gauge, Trophy, Swords, Minus, Calendar, MessageSquare, Medal } from "lucide-react";
+import { MapPin, Bolt, Crosshair, Gauge, Trophy, Swords, Minus, Calendar, MessageSquare, Medal, Check, CheckCheck } from "lucide-react";
 import { format } from "date-fns";
 
 interface PlayerProfileModalProps {
@@ -30,6 +30,8 @@ interface PlayerProfile {
   wins: number;
   losses: number;
   reliability_score: number;
+  initial_level_source: string | null;
+  external_platform_matches: number | null;
 }
 
 interface HeadToHead {
@@ -75,7 +77,7 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
     const fetchData = async () => {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("user_id, display_name, avatar_url, padel_level, location, dominant_hand, preferred_side, total_matches, wins, losses, reliability_score")
+        .select("user_id, display_name, avatar_url, padel_level, location, dominant_hand, preferred_side, total_matches, wins, losses, reliability_score, initial_level_source, external_platform_matches")
         .eq("user_id", playerId)
         .single();
 
@@ -258,6 +260,21 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
                     <Medal className="w-3 h-3" />
                     {tierName} Member
                   </div>
+                )}
+
+                {/* XPLAY Verified badge — double-tick once reliability reaches MED (≥70) */}
+                {profile.initial_level_source === "external_seeded" && (
+                  (profile.reliability_score ?? 0) >= 70 ? (
+                    <div className="mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
+                      <CheckCheck className="w-3 h-3" />
+                      XPLAY Verified
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full border bg-muted/40 text-muted-foreground border-border/30 text-[10px] font-medium">
+                      <Check className="w-3 h-3" />
+                      {profile.external_platform_matches ?? 0} match{(profile.external_platform_matches ?? 0) !== 1 ? "es" : ""} on external platform
+                    </div>
+                  )
                 )}
               </div>
 
