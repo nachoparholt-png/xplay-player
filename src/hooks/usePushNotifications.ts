@@ -48,12 +48,34 @@ export function usePushNotifications() {
             if (!mounted) return;
             const data = action.notification.data as Record<string, string> | undefined;
             const type = data?.type;
-            // match_id may come as an explicit field, or we extract it from the link/route
+            // match_id / tournament_id may come as explicit fields, or be extracted from the link/route
             const route = data?.route ?? data?.link ?? "";
             const matchIdFromRoute = route.match(/\/matches\/([a-f0-9-]{36})/)?.[1];
+            const tournamentIdFromRoute = route.match(/\/tournaments\/([a-f0-9-]{36})/)?.[1];
             const matchId = data?.match_id ?? matchIdFromRoute ?? null;
+            const tournamentId = data?.tournament_id ?? tournamentIdFromRoute ?? null;
 
-            // Type-aware routing for match lifecycle notifications
+            // ── Tournament Live Mode routing ──────────────────────────────
+            if (
+              type === "tournament_live_started" ||
+              type === "tournament_announcement" ||
+              type === "tournament_help_acknowledged" ||
+              type === "tournament_score_missing" ||
+              type === "tournament_round_starting" ||
+              type === "tournament_completed" ||
+              type === "tournament_score_confirmed"
+            ) {
+              if (tournamentId) {
+                navigate(`/tournaments/${tournamentId}/live`);
+              } else if (route) {
+                navigate(route);
+              } else {
+                navigate("/tournaments");
+              }
+              return;
+            }
+
+            // ── Match lifecycle routing (existing) ────────────────────────
             if (type === "match_auto_cancelled") {
               // Match was cancelled — go to the matches list so they can find another
               navigate("/matches");

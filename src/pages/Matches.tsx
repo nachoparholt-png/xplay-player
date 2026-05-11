@@ -15,6 +15,7 @@ import MatchJoinModal from "@/components/MatchJoinModal";
 import MatchBetSheet from "@/components/betting/MatchBetSheet";
 import { format } from "date-fns";
 import ClubsExplorer from "@/components/clubs/ClubsExplorer";
+import LiveTournamentBanner from "@/components/tournaments/live/LiveTournamentBanner";
 
 type MatchRow = {
   id: string;
@@ -406,6 +407,9 @@ const Matches = () => {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <div className="px-4 py-5 space-y-6">
+
+        {/* P1 — LIVE tournament banner (auto-hidden when no live tournament for the user) */}
+        <LiveTournamentBanner />
 
         {/* TOP-LEVEL TOGGLE: Matches | Clubs */}
         <div className="flex gap-4 border-b border-border/20">
