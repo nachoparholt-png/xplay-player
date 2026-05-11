@@ -282,11 +282,13 @@ const Matches = () => {
           return;
         }
 
+        const today = new Date().toISOString().split("T")[0];
         const { data: matchData } = await supabase
           .from("matches")
           .select("*")
           .in("id", matchIds)
           .in("status", ACTIVE_STATUSES)
+          .gte("match_date", today)
           .order("match_date", { ascending: true })
           .order("match_time", { ascending: true });
 
@@ -453,33 +455,36 @@ const Matches = () => {
               </button>
             </div>
 
-            {/* NEXT MATCH HERO (if user has matches) */}
-            {tab === "my_matches" && !loading && matches.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-[22px] bg-primary p-5 space-y-2"
-              >
-                <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
-                  ● YOUR NEXT · IN {(() => {
-                    const nextMatch = matches[0];
-                    if (!nextMatch.match_date || !nextMatch.match_time) return "TBD";
-                    const matchDt = new Date(nextMatch.match_date + "T" + nextMatch.match_time);
-                    const now = new Date();
-                    const diff = matchDt.getTime() - now.getTime();
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    return `${hours}H ${mins}M`;
-                  })()}
-                </div>
-                <div className="font-display text-[26px] font-black italic uppercase text-primary-foreground leading-tight">
-                  {matches[0].match_time?.slice(0, 5) ?? "TBD"} · COURT {matches[0].court || "?"}
-                </div>
-                <div className="text-[11px] font-semibold text-primary-foreground/75">
-                  {matches[0].club} · {matches[0].format} · {matches[0].playerCount} confirmed
-                </div>
-              </motion.div>
-            )}
+            {/* NEXT MATCH HERO (only if user has a future match) */}
+            {tab === "my_matches" && !loading && (() => {
+              const now = new Date();
+              const nextMatch = matches.find((m) => {
+                if (!m.match_date || !m.match_time) return false;
+                return new Date(m.match_date + "T" + m.match_time) > now;
+              });
+              if (!nextMatch) return null;
+              const matchDt = new Date(nextMatch.match_date + "T" + nextMatch.match_time);
+              const diff = matchDt.getTime() - now.getTime();
+              const hours = Math.floor(diff / (1000 * 60 * 60));
+              const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-[22px] bg-primary p-5 space-y-2"
+                >
+                  <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
+                    ● YOUR NEXT · IN {`${hours}H ${mins}M`}
+                  </div>
+                  <div className="font-display text-[26px] font-black italic uppercase text-primary-foreground leading-tight">
+                    {nextMatch.match_time?.slice(0, 5) ?? "TBD"} · COURT {nextMatch.court || "?"}
+                  </div>
+                  <div className="text-[11px] font-semibold text-primary-foreground/75">
+                    {nextMatch.club} · {nextMatch.format} · {nextMatch.playerCount} confirmed
+                  </div>
+                </motion.div>
+              );
+            })()}
 
             {/* TABS (my_matches | open) */}
             <div className="flex gap-6 border-b border-border/20">
