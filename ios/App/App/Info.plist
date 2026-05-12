@@ -6,6 +6,14 @@
 	<string>XPLAY uses your location to show nearby padel clubs and filter by distance.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>XPLAY uses your location to show nearby padel clubs and filter by distance.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>XPLAY can use the camera if you choose to scan your payment card for faster checkout. Card details are processed securely by Stripe and never stored on this device.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>XPLAY can access your photo library if you choose to update your profile picture or attach an image.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>XPLAY can save match recaps and tournament certificates to your photo library when you choose to share them.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>XPLAY uses Face ID to confirm your identity when authorizing payments through Stripe.</string>
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
