@@ -28,7 +28,8 @@ export async function launchTournament(tournamentId: string, userId: string): Pr
     .eq("tournament_id", tournamentId)
     .eq("status", "confirmed");
 
-  // Filter out non-playing organisers
+  // Filter out non-playing organisers (role='organiser'). Role 'organiser_player'
+  // — set by the wizard when "I am playing" is on — IS included in the bracket.
   const playingRows = (playerRows || []).filter((p: { user_id: string; side_preference: string | null; role: string }) => p.role !== "organiser");
   const players = playingRows.map((p: { user_id: string; side_preference: string | null; role: string }) => ({
     userId: p.user_id,

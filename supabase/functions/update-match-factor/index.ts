@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
     if (!match_id) return json({ error: "match_id required" }, 400);
 
     // Get or create market
-    let { data: market } = await serviceClient
+    const { data: market } = await serviceClient
       .from("match_bet_markets")
       .select("*")
       .eq("match_id", match_id)

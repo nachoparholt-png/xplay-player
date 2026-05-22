@@ -35,7 +35,7 @@ export function generateKingOfCourt(
 
   // Initialize court assignments: pair teams onto courts
   // Court 1 = highest, Court N = lowest
-  let courtAssignments: string[] = [...teamIds]; // ordered by court position
+  const courtAssignments: string[] = [...teamIds]; // ordered by court position
   let byeIndex = 0; // tracks fair bye rotation
 
   for (let r = 0; r < totalRounds; r++) {

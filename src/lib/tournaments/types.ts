@@ -53,6 +53,7 @@ export interface Tournament {
   match_config: MatchConfig;
   bracket_config: BracketConfig;
   club: string | null;
+  club_id: string | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
   started_at: string | null;
@@ -61,6 +62,12 @@ export interface Tournament {
   updated_at: string;
   skill_category_id: string | null;
   require_admin_approval: boolean;
+  /** Ticket price set by the organiser in the wizard (gross, in minor units). 0 = free. */
+  ticket_price_cents: number;
+  /** Discount applied to club members at ticket-purchase time. 0–100. */
+  member_discount_pct: number;
+  /** Whether the live-mode flag is on (`tournament-go-live` flipped it). */
+  is_live?: boolean | null;
 }
 
 export interface TournamentPlayer {

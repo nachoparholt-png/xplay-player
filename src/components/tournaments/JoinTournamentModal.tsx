@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, Check, Loader2, AlertTriangle } from "lucide-react";
+import { Stripe, PaymentSheetEventsEnum } from "@capacitor-community/stripe";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,14 @@ interface JoinTournamentModalProps {
   skillLevelMin?: number | null;
   skillLevelMax?: number | null;
   requireAdminApproval?: boolean;
+  /**
+   * Ticket price in minor units (cents/pence) snapshotted from the tournament row.
+   * When > 0 the modal runs the Stripe Payment Sheet before creating the
+   * tournament_players row — handled entirely server-side via the
+   * create-tournament-ticket-payment-intent + record-tournament-ticket-payment
+   * edge functions. Set to 0 for free tournaments.
+   */
+  ticketPriceCents?: number;
 }
 
 const JoinTournamentModal = ({
@@ -50,6 +59,7 @@ const JoinTournamentModal = ({
   skillLevelMin,
   skillLevelMax,
   requireAdminApproval,
+  ticketPriceCents = 0,
 }: JoinTournamentModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -190,27 +200,99 @@ const JoinTournamentModal = ({
       return;
     }
 
-    const insertData: Record<string, unknown> = {
-      tournament_id: tournamentId,
-      user_id: user.id,
-    };
+    // ── Paid tournament → Stripe Payment Sheet, then record via edge fn ─────
+    // Free tournament → direct insert into tournament_players (legacy path).
+    const isPaid = ticketPriceCents > 0;
 
-    if (isPairs) {
-      insertData.partner_user_id = selectedPartner;
-      insertData.partner_status = "pending";
+    if (isPaid) {
+      // Step 1: ask the server for a PaymentIntent
+      const { data: piData, error: piErr } = await supabase.functions.invoke(
+        "create-tournament-ticket-payment-intent",
+        { body: { tournament_id: tournamentId } },
+      );
+      if (piErr || !piData?.clientSecret) {
+        const ctx = (piErr as { context?: { json?: () => Promise<unknown> } } | null)?.context;
+        let detail: { message?: string } | null = null;
+        try { detail = (await ctx?.json?.()) as typeof detail; } catch { /* ignore */ }
+        toast({
+          title: "Payment setup failed",
+          description: detail?.message ?? piErr?.message ?? "Could not start the payment.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Step 2: present the Payment Sheet (Capacitor SDK works on web + iOS)
+      try {
+        await Stripe.createPaymentSheet({
+          paymentIntentClientSecret: piData.clientSecret,
+          merchantDisplayName: "XPLAY",
+          style: "alwaysDark",
+          withZipCode: false,
+        });
+        const { paymentResult } = await Stripe.presentPaymentSheet();
+        if (paymentResult !== PaymentSheetEventsEnum.Completed) {
+          toast({
+            title: paymentResult === PaymentSheetEventsEnum.Canceled ? "Payment cancelled" : "Payment failed",
+            description: "You were not charged. The tournament join was not completed.",
+            variant: paymentResult === PaymentSheetEventsEnum.Canceled ? "default" : "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (stripeErr: unknown) {
+        const msg = stripeErr instanceof Error ? stripeErr.message : "Payment could not be completed.";
+        toast({ title: "Payment error", description: msg, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      // Step 3: tell the server the PaymentIntent succeeded — server verifies
+      // with Stripe, flips the ledger row to 'succeeded', and inserts the
+      // tournament_players row atomically.
+      const { data: recordData, error: recordErr } = await supabase.functions.invoke(
+        "record-tournament-ticket-payment",
+        {
+          body: {
+            tournament_id: tournamentId,
+            payment_intent_id: piData.payment_intent_id,
+            partner_user_id: isPairs ? selectedPartner : null,
+            partner_status:  isPairs ? "pending"        : "solo",
+            slot_index:      isPairs ? null             : selectedSlot,
+          },
+        },
+      );
+      if (recordErr || !recordData?.ok) {
+        toast({
+          title: "Payment received but join failed",
+          description: "Your card was charged. We'll record the entry shortly — please refresh in a few seconds.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
     } else {
-      insertData.partner_status = "solo";
-      insertData.slot_index = selectedSlot;
-    }
-
-    const { error } = await supabase
-      .from("tournament_players")
-      .insert(insertData);
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setLoading(false);
-      return;
+      // Free tournament — legacy direct insert path
+      const insertData: Record<string, unknown> = {
+        tournament_id: tournamentId,
+        user_id: user.id,
+      };
+      if (isPairs) {
+        insertData.partner_user_id = selectedPartner;
+        insertData.partner_status = "pending";
+      } else {
+        insertData.partner_status = "solo";
+        insertData.slot_index = selectedSlot;
+      }
+      const { error } = await supabase
+        .from("tournament_players")
+        .insert(insertData);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        setLoading(false);
+        return;
+      }
     }
 
     // Notify partner in pairs mode

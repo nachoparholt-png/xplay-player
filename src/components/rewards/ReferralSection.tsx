@@ -33,7 +33,7 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
     if (navigator.share && referralLink) {
       try {
         await navigator.share({ title: "Join XPLAY", text: "Join me on XPLAY — compete, earn XP, and win rewards. Sign up with my link:", url: referralLink });
-      } catch {}
+      } catch { /* ignore */ }
     } else {
       handleCopy();
     }

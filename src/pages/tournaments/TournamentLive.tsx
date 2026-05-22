@@ -228,6 +228,98 @@ export default function TournamentLive() {
     );
   }
 
+  /* ─── Pre-live waiting state ──────────────────────────────────
+     Tournament is published but the organiser hasn't pressed Go Live yet,
+     so is_live is still false. Don't show the Live tabs (they would imply
+     it's already running) — show a clear waiting state instead.            */
+  const isActuallyLive   = tournament.is_live === true;
+  const isCompleted      = tournament.status === 'completed' || !!tournament.completed_at;
+  const showWaitingState = !isActuallyLive && !isCompleted;
+
+  if (showWaitingState) {
+    const scheduledAt =
+      tournament.started_at ??
+      (tournament as TournamentRow & { scheduled_date?: string | null; scheduled_time?: string | null }).scheduled_date ??
+      null;
+    return (
+      <div style={{
+        minHeight: '100vh', background: XP.navyDeep, color: 'white',
+        display: 'flex', flexDirection: 'column',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <button
+          onClick={() => navigate(-1)}
+          aria-label="Back"
+          style={{
+            position: 'fixed', top: 'max(14px, env(safe-area-inset-top))', left: 12, zIndex: 30,
+            width: 36, height: 36, borderRadius: 18,
+            background: 'rgba(0,0,0,.35)', border: '1px solid rgba(255,255,255,.1)',
+            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+          <ArrowLeft size={18} />
+        </button>
+
+        <TournHeader
+          tournamentName={tournament.name}
+          organizerLabel={tournament.club ?? undefined}
+          totalRounds={totalRounds}
+          currentRound={currentRound}
+          matchesDone={matchesDone}
+          matchesTotal={matchesTotal}
+          liveStartedAt={tournament.live_started_at}
+          state="waiting"
+        />
+
+        <div style={{
+          flex: 1, padding: '24px 18px',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        }}>
+          <div style={{
+            maxWidth: 420, width: '100%',
+            background: 'rgba(255,255,255,.04)',
+            borderRadius: 20, padding: 24,
+            border: '1px solid rgba(255,255,255,.06)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontFamily: "'Lexend', sans-serif", fontSize: 14, fontWeight: 800, fontStyle: 'italic',
+              textTransform: 'uppercase', letterSpacing: '.08em',
+              marginBottom: 8,
+            }}>Not yet live</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)', lineHeight: 1.5 }}>
+              {matchesTotal === 0
+                ? 'The bracket has not been generated yet. The organiser will publish it when ready.'
+                : 'Waiting for the organiser to start the tournament.'}
+            </div>
+            {scheduledAt && (
+              <div style={{
+                marginTop: 14, fontSize: 11, color: 'rgba(255,255,255,.5)',
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+              }}>
+                Scheduled · {new Date(scheduledAt).toLocaleString(undefined, {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => navigate(`/tournaments/${tournament.id}`)}
+              style={{
+                marginTop: 18,
+                padding: '10px 18px', borderRadius: 12, border: 'none',
+                background: XP.lime, color: XP.navy, cursor: 'pointer',
+                fontFamily: "'Lexend', sans-serif", fontWeight: 800, fontStyle: 'italic',
+                textTransform: 'uppercase', fontSize: 11, letterSpacing: '.08em',
+              }}>
+              View tournament details
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   /* ─── Page ─────────────────────────────────────────────────── */
   return (
     <div style={{
@@ -259,6 +351,7 @@ export default function TournamentLive() {
         matchesDone={matchesDone}
         matchesTotal={matchesTotal}
         liveStartedAt={tournament.live_started_at}
+        state={isCompleted ? 'ended' : 'live'}
       />
       <TournTabs active={tab} onChange={setTab} />
 

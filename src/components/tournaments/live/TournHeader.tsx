@@ -13,6 +13,12 @@ interface Props {
   matchesDone: number;
   matchesTotal: number;
   liveStartedAt?: string | null;
+  /**
+   * `true`  → tournament is actually live (is_live flag flipped, organiser hit Go Live)
+   * `false` → tournament is published / active but not yet live (waiting)
+   * `'ended'` → tournament has been completed
+   */
+  state?: 'live' | 'waiting' | 'ended';
 }
 
 function fmtLiveDuration(startedAt: string | null | undefined): string {
@@ -27,6 +33,7 @@ function fmtLiveDuration(startedAt: string | null | undefined): string {
 export default function TournHeader({
   tournamentName, organizerLabel, totalRounds, currentRound,
   matchesDone, matchesTotal, liveStartedAt,
+  state = 'live',
 }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -48,17 +55,39 @@ export default function TournHeader({
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LiveDot />
+          {state === 'live' && <LiveDot />}
+          {state === 'waiting' && (
+            <span style={{
+              width: 8, height: 8, borderRadius: 4,
+              background: 'rgba(255,255,255,.45)',
+              display: 'inline-block',
+            }} />
+          )}
+          {state === 'ended' && (
+            <span style={{
+              width: 8, height: 8, borderRadius: 4,
+              background: 'rgba(255,255,255,.25)',
+              display: 'inline-block',
+            }} />
+          )}
           <span style={{
             fontFamily: "'Lexend', sans-serif", fontSize: 10, fontWeight: 900,
             fontStyle: 'italic', letterSpacing: '.18em', textTransform: 'uppercase',
-            color: XP.lime,
-          }}>Live Tournament</span>
+            color: state === 'live' ? XP.lime
+              : state === 'ended' ? 'rgba(255,255,255,.45)'
+              : 'rgba(255,255,255,.65)',
+          }}>{
+            state === 'live'    ? 'Live Tournament'
+            : state === 'ended' ? 'Tournament Ended'
+            :                     'Waiting to go live'
+          }</span>
         </div>
-        <div style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-          fontSize: 10, color: 'rgba(255,255,255,.5)',
-        }}>{fmtLiveDuration(liveStartedAt)}</div>
+        {state === 'live' && (
+          <div style={{
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontSize: 10, color: 'rgba(255,255,255,.5)',
+          }}>{fmtLiveDuration(liveStartedAt)}</div>
+        )}
       </div>
       <div style={{
         fontFamily: "'Lexend', sans-serif", fontSize: 26, fontWeight: 900, fontStyle: 'italic',

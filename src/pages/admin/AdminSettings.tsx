@@ -91,7 +91,7 @@ const AdminSettings = () => {
           if (row.key === "tournament_default_time_estimates") {
             try {
               setTimeEstimates({ ...DEFAULT_TIME_ESTIMATES, ...JSON.parse(row.value) });
-            } catch {}
+            } catch { /* ignore */ }
           } else {
             map[row.key] = row.value;
           }

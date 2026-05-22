@@ -126,7 +126,7 @@ const Messages = () => {
     );
 
     const matchIds = convs.filter((c) => c.match_id).map((c) => c.match_id!);
-    let matchMap = new Map<string, { club: string; match_date: string; match_time: string }>();
+    const matchMap = new Map<string, { club: string; match_date: string; match_time: string }>();
     if (matchIds.length > 0) {
       const { data: matches } = await supabase
         .from("matches")

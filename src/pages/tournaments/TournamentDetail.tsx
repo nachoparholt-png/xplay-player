@@ -5,6 +5,7 @@ import AdminBadge from "@/components/tournaments/AdminBadge";
 import TournamentStructurePreview from "@/components/tournaments/TournamentStructurePreview";
 import TournamentFixtureView from "@/components/tournaments/TournamentFixtureView";
 import type { BracketConfig } from "@/lib/tournaments/types";
+import { formatPrice } from "@/lib/shopify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -232,10 +233,38 @@ const TournamentDetail = () => {
     }
 
     setLaunching(true);
-    const result = await launchTournament(id, user.id);
+    // Bracket generation moved to the `tournament-publish-and-launch` edge function
+    // so both the Club app's Publish and the Players app's Launch take the same
+    // server-side path (validates auth, generates teams + matches atomically,
+    // flips status to 'active', fans out notifications). Falls back to the
+    // legacy client-side `launchTournament` if the edge fn is unreachable.
+    let success = false;
+    let errorMsg: string | undefined;
+    try {
+      const { data, error } = await supabase.functions.invoke("tournament-publish-and-launch", {
+        body: { tournament_id: id },
+      });
+      if (error) {
+        type ErrPayload = { error?: string; message?: string; failed_hard?: string[] };
+        const ctx = (error as { context?: { json?: () => Promise<unknown> } }).context;
+        let payload: ErrPayload | null = null;
+        try { payload = (await ctx?.json?.()) as ErrPayload; } catch { /* ignore */ }
+        errorMsg = payload?.message ?? error.message;
+        if (payload?.failed_hard?.length) errorMsg += ` (${payload.failed_hard.join(", ")})`;
+      } else {
+        success = !!(data as { success?: boolean } | null)?.success;
+      }
+    } catch (e) {
+      // Network / unexpected error — fall back to the client-side path so a
+      // brief edge-fn outage doesn't block organisers entirely.
+      const result = await launchTournament(id, user.id);
+      success  = result.success;
+      errorMsg = result.error;
+    }
+
     setLaunching(false);
-    if (!result.success) {
-      toast({ title: "Launch failed", description: result.error, variant: "destructive" });
+    if (!success) {
+      toast({ title: "Launch failed", description: errorMsg, variant: "destructive" });
     } else {
       toast({ title: "Tournament launched! 🏆" });
       navigate(`/tournaments/${id}/live`);
@@ -321,6 +350,43 @@ const TournamentDetail = () => {
             )}
           </div>
         </div>
+
+        {/* Ticket price banner — only when the organiser set ticket_price_cents > 0.
+            Surfaces the £/€ amount so players can't get to the join CTA
+            without knowing they'll be charged. */}
+        {(() => {
+          const priceCents = (tournament as typeof tournament & { ticket_price_cents?: number | null }).ticket_price_cents ?? 0;
+          const discountPct = (tournament as typeof tournament & { member_discount_pct?: number | null }).member_discount_pct ?? 0;
+          if (priceCents <= 0) return null;
+          const currencyCode = "GBP"; // TODO: thread club.currency through here once exposed
+          const gross = priceCents / 100;
+          const discounted = discountPct > 0 ? gross * (1 - discountPct / 100) : null;
+          return (
+            <div className="rounded-[14px] bg-primary/[0.06] border border-primary/30 p-4 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                  Entry ticket
+                </div>
+                <div className="font-display text-[26px] font-black italic text-foreground leading-none mt-1">
+                  {formatPrice(discounted ?? gross, currencyCode)}
+                </div>
+                {discounted != null && (
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="line-through">{formatPrice(gross, currencyCode)}</span>
+                    <span className="font-bold text-primary/80 uppercase tracking-[0.12em]">
+                      {Math.round(discountPct)}% members
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80 text-right max-w-[140px]">
+                {discounted != null
+                  ? "Member rate applied at checkout if eligible"
+                  : "Charged when you join"}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* 2 Dominant Numbers */}
         <div className="flex gap-3">
@@ -507,12 +573,24 @@ const TournamentDetail = () => {
                   </div>
                   <span className="text-sm font-medium truncate">{prof?.display_name || "Player"}</span>
                   {p.user_id === tournament.created_by && (
-                    <AdminBadge role={p.role === "organiser" ? "organiser" : "admin"} size="sm" />
+                    // Show the organiser crown for the creator regardless of whether
+                    // they're also playing (role='organiser' or 'organiser_player').
+                    <AdminBadge
+                      role={(p.role === "organiser" || p.role === "organiser_player") ? "organiser" : "admin"}
+                      size="sm"
+                    />
                   )}
                   {p.role === "organiser" && (
+                    // Not playing — won't appear in the bracket
                     <Badge variant="outline" className="text-[9px] ml-auto">Organiser only</Badge>
                   )}
-                  {p.user_id === tournament.created_by && p.role !== "organiser" && (
+                  {p.role === "organiser_player" && (
+                    // Organising AND playing — counts toward the bracket
+                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser · playing</Badge>
+                  )}
+                  {p.user_id === tournament.created_by
+                    && p.role !== "organiser"
+                    && p.role !== "organiser_player" && (
                     <Badge variant="outline" className="text-[9px] ml-auto">Organiser</Badge>
                   )}
                   {p.partner_status === "pending" && (
@@ -556,6 +634,7 @@ const TournamentDetail = () => {
             skillLevelMin={skillLevelMin}
             skillLevelMax={skillLevelMax}
             requireAdminApproval={tournament.require_admin_approval}
+            ticketPriceCents={(tournament as typeof tournament & { ticket_price_cents?: number | null }).ticket_price_cents ?? 0}
           />
         )}
 
@@ -595,15 +674,29 @@ const TournamentDetail = () => {
             </>
           )}
 
-          {tournament.status === "active" && (
-            <button
-              onClick={() => navigate(`/tournaments/${tournament.id}/live`)}
-              className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
-            >
-              <span>Go live</span>
-              <ArrowLeft className="w-5 h-5 rotate-180" />
-            </button>
-          )}
+          {tournament.status === "active" && (() => {
+            // is_live flips to true only when an organiser hits Go Live in the Club app.
+            // While the tournament is just published/active but not yet live, we still
+            // let players open the live screen — but the label makes it clear it's a
+            // status view, not the start action.
+            const isActuallyLive = (tournament as typeof tournament & { is_live?: boolean | null }).is_live === true;
+            return (
+              <button
+                onClick={() => navigate(`/tournaments/${tournament.id}/live`)}
+                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
+              >
+                <span>{isActuallyLive ? "Open live screen" : "View status"}</span>
+                {isActuallyLive ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-primary-foreground/90 animate-pulse" />
+                    Live
+                  </span>
+                ) : (
+                  <ArrowLeft className="w-5 h-5 rotate-180" />
+                )}
+              </button>
+            );
+          })()}
 
           {(tournament.status === "draft" || tournament.status === "active") && (
             <>

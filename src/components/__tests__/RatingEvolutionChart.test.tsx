@@ -99,12 +99,13 @@ describe("RatingEvolutionChart", () => {
     });
   });
 
-  it("shows loading spinner initially", () => {
+  it("shows loading skeleton initially", () => {
     mockLimit.mockImplementation(() => new Promise(() => {})); // never resolves
 
     render(<RatingEvolutionChart userId="user-123" />);
 
-    const spinner = document.querySelector(".animate-spin");
-    expect(spinner).toBeInTheDocument();
+    // Loading state uses animate-pulse skeleton, not a spinner
+    const skeleton = document.querySelector(".animate-pulse");
+    expect(skeleton).toBeInTheDocument();
   });
 });

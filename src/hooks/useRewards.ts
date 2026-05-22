@@ -50,7 +50,7 @@ export const useRewards = () => {
 
       // Fetch linked stores
       const storeIds = [...new Set((data || []).map((r: any) => r.linked_store_id).filter(Boolean))];
-      let storesMap: Record<string, any> = {};
+      const storesMap: Record<string, any> = {};
       if (storeIds.length > 0) {
         const { data: stores } = await supabase.from("stores").select("id, store_name, website_url, redemption_instructions").in("id", storeIds);
         (stores || []).forEach((s: any) => { storesMap[s.id] = s; });

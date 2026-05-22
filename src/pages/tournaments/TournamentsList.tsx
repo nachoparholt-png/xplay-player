@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Tournament } from "@/lib/tournaments/types";
+import { formatPrice } from "@/lib/shopify";
 import TournamentBetSheet from "@/components/betting/TournamentBetSheet";
 
 /* ── types ─────────────────────────────────────────── */
@@ -537,6 +538,42 @@ const TournamentCard = ({
               <span className="text-muted-foreground/30">·</span>
               <span className="text-[11px] text-muted-foreground font-medium">
                 {t.court_count} courts
+              </span>
+            </>
+          )}
+
+          {/* Ticket price chip — shown only for paid tournaments. The exact
+              price the *current* player will pay depends on whether they
+              have an active club membership; the chip is intentionally a
+              "from / starts at" indicator. The full breakdown appears on
+              TournamentDetail + the Stripe Payment Sheet. */}
+          {t.ticket_price_cents > 0 && (
+            <>
+              <span className="text-muted-foreground/30">·</span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+                {(() => {
+                  // Use a single source of truth for currency: TODO once
+                  // tournaments.currency lands, drop this default to GBP.
+                  const currencyCode = "GBP";
+                  const gross = t.ticket_price_cents / 100;
+                  const discounted = t.member_discount_pct > 0
+                    ? gross * (1 - t.member_discount_pct / 100)
+                    : null;
+                  if (discounted != null) {
+                    return (
+                      <>
+                        <span className="line-through text-muted-foreground/60 font-medium">
+                          {formatPrice(gross, currencyCode)}
+                        </span>
+                        <span>{formatPrice(discounted, currencyCode)}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-primary/80">
+                          members
+                        </span>
+                      </>
+                    );
+                  }
+                  return <span>{formatPrice(gross, currencyCode)}</span>;
+                })()}
               </span>
             </>
           )}

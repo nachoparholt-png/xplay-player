@@ -54,7 +54,7 @@ async function loadOverrides(): Promise<Record<string, number>> {
       _cacheTime = Date.now();
       return _cachedOverrides;
     }
-  } catch {}
+  } catch { /* ignore */ }
   return {};
 }
 

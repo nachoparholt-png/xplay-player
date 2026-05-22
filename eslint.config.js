@@ -21,6 +21,22 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Project convention: `as any` is used for Supabase columns that aren't yet
+      // in the generated types. Keep visibility as a warning rather than blocking errors.
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-empty-object-type": "warn",
+      "@typescript-eslint/no-unused-expressions": "warn",
+    },
+  },
+  {
+    // Supabase Edge Functions run in Deno — relax browser-globals rules and `any`-heavy patterns
+    files: ["supabase/functions/**/*.ts"],
+    languageOptions: {
+      globals: { ...globals.node, Deno: "readonly" },
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-undef": "off",
     },
   },
 );

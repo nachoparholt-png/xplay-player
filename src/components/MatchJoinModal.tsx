@@ -601,17 +601,15 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
             </button>
 
             {/* BET LINK - Secondary, quiet */}
-            {true && (
-              <div className="text-center text-[11px] text-muted-foreground font-semibold">
-                Also betting?{" "}
-                <button
-                  onClick={() => setShowBetModal(true)}
-                  className="text-primary font-bold hover:underline"
-                >
-                  Add a bet →
-                </button>
-              </div>
-            )}
+            <div className="text-center text-[11px] text-muted-foreground font-semibold">
+              Also betting?{" "}
+              <button
+                onClick={() => setShowBetModal(true)}
+                className="text-primary font-bold hover:underline"
+              >
+                Add a bet →
+              </button>
+            </div>
 
             {/* CANCEL SPOT - Secondary, only if joined and can cancel */}
             {canCancel && (
