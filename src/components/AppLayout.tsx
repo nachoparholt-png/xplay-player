@@ -4,6 +4,7 @@ import { MessageSquare, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
+import PointsBalanceChip from "@/components/points/PointsBalanceChip";
 import AppTour from "@/components/AppTour";
 import xplayLogo from "@/assets/xplay-logo-full.png";
 import {
@@ -42,7 +43,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           <div className="flex items-center gap-2.5">
             <img src={xplayLogo} alt="XPLAY" className="h-9 w-auto object-contain rounded-xl" />
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-2">
+            <PointsBalanceChip />
+            <NotificationBell />
+          </div>
         </div>
 
         <nav className="flex-1 space-y-1">
@@ -91,7 +95,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           >
             <img src={xplayLogo} alt="X Play" className="h-8 w-auto object-contain" />
           </button>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <PointsBalanceChip compact />
             <button
               onClick={() => navigate("/messages")}
               className={`p-2 rounded-xl transition-colors active:scale-95 ${

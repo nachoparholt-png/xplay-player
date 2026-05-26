@@ -40,6 +40,7 @@ import StakeOptionsSection from "@/components/rewards/StakeOptionsSection";
 import ReferralSection from "@/components/rewards/ReferralSection";
 import TransactionHistory from "@/components/rewards/TransactionHistory";
 import RewardCatalogCard from "@/components/rewards/RewardCatalogCard";
+import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
 
 const Rewards = () => {
   const { profile, refreshProfile } = useAuth();
@@ -417,16 +418,18 @@ const Rewards = () => {
         </div>
       )}
 
-      {/* ── Stake ── */}
-      <div className="border-t border-border/30 pt-6">
-        <StakeOptionsSection
-          title={getSetting("stake_section_title", "Stake Your Points")}
-          stakeEnabled={getSetting("stake_enabled", "true") === "true"}
-          activeStakeCount={stakeStats?.activeCount ?? 0}
-          minStake={parseInt(getSetting("minimum_stake_points", "50"))}
-          maxStake={parseInt(getSetting("maximum_stake_points", "500"))}
-        />
-      </div>
+      {/* ── Stake (gated behind STAKES_ENABLED — see src/lib/featureFlags.ts) ── */}
+      {STAKES_ENABLED && (
+        <div className="border-t border-border/30 pt-6">
+          <StakeOptionsSection
+            title={getSetting("stake_section_title", "Stake Your Points")}
+            stakeEnabled={getSetting("stake_enabled", "true") === "true"}
+            activeStakeCount={stakeStats?.activeCount ?? 0}
+            minStake={parseInt(getSetting("minimum_stake_points", "50"))}
+            maxStake={parseInt(getSetting("maximum_stake_points", "500"))}
+          />
+        </div>
+      )}
 
       {/* ── Earn More ── */}
       <div ref={earnRef} className="border-t border-border/30 pt-6">
@@ -445,27 +448,30 @@ const Rewards = () => {
         inviterPoints={getSetting("referral_points_inviter", "200")}
       />
 
-      {/* ── Buy Points ── */}
-      <div ref={buyRef} className="border-t border-border/30 pt-6">
-        <BuyPointsSection
-          title={getSetting("buy_points_section_title", "Buy More Points")}
-          enabled={getSetting("enable_points_purchase", "true") === "true"}
-          packs={getPointsPacks()}
-          onBuyPack={async (pack: PointsPack) => {
-            try {
-              const { data, error } = await supabase.functions.invoke("create-checkout", {
-                body: { package_id: pack.id },
-              });
-              if (error) throw error;
-              if (data?.error) throw new Error(data.error);
-              if (data?.url) window.location.href = data.url;
-            } catch (err: any) {
-              toast({ title: "Purchase failed", description: err.message, variant: "destructive" });
-            }
-          }}
-          suggestedAmount={suggestedMissing}
-        />
-      </div>
+      {/* ── Buy Points (gated behind POINTS_PURCHASE_ENABLED — legal bright line: ── */}
+      {/*     selling points = e-money under EMRs 2011. See src/lib/featureFlags.ts) ── */}
+      {POINTS_PURCHASE_ENABLED && (
+        <div ref={buyRef} className="border-t border-border/30 pt-6">
+          <BuyPointsSection
+            title={getSetting("buy_points_section_title", "Buy More Points")}
+            enabled={getSetting("enable_points_purchase", "true") === "true"}
+            packs={getPointsPacks()}
+            onBuyPack={async (pack: PointsPack) => {
+              try {
+                const { data, error } = await supabase.functions.invoke("create-checkout", {
+                  body: { package_id: pack.id },
+                });
+                if (error) throw error;
+                if (data?.error) throw new Error(data.error);
+                if (data?.url) window.location.href = data.url;
+              } catch (err: any) {
+                toast({ title: "Purchase failed", description: err.message, variant: "destructive" });
+              }
+            }}
+            suggestedAmount={suggestedMissing}
+          />
+        </div>
+      )}
 
       {/* ── Transaction History ── */}
       <TransactionHistory transactions={transactions} />
@@ -473,40 +479,42 @@ const Rewards = () => {
       {/* ── Close XPLAY content fragment ── */}
       </>}
 
-      {/* ── FAB: Buy Points ── */}
-      <motion.button
-        onClick={() => scrollTo(buyRef)}
-        className="fixed bottom-24 right-5 z-40 flex items-center justify-center bg-primary text-primary-foreground shadow-lg font-black text-sm overflow-hidden h-12"
-        style={{ minWidth: 48 }}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{
-          scale: 1,
-          opacity: 1,
-          width: fabExpanded ? 152 : 48,
-          borderRadius: fabExpanded ? 16 : 24,
-          paddingLeft: fabExpanded ? 16 : 0,
-          paddingRight: fabExpanded ? 16 : 0,
-        }}
-        transition={{ duration: 0.25, ease: "easeInOut" }}
-      >
-        <ShoppingCart className="w-5 h-5 flex-shrink-0" />
-        <AnimatePresence>
-          {fabExpanded && (
-            <motion.span
-              key="label"
-              initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-              animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
-              exit={{ width: 0, opacity: 0, marginLeft: 0 }}
-              transition={{ duration: 0.2 }}
-              className="whitespace-nowrap overflow-hidden font-display uppercase tracking-wider"
-            >
-              Buy Points
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
+      {/* ── FAB: Buy Points (gated behind POINTS_PURCHASE_ENABLED) ── */}
+      {POINTS_PURCHASE_ENABLED && (
+        <motion.button
+          onClick={() => scrollTo(buyRef)}
+          className="fixed bottom-24 right-5 z-40 flex items-center justify-center bg-primary text-primary-foreground shadow-lg font-black text-sm overflow-hidden h-12"
+          style={{ minWidth: 48 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            width: fabExpanded ? 152 : 48,
+            borderRadius: fabExpanded ? 16 : 24,
+            paddingLeft: fabExpanded ? 16 : 0,
+            paddingRight: fabExpanded ? 16 : 0,
+          }}
+          transition={{ duration: 0.25, ease: "easeInOut" }}
+        >
+          <ShoppingCart className="w-5 h-5 flex-shrink-0" />
+          <AnimatePresence>
+            {fabExpanded && (
+              <motion.span
+                key="label"
+                initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
+                exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                transition={{ duration: 0.2 }}
+                className="whitespace-nowrap overflow-hidden font-display uppercase tracking-wider"
+              >
+                Buy Points
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      )}
 
       {/* ── Modals ── */}
       <RewardDetailModal

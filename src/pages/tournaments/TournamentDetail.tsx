@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 
 import ApprovalRequestPanel from "@/components/tournaments/ApprovalRequestPanel";
 import TournamentBetSheet from "@/components/betting/TournamentBetSheet";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -638,19 +639,21 @@ const TournamentDetail = () => {
           />
         )}
 
-        {/* Bet Sheet */}
-        <TournamentBetSheet
-          open={betSheetOpen}
-          onClose={() => setBetSheetOpen(false)}
-          tournament={tournament ? {
-            tournamentId: tournament.id,
-            name: tournament.name,
-            formatType: tournament.format_type,
-            bracketConfig: tournament.bracket_config || {},
-          } : null}
-          onBetPlaced={() => {}}
-          isCreatorBlocked={isCreator}
-        />
+        {/* Bet Sheet — gated behind STAKES_ENABLED (see src/lib/featureFlags.ts) */}
+        {STAKES_ENABLED && (
+          <TournamentBetSheet
+            open={betSheetOpen}
+            onClose={() => setBetSheetOpen(false)}
+            tournament={tournament ? {
+              tournamentId: tournament.id,
+              name: tournament.name,
+              formatType: tournament.format_type,
+              bracketConfig: tournament.bracket_config || {},
+            } : null}
+            onBetPlaced={() => {}}
+            isCreatorBlocked={isCreator}
+          />
+        )}
       </div>
 
       {/* Sticky CTA Footer */}

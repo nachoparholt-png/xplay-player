@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import BetModal from "@/components/BetModal";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 import { useOfflineQueue } from "@/hooks/useOfflineQueue";
 
 type MatchData = {
@@ -600,16 +601,18 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
               {joining && ctaState.type !== "pending" ? "Loading…" : ctaState.label}
             </button>
 
-            {/* BET LINK - Secondary, quiet */}
-            <div className="text-center text-[11px] text-muted-foreground font-semibold">
-              Also betting?{" "}
-              <button
-                onClick={() => setShowBetModal(true)}
-                className="text-primary font-bold hover:underline"
-              >
-                Add a bet →
-              </button>
-            </div>
+            {/* BET LINK — gated behind STAKES_ENABLED (see src/lib/featureFlags.ts) */}
+            {STAKES_ENABLED && (
+              <div className="text-center text-[11px] text-muted-foreground font-semibold">
+                Also betting?{" "}
+                <button
+                  onClick={() => setShowBetModal(true)}
+                  className="text-primary font-bold hover:underline"
+                >
+                  Add a bet →
+                </button>
+              </div>
+            )}
 
             {/* CANCEL SPOT - Secondary, only if joined and can cancel */}
             {canCancel && (
@@ -626,7 +629,9 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
       </div>
 
       {/* Modals */}
-      <BetModal matchId={matchId} open={showBetModal} onOpenChange={setShowBetModal} />
+      {STAKES_ENABLED && (
+        <BetModal matchId={matchId} open={showBetModal} onOpenChange={setShowBetModal} />
+      )}
       {match && (
         <CancelRegistrationModal
           open={showCancelModal}

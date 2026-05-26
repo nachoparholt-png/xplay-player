@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
-import { Sparkles, Gift, TrendingUp, Wallet } from "lucide-react";
+import { Sparkles, Gift, Trophy, Calendar, Flame, UserPlus, Award } from "lucide-react";
 
 interface EarnMethod {
   icon: typeof Gift;
   title: string;
   description: string;
+  points: string;
   color: string;
 }
 
@@ -13,25 +14,61 @@ interface EarnPointsSectionProps {
   settings: Record<string, string>;
 }
 
-const EarnPointsSection = ({ title, settings }: EarnPointsSectionProps) => {
+/**
+ * XPLAY Points earning catalogue — simplified.
+ * Anchor: 100 pts = £1 of catalogue value.
+ * See XPLAY_Rewards_Program_Design.html for full programme rules.
+ */
+const EarnPointsSection = ({ title, settings: _settings }: EarnPointsSectionProps) => {
   const earningMethods: EarnMethod[] = [
     {
       icon: Gift,
-      title: "Welcome Bonus",
-      description: "Get 50 XPLAY Points when you join the platform",
+      title: "Sign up & complete profile",
+      description: "One-time welcome bonus when you finish onboarding",
+      points: "+100 pts",
       color: "text-primary",
     },
     {
-      icon: TrendingUp,
-      title: "Earn Points from Stakes",
-      description: "Win points by correctly predicting match outcomes",
+      icon: Trophy,
+      title: "Play a match",
+      description: "Whether you organise or join — every completed match earns the same",
+      points: "+100 pts",
+      color: "text-primary",
+    },
+    {
+      icon: Award,
+      title: "Win a match (skill bonus)",
+      description: "Activity bonus on completed wins — capped at 4 wins / week",
+      points: "+25 pts",
       color: "text-secondary",
     },
     {
-      icon: Wallet,
-      title: "Buy More Points",
-      description: "Purchase point bundles with bonus rewards included",
+      icon: Calendar,
+      title: "Daily app check-in",
+      description: "Open the app each day to keep your streak alive",
+      points: "+5 pts",
       color: "text-primary",
+    },
+    {
+      icon: Flame,
+      title: "Weekly play streak",
+      description: "3 consecutive weeks with a match played",
+      points: "+100 pts",
+      color: "text-secondary",
+    },
+    {
+      icon: UserPlus,
+      title: "Refer a friend who plays",
+      description: "Invited friend completes their 1st match",
+      points: "+500 pts",
+      color: "text-primary",
+    },
+    {
+      icon: Trophy,
+      title: "Play in a tournament",
+      description: "Check in to any XPLAY tournament",
+      points: "+100 pts",
+      color: "text-secondary",
     },
   ];
 
@@ -58,8 +95,16 @@ const EarnPointsSection = ({ title, settings }: EarnPointsSectionProps) => {
               <h4 className="font-semibold text-sm">{method.title}</h4>
               <p className="text-xs text-muted-foreground">{method.description}</p>
             </div>
+            <div className="text-xs font-bold text-primary whitespace-nowrap font-mono">
+              {method.points}
+            </div>
           </motion.div>
         ))}
+      </div>
+
+      <div className="text-[11px] text-muted-foreground mt-3 px-1">
+        100 XPLAY Points redeem for £1 of catalogue value. Points have no cash value
+        and cannot be transferred or exchanged for cash.
       </div>
     </div>
   );

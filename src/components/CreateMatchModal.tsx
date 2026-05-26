@@ -420,18 +420,32 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="fixed bottom-0 left-0 right-0 top-auto w-full max-w-none translate-x-0 translate-y-0 max-h-[90dvh] overflow-y-auto p-0 bg-card border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0">
+        <DialogContent
+          className="max-h-[90dvh] overflow-y-auto overflow-x-hidden p-0 bg-card border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0"
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            top: "auto",
+            width: "100vw",
+            maxWidth: "100vw",
+            transform: "none",
+            paddingBottom: "env(safe-area-inset-bottom)",
+            boxSizing: "border-box",
+          }}
+        >
           {/* Handle bar */}
           <div className="flex justify-center pt-3 pb-2">
             <div className="w-10 h-1 rounded-full bg-border" />
           </div>
 
           {/* Header */}
-          <div className="px-5 pt-2 pb-6 space-y-2">
+          <div className="px-5 pt-2 pb-6 space-y-2 min-w-0">
             <div className="text-[10px] font-black tracking-[0.18em] text-primary uppercase">
               NEW MATCH
             </div>
-            <div className="font-display text-[36px] font-black italic uppercase leading-[0.92]">
+            <div className="font-display text-[clamp(28px,8vw,36px)] font-black italic uppercase leading-[0.92] break-words">
               Who's in?
             </div>
             <div className="text-xs text-muted-foreground">
@@ -439,7 +453,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
             </div>
           </div>
 
-          <div className="space-y-5 px-4 pb-6">
+          <div className="space-y-5 px-4 pb-6 min-w-0 w-full max-w-full">
             {/* Paste banner */}
             <button
               onClick={handlePasteAutofill}

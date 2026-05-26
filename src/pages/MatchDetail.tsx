@@ -13,6 +13,7 @@ import type { Enums } from "@/integrations/supabase/types";
 
 import BetModal from "@/components/BetModal";
 import MatchBettingSection from "@/components/MatchBettingSection";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 import AfterGameCard from "@/components/aftergame/AfterGameCard";
 import ScoreUploadModal from "@/components/aftergame/ScoreUploadModal";
@@ -1094,7 +1095,7 @@ const MatchDetail = () => {
             </div>
           </div>
         )}
-        {isPreGame && id && match?.format !== "social" && (
+        {STAKES_ENABLED && isPreGame && id && match?.format !== "social" && (
           <MatchBettingSection
             matchId={id}
             userTeam={currentPlayerEntry?.team === "A" ? "A" : currentPlayerEntry?.team === "B" ? "B" : null}
@@ -1386,7 +1387,9 @@ const MatchDetail = () => {
       )}
 
       {/* Modals */}
-      <BetModal matchId={id || null} open={showBetModal} onOpenChange={setShowBetModal} />
+      {STAKES_ENABLED && (
+        <BetModal matchId={id || null} open={showBetModal} onOpenChange={setShowBetModal} />
+      )}
       <ScoreUploadModal
         matchId={id || ""}
         open={showScoreUpload}

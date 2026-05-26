@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Tournament } from "@/lib/tournaments/types";
 import { formatPrice } from "@/lib/shopify";
 import TournamentBetSheet from "@/components/betting/TournamentBetSheet";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 /* ── types ─────────────────────────────────────────── */
 type Tab = "all" | "open" | "my_entries" | "completed";
@@ -418,18 +419,21 @@ const TournamentsList = () => {
         </div>
       )}
 
-      <TournamentBetSheet
-        open={!!activeBetTournament}
-        onClose={() => setActiveBetTournament(null)}
-        tournament={activeBetTournament ? {
-          tournamentId: activeBetTournament.id,
-          name: activeBetTournament.name,
-          formatType: activeBetTournament.format_type,
-          bracketConfig: activeBetTournament.bracket_config || {},
-        } : null}
-        onBetPlaced={() => {}}
-        isCreatorBlocked={activeBetTournament?.created_by === user?.id}
-      />
+      {/* TournamentBetSheet gated behind STAKES_ENABLED — see src/lib/featureFlags.ts */}
+      {STAKES_ENABLED && (
+        <TournamentBetSheet
+          open={!!activeBetTournament}
+          onClose={() => setActiveBetTournament(null)}
+          tournament={activeBetTournament ? {
+            tournamentId: activeBetTournament.id,
+            name: activeBetTournament.name,
+            formatType: activeBetTournament.format_type,
+            bracketConfig: activeBetTournament.bracket_config || {},
+          } : null}
+          onBetPlaced={() => {}}
+          isCreatorBlocked={activeBetTournament?.created_by === user?.id}
+        />
+      )}
     </div>
   );
 };

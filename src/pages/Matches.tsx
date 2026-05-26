@@ -13,6 +13,7 @@ import MatchCard from "@/components/MatchCard";
 import CreateMatchModal from "@/components/CreateMatchModal";
 import MatchJoinModal from "@/components/MatchJoinModal";
 import MatchBetSheet from "@/components/betting/MatchBetSheet";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 import { format } from "date-fns";
 import ClubsExplorer from "@/components/clubs/ClubsExplorer";
 import LiveTournamentBanner from "@/components/tournaments/live/LiveTournamentBanner";
@@ -233,7 +234,8 @@ const Matches = () => {
       const matchStakes = stakeData.filter((s) => s.match_id === m.id);
       const userStake = matchStakes.find((s) => s.user_id === user.id) || null;
       const matchMarket = marketMap.get(m.id) as MarketInfo | undefined;
-      const stakingAvailable = m.format !== "social" && (matchMarket != null || matchStakes.length > 0 || ["open", "almost_full", "full"].includes(m.status));
+      // Stakes gated behind feature flag — see src/lib/featureFlags.ts
+      const stakingAvailable = STAKES_ENABLED && m.format !== "social" && (matchMarket != null || matchStakes.length > 0 || ["open", "almost_full", "full"].includes(m.status));
       const totalPointsStaked = matchMarket?.total_pot ?? matchStakes
         .filter((s) => s.status === "active")
         .reduce((sum, s) => sum + s.points_staked, 0);
@@ -297,10 +299,12 @@ const Matches = () => {
         setMatches(enriched);
 
       } else {
+        const today = new Date().toISOString().split("T")[0];
         const { data: matchData } = await supabase
           .from("matches")
           .select("*")
           .in("status", ["open", "almost_full"])
+          .gte("match_date", today) // defensive: never show past matches even if cron is briefly behind
           .order("match_date", { ascending: true })
           .order("match_time", { ascending: true });
 
@@ -820,21 +824,24 @@ const Matches = () => {
               open={!!selectedMatchId}
               onOpenChange={(o) => { if (!o) { setSelectedMatchId(null); fetchMatches(); } }}
             />
-            <MatchBetSheet
-              open={!!activeBetMatch}
-              onClose={() => setActiveBetMatch(null)}
-              match={activeBetMatch ? {
-                matchId: activeBetMatch.id,
-                club: activeBetMatch.club,
-                date: activeBetMatch.match_date ? format(new Date(activeBetMatch.match_date + "T00:00:00"), "EEE d MMMM") : "TBD",
-                time: activeBetMatch.match_time?.slice(0, 5) ?? "",
-                teamALabel: activeBetMatch.players.filter(p => p.team === "A").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
-                teamBLabel: activeBetMatch.players.filter(p => p.team === "B").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
-                teamAOdds: activeBetMatch.market?.team_a_multiplier ?? 1.8,
-                teamBOdds: activeBetMatch.market?.team_b_multiplier ?? 1.8,
-              } : null}
-              onBetPlaced={() => fetchMatches()}
-            />
+            {/* MatchBetSheet preserved behind STAKES_ENABLED — see src/lib/featureFlags.ts */}
+            {STAKES_ENABLED && (
+              <MatchBetSheet
+                open={!!activeBetMatch}
+                onClose={() => setActiveBetMatch(null)}
+                match={activeBetMatch ? {
+                  matchId: activeBetMatch.id,
+                  club: activeBetMatch.club,
+                  date: activeBetMatch.match_date ? format(new Date(activeBetMatch.match_date + "T00:00:00"), "EEE d MMMM") : "TBD",
+                  time: activeBetMatch.match_time?.slice(0, 5) ?? "",
+                  teamALabel: activeBetMatch.players.filter(p => p.team === "A").map(p => p.name.split(" ")[0]).join(" & ") || "Team A",
+                  teamBLabel: activeBetMatch.players.filter(p => p.team === "B").map(p => p.name.split(" ")[0]).join(" & ") || "Team B",
+                  teamAOdds: activeBetMatch.market?.team_a_multiplier ?? 1.8,
+                  teamBOdds: activeBetMatch.market?.team_b_multiplier ?? 1.8,
+                } : null}
+                onBetPlaced={() => fetchMatches()}
+              />
+            )}
           </>
         )}
       </div>

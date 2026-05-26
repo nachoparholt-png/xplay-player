@@ -16,6 +16,7 @@ import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
 import AdminRoute from "./components/AdminRoute";
 import { Stripe } from "@capacitor-community/stripe";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 // ── Chunk-load resilience ───────────────────────────────────────────────────
 // After a Vercel redeploy the old chunk URLs are gone. This wrapper catches
@@ -163,7 +164,9 @@ const AppRoutes = () => {
           <Route path="/marketplace/:handle" element={<ProtectedRoute><AppLayout><ProductDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><AppLayout><Orders /></AppLayout></ProtectedRoute>} />
           <Route path="/payment-success" element={<ProtectedRoute><AppLayout><PaymentSuccess /></AppLayout></ProtectedRoute>} />
-          <Route path="/stakes" element={<ProtectedRoute><AppLayout><ActiveStakes /></AppLayout></ProtectedRoute>} />
+          {STAKES_ENABLED && (
+            <Route path="/stakes" element={<ProtectedRoute><AppLayout><ActiveStakes /></AppLayout></ProtectedRoute>} />
+          )}
           <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><AppLayout><Bookings /></AppLayout></ProtectedRoute>} />
@@ -179,10 +182,14 @@ const AppRoutes = () => {
           <Route path="/admin/rewards" element={<AdminRoute><AdminLayout><AdminRewardsSettings /></AdminLayout></AdminRoute>} />
           <Route path="/admin/reward-codes" element={<AdminRoute><AdminLayout><AdminRewardCodes /></AdminLayout></AdminRoute>} />
           <Route path="/admin/stores" element={<AdminRoute><AdminLayout><AdminStores /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/betting" element={<AdminRoute><AdminLayout><AdminBettingSettings /></AdminLayout></AdminRoute>} />
+          {STAKES_ENABLED && (
+            <Route path="/admin/betting" element={<AdminRoute><AdminLayout><AdminBettingSettings /></AdminLayout></AdminRoute>} />
+          )}
           <Route path="/admin/products" element={<AdminRoute><AdminLayout><AdminProducts /></AdminLayout></AdminRoute>} />
           <Route path="/admin/tournament-categories" element={<AdminRoute><AdminLayout><AdminTournamentCategories /></AdminLayout></AdminRoute>} />
-          <Route path="/tournaments/:id/bets" element={<AdminRoute><AdminLayout><TournamentBetConfig /></AdminLayout></AdminRoute>} />
+          {STAKES_ENABLED && (
+            <Route path="/tournaments/:id/bets" element={<AdminRoute><AdminLayout><TournamentBetConfig /></AdminLayout></AdminRoute>} />
+          )}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

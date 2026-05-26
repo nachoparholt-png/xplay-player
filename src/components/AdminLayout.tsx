@@ -2,12 +2,16 @@ import { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Users, BarChart3, Shield, ArrowLeft, Building2, Sliders, Gift, Package, Store, TrendingUp, ShoppingBag } from "lucide-react";
 import { motion } from "framer-motion";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
-const adminNavItems = [
+const allAdminNavItems = [
   { path: "/admin/players", icon: Users, label: "Players" },
   { path: "/admin/clubs", icon: Building2, label: "Clubs" },
   { path: "/admin/rating", icon: Sliders, label: "Rating" },
-  { path: "/admin/betting", icon: TrendingUp, label: "Betting" },
+  // Betting tab is gated behind STAKES_ENABLED (see src/lib/featureFlags.ts)
+  ...(STAKES_ENABLED
+    ? [{ path: "/admin/betting", icon: TrendingUp, label: "Betting" } as const]
+    : []),
   { path: "/admin/products", icon: ShoppingBag, label: "Products" },
   { path: "/admin/rewards", icon: Gift, label: "Rewards" },
   { path: "/admin/reward-codes", icon: Package, label: "Codes" },
@@ -15,6 +19,8 @@ const adminNavItems = [
   { path: "/admin/activity", icon: BarChart3, label: "Activity Log" },
   { path: "/admin/settings", icon: Shield, label: "Settings" },
 ];
+
+const adminNavItems = allAdminNavItems;
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
