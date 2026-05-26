@@ -205,21 +205,27 @@ const Matches = () => {
 
     const ids = matchData.map((m) => m.id);
 
-    // Single join on match_players → profiles eliminates the separate profiles fetch
+    // Single join on match_players → profiles eliminates the separate profiles fetch.
+    // match_stakes + match_bet_markets queries are skipped when stakes feature is off.
+    const stakesQuery = STAKES_ENABLED
+      ? supabase.from("match_stakes")
+          .select("match_id, user_id, points_staked, status, team")
+          .in("match_id", ids)
+      : Promise.resolve({ data: [], error: null });
+    const marketsQuery = STAKES_ENABLED
+      ? supabase.from("match_bet_markets")
+          .select("match_id, total_pot, team_a_multiplier, team_b_multiplier, phase")
+          .in("match_id", ids)
+      : Promise.resolve({ data: [], error: null });
+
     const [playersRes, stakesRes, marketsRes] = await Promise.all([
       supabase
         .from("match_players")
         .select("match_id, user_id, status, team, profiles(display_name, avatar_url, padel_level)")
         .in("match_id", ids)
         .eq("status", "confirmed"),
-      supabase
-        .from("match_stakes")
-        .select("match_id, user_id, points_staked, status, team")
-        .in("match_id", ids),
-      supabase
-        .from("match_bet_markets")
-        .select("match_id, total_pot, team_a_multiplier, team_b_multiplier, phase")
-        .in("match_id", ids),
+      stakesQuery,
+      marketsQuery,
     ]);
 
     const playerData = playersRes.data || [];

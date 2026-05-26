@@ -11,6 +11,8 @@ import AppLayout from "./components/AppLayout";
 import SplashScreen from "./components/SplashScreen";
 import { useCartSync } from "./hooks/useCartSync";
 import { usePushNotifications } from "./hooks/usePushNotifications";
+import { useDailyCheckIn } from "./hooks/useDailyCheckIn";
+import { usePointsEarnedToasts } from "./hooks/usePointsEarnedToasts";
 import ErrorBoundary from "./components/ErrorBoundary";
 import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
@@ -66,6 +68,7 @@ const PaymentSuccess      = lazyWithRetry(() => import("./pages/PaymentSuccess")
 const Profile             = lazyWithRetry(() => import("./pages/Profile"));
 const ProfileSettings     = lazyWithRetry(() => import("./pages/ProfileSettings"));
 const PointsStore         = lazyWithRetry(() => import("./pages/PointsStore"));
+const ProgrammeRules      = lazyWithRetry(() => import("./pages/ProgrammeRules"));
 const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
 const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
 const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
@@ -141,6 +144,8 @@ const RouteErrorBoundary = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   useCartSync();
   usePushNotifications();
+  useDailyCheckIn();
+  usePointsEarnedToasts();
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<PageLoader />}>
@@ -168,6 +173,7 @@ const AppRoutes = () => {
             <Route path="/stakes" element={<ProtectedRoute><AppLayout><ActiveStakes /></AppLayout></ProtectedRoute>} />
           )}
           <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
+          <Route path="/programme-rules" element={<ProtectedRoute><AppLayout><ProgrammeRules /></AppLayout></ProtectedRoute>} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><AppLayout><Bookings /></AppLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />

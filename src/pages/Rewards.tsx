@@ -40,6 +40,9 @@ import StakeOptionsSection from "@/components/rewards/StakeOptionsSection";
 import ReferralSection from "@/components/rewards/ReferralSection";
 import TransactionHistory from "@/components/rewards/TransactionHistory";
 import RewardCatalogCard from "@/components/rewards/RewardCatalogCard";
+import XplayProPaywall from "@/components/points/XplayProPaywall";
+import { useXplayPro } from "@/hooks/useXplayPro";
+import { Sparkles } from "lucide-react";
 import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
 
 const Rewards = () => {
@@ -62,6 +65,8 @@ const Rewards = () => {
   const [shopifyLoading, setShopifyLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [marketTab, setMarketTab] = useState<"xplay" | "clubs">("xplay");
+  const [proPaywallOpen, setProPaywallOpen] = useState(false);
+  const proState = useXplayPro();
 
   const catalogRef = useRef<HTMLDivElement>(null);
   const buyRef = useRef<HTMLDivElement>(null);
@@ -431,6 +436,29 @@ const Rewards = () => {
         </div>
       )}
 
+      {/* ── XPLAY Pro upsell banner ── */}
+      {!proState.active && (
+        <button
+          onClick={() => setProPaywallOpen(true)}
+          className="w-full text-left bg-gradient-to-br from-primary/15 via-primary/10 to-secondary/10 border border-primary/30 rounded-2xl p-4 flex items-center gap-3 hover:from-primary/20 hover:via-primary/15 transition-colors active:scale-[0.99]"
+        >
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+            <Sparkles className="w-5 h-5 text-primary-foreground fill-primary-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-display text-sm font-black italic">
+              Earn 2× faster with XPLAY <span className="text-primary">Pro</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              From £7.99/mo · 2× points, 10% off bookings, priority slots
+            </div>
+          </div>
+          <div className="text-[10px] uppercase tracking-widest font-bold text-primary whitespace-nowrap">
+            See more →
+          </div>
+        </button>
+      )}
+
       {/* ── Earn More ── */}
       <div ref={earnRef} className="border-t border-border/30 pt-6">
         <EarnPointsSection
@@ -515,6 +543,9 @@ const Rewards = () => {
           </AnimatePresence>
         </motion.button>
       )}
+
+      {/* ── XPLAY Pro Paywall ── */}
+      <XplayProPaywall open={proPaywallOpen} onClose={() => setProPaywallOpen(false)} />
 
       {/* ── Modals ── */}
       <RewardDetailModal

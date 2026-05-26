@@ -4,6 +4,7 @@ import { ChevronRight, Settings, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 import SkillBadge from "@/components/SkillBadge";
 import PlayerRatingCard from "@/components/PlayerRatingCard";
@@ -37,7 +38,7 @@ const Profile = () => {
   const [matchesLoading, setMatchesLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !STAKES_ENABLED) return;
     supabase.from("match_stakes").select("id", { count: "exact", head: true })
       .eq("user_id", user.id).eq("status", "active")
       .then(({ count }) => setActiveStakeCount(count || 0));

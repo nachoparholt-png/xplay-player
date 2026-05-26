@@ -14,6 +14,7 @@
 import { useNavigate } from "react-router-dom";
 import { Zap, Sparkles } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useXplayPro } from "@/hooks/useXplayPro";
 import { LOYALTY_ENABLED } from "@/lib/featureFlags";
 
 interface PointsBalanceChipProps {
@@ -24,17 +25,14 @@ interface PointsBalanceChipProps {
 const PointsBalanceChip = ({ compact = false }: PointsBalanceChipProps) => {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const pro = useXplayPro();
 
   if (!LOYALTY_ENABLED) return null;
 
   // padel_park_points is the canonical balance column; treat null as 0
   const balance = (profile as { padel_park_points?: number } | null)?.padel_park_points ?? 0;
   const equivalentPounds = (balance / 100).toFixed(2);
-
-  // Premium status — checked by reading the cached profile shape if present.
-  // (Real-time premium status comes from the xplay_pro_subscriptions table;
-  // a future revision can wire a useXplayPro() hook for this.)
-  const isPro = Boolean((profile as { xplay_pro_active?: boolean } | null)?.xplay_pro_active);
+  const isPro = pro.active;
 
   return (
     <button
