@@ -90,7 +90,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </h1>
 
       <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs mb-3">
-        XPLAY is a community where players can create matches, join games, chat with other players, and compete using XPLAY Points (XP) and stakes.
+        XPLAY is a community where players create matches, join games, chat with other players, and earn XPLAY Points they can redeem for rewards.
       </p>
 
       <p className="text-[11px] text-muted-foreground/60 mb-10">
@@ -565,10 +565,10 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
       >
         <h2 className="font-display text-[28px] font-black italic uppercase leading-[0.95]">Welcome Bonus!</h2>
         <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
-          50 XPLAY Points have been added to your wallet. Use them to stake on matches and win more.
+          100 XPLAY Points have been added to your account. Play matches, refer friends and complete tournaments to earn more.
         </p>
         <p className="text-[11px] text-muted-foreground/60">
-          1 XP = £0.10 · Stake smart, win big.
+          100 XPLAY Points = £1 of catalogue value · Points have no cash value.
         </p>
       </motion.div>
 

@@ -35,14 +35,14 @@ export const TOUR_STOPS: TourStop[] = [
     step: 1,
     route: "/matches",
     title: "Jump Into a Match",
-    body: "Open matches are waiting for players like you. Tap any card to see the court, the level and the stakes. Then claim your spot.",
+    body: "Open matches are waiting for players like you. Tap any card to see the court, the level and the players. Then claim your spot.",
     icon: "🎾",
   },
   {
     step: 2,
     route: "/matches",
-    title: "Bet XP, Win More",
-    body: "Before any competitive match you can stake XP on your team. Win the match and split the pot. Every point matters.",
+    title: "Play & Earn XPLAY Points",
+    body: "Every match you complete earns you XPLAY Points — extra bonus for winning. The more you play, the faster you rack them up.",
     icon: "🏆",
   },
   {

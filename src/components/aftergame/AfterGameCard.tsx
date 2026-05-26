@@ -74,7 +74,7 @@ const AfterGameCard = ({
         return {
           icon: <Equal className="w-5 h-5" />,
           title: "Match Ended — Draw",
-          subtitle: "Both teams agreed on a draw. Stakes refunded.",
+          subtitle: "Both teams agreed on a draw.",
           color: "text-gold",
           bg: "bg-gold/10 border-gold/20",
         };

@@ -122,7 +122,7 @@ const PointsStore = () => {
       </div>
 
       <p className="text-muted-foreground text-sm">
-        Purchase points packages to stake on matches, redeem rewards, and more.
+        Earn XPLAY Points by playing matches, winning, completing tournaments and referring friends. Redeem them for rewards.
       </p>
 
       {/* Referral CTA */}
