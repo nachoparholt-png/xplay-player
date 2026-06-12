@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminProvider } from "@/contexts/AdminContext";
 import { TourProvider } from "@/contexts/TourContext";
 import AppLayout from "./components/AppLayout";
-import SplashScreen from "./components/SplashScreen";
+import SplashOverlay from "./components/SplashOverlay";
 import { useCartSync } from "./hooks/useCartSync";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useDailyCheckIn } from "./hooks/useDailyCheckIn";
@@ -227,7 +227,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
+        {!splashDone && <SplashOverlay onDone={() => setSplashDone(true)} />}
         <BrowserRouter>
           <AuthProvider>
             <AdminProvider>
