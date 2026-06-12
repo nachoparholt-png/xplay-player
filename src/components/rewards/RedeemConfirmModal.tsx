@@ -45,10 +45,16 @@ const RedeemConfirmModal = ({ reward, open, onClose, onConfirm, userPoints, isLo
           </div>
         </div>
 
+        {/* Legal microcopy — compliance (design R2) */}
+        <p className="text-[10.5px] text-muted-foreground/60 text-center leading-relaxed">
+          XPLAY Points have no cash value and can't be exchanged for money.
+          100 XP = £1 of catalogue value. Redemptions are final.
+        </p>
+
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? "Redeeming..." : "Confirm Redemption"}
+            {isLoading ? "Redeeming..." : `Confirm · ${reward.points_cost.toLocaleString()} XP`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Zap, ShoppingBag, AlertTriangle, CheckCircle, ShoppingCart, Sparkles, Store, ExternalLink } from "lucide-react";
 import type { Reward } from "@/hooks/useRewards";
+import { POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
 
 interface RewardDetailModalProps {
   reward: Reward | null;
@@ -85,22 +86,37 @@ const RewardDetailModal = ({ reward, open, onClose, userPoints, onRedeem, onBuyP
           )}
 
           {!canAfford && isAvailable && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 space-y-2">
+            <div className="p-3 rounded-xl bg-amber-400/10 border border-amber-400/20 space-y-3">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-destructive" />
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
                 <span className="text-sm font-medium text-foreground">
-                  You need {missingPoints.toLocaleString()} more points
+                  Almost there — {missingPoints.toLocaleString()} more points
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">Keep playing or buy points to unlock this reward!</p>
+              {/* Progress towards the reward (design R4) */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between font-mono text-[11px]">
+                  <span className="text-primary">{userPoints.toLocaleString()} XP</span>
+                  <span className="text-muted-foreground">{reward.points_cost.toLocaleString()} XP</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.max(3, (userPoints / reward.points_cost) * 100))}%` }}
+                  />
+                </div>
+              </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={onBuyPoints} className="flex-1 gap-1.5 text-xs">
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  Buy Points
-                </Button>
-                <Button size="sm" variant="outline" onClick={onEarnMore} className="flex-1 gap-1.5 text-xs">
+                {/* Buy Points gated — selling points is off (legal: e-money under EMRs 2011) */}
+                {POINTS_PURCHASE_ENABLED && (
+                  <Button size="sm" onClick={onBuyPoints} className="flex-1 gap-1.5 text-xs">
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    Buy Points
+                  </Button>
+                )}
+                <Button size="sm" variant={POINTS_PURCHASE_ENABLED ? "outline" : "default"} onClick={onEarnMore} className="flex-1 gap-1.5 text-xs">
                   <Sparkles className="w-3.5 h-3.5" />
-                  Earn More
+                  Earn the rest fast
                 </Button>
               </div>
             </div>

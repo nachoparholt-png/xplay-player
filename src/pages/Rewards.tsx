@@ -385,22 +385,34 @@ const Rewards = () => {
                         {product.node.description}
                       </p>
                       {costNum && (
-                        <div className="flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-primary" />
-                          <span className="text-xs font-black text-primary">{costNum.toLocaleString()} XP</span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="inline-flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-primary" />
+                            <span className="text-xs font-black text-primary">{costNum.toLocaleString()} XP</span>
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">· worth £{(costNum / 100).toFixed(2)}</span>
                         </div>
                       )}
                     </div>
-                    <button
-                      disabled={!canAfford}
-                      className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-black uppercase transition-colors ${
-                        canAfford
-                          ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
-                          : "bg-muted text-muted-foreground cursor-not-allowed"
-                      }`}
-                    >
-                      {canAfford ? "Redeem" : "Need XP"}
-                    </button>
+                    {/* WS4 fix: button previously had NO handler (audit P1 — "Redeem does nothing").
+                        Routes to the product order sheet (pay with XP or card). */}
+                    <div className="flex-shrink-0 text-right">
+                      <button
+                        onClick={() => navigate(`/marketplace/${product.node.handle}`)}
+                        className={`px-3 py-2 rounded-xl text-xs font-black uppercase transition-colors ${
+                          canAfford
+                            ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95"
+                        }`}
+                      >
+                        {canAfford ? "Redeem" : "View"}
+                      </button>
+                      {!canAfford && costNum && (
+                        <div className="text-[9.5px] font-bold text-amber-400 mt-1">
+                          {(costNum - userPoints).toLocaleString()} more pts
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
                 );
               })}

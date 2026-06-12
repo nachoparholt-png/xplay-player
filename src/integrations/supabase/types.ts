@@ -1520,6 +1520,24 @@ export type Database = {
           },
         ]
       }
+      pro_waitlist: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean

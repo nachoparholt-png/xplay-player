@@ -48,9 +48,14 @@ const RewardCatalogCard = ({ reward, userPoints, onSelect }: RewardCatalogCardPr
             </div>
           )}
         </div>
-        {isAvailable && canAfford && (
-          <div className="text-primary font-display font-black whitespace-nowrap ml-2">
-            {reward.points_cost.toLocaleString()} XP
+        {isAvailable && (
+          <div className="text-right ml-2 whitespace-nowrap">
+            <div className={`font-display font-black ${canAfford ? "text-primary" : "text-muted-foreground"}`}>
+              {reward.points_cost.toLocaleString()} XP
+            </div>
+            <div className="text-[10px] text-muted-foreground/70 font-medium">
+              worth £{(reward.points_cost / 100).toFixed(2)}
+            </div>
           </div>
         )}
       </div>

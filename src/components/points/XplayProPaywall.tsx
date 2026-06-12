@@ -15,6 +15,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useXplayPro } from "@/hooks/useXplayPro";
 import { XPLAY_PRO_ENABLED } from "@/lib/featureFlags";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface XplayProPaywallProps {
   open: boolean;
@@ -31,15 +33,26 @@ const BENEFITS = [
 
 const XplayProPaywall = ({ open, onClose }: XplayProPaywallProps) => {
   const pro = useXplayPro();
+  const { user } = useAuth();
 
-  const handleSubscribe = () => {
+  const handleSubscribe = async () => {
     if (XPLAY_PRO_ENABLED) {
       // Hook this up to the create-stripe-subscription edge function once it exists.
       toast.error("Subscription flow not yet wired. Coming soon.");
       return;
     }
-    toast("XPLAY Pro is launching soon", {
-      description: "Tap the bell on the rewards page and we'll let you know.",
+    // Waitlist capture (design R5) — one row per user, idempotent
+    if (user) {
+      const { error } = await supabase
+        .from("pro_waitlist")
+        .upsert({ user_id: user.id }, { onConflict: "user_id", ignoreDuplicates: true });
+      if (error) {
+        toast.error("Couldn't save that — try again in a moment.");
+        return;
+      }
+    }
+    toast("You're on the list ⚡", {
+      description: "We'll send one notification when XPLAY Pro launches. No charge until you subscribe.",
     });
     onClose();
   };
