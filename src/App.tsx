@@ -178,7 +178,8 @@ const AppRoutes = () => {
             <Route path="/stakes" element={<ProtectedRoute><AppLayout><ActiveStakes /></AppLayout></ProtectedRoute>} />
           )}
           <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
-          <Route path="/programme-rules" element={<ProtectedRoute><AppLayout><ProgrammeRules /></AppLayout></ProtectedRoute>} />
+          {/* Programme Rules — public like /terms + /privacy (linked from landing + legal pages) */}
+          <Route path="/programme-rules" element={<ProgrammeRules />} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><AppLayout><Bookings /></AppLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />
