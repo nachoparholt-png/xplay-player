@@ -1,18 +1,18 @@
 /**
  * CourtFinder — cross-app court availability search (design flow5, FC1–FC6).
  * ──────────────────────────────────────────────────────────────────────────
- * FC1: search config — location (Capacitor Geolocation w/ friendly inline ask,
- *      London-wide fallback), date chips, time-window chips.
- * FC2: time-first results grid (hours × clubs) over search_court_availability
- *      RPC — XPLAY slots lime "book now", external neutral + fetched-ago hint.
- * FC3a/b: slot sheets — native → prefilled CreateMatch; external → Playtomic
- *      deep link + instant draft match.
- * FC4: "Did you get the court?" on return from the host platform.
- * FC6: no-availability alternatives + create-open-match escape hatch.
+ * UX round 12 Jun (device feedback):
+ *  - grid cells show START TIME (+from-price) instead of price-only; ALL slot
+ *    variants for that club+hour are picked inside the sheet (time · length · £)
+ *  - sheet sits ABOVE the tab bar (z-60 + safe-area padding) and locks
+ *    background scroll while open
+ *  - organize-first flow: primary CTA creates the match immediately
+ *    (court-pending); "Book on Playtomic" is secondary here and also lives on
+ *    the match page banner afterwards
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Calendar, ExternalLink, Zap, X, Check, AlertTriangle, RefreshCw } from "lucide-react";
+import { MapPin, ExternalLink, Zap, X, Check, AlertTriangle, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Geolocation } from "@capacitor/geolocation";
 import { format, addDays } from "date-fns";
@@ -40,6 +40,11 @@ type Slot = {
   fetched_at: string;
 };
 
+type SheetData = {
+  slots: Slot[]; // all variants for the tapped club+hour, sorted
+  native: boolean;
+};
+
 type Window = "morning" | "afternoon" | "evening" | "all";
 const WINDOWS: Record<Window, [number, number]> = {
   morning: [6, 12],
@@ -47,6 +52,8 @@ const WINDOWS: Record<Window, [number, number]> = {
   evening: [17, 23],
   all: [6, 23],
 };
+
+const fmtDur = (m: number) => (m < 60 ? `${m}min` : m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h${m % 60}`);
 
 const CourtFinder = () => {
   const navigate = useNavigate();
@@ -60,9 +67,19 @@ const CourtFinder = () => {
   const [xplayOnly, setXplayOnly] = useState(false);
   const [results, setResults] = useState<Slot[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [sheet, setSheet] = useState<Slot | null>(null);
+  const [sheet, setSheet] = useState<SheetData | null>(null);
+  const [variantIdx, setVariantIdx] = useState(0);
   const [sheetStage, setSheetStage] = useState<"detail" | "confirm">("detail");
   const [creating, setCreating] = useState(false);
+
+  // lock background scroll while the sheet is open (device feedback)
+  useEffect(() => {
+    if (sheet) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [sheet]);
 
   const askLocation = async () => {
     setLocating(true);
@@ -115,12 +132,12 @@ const CourtFinder = () => {
     [coords, radiusKm, win, dayOffset]
   );
 
-  /* group results into clubs × hours */
+  /* group results into clubs × hours — ALL variants kept per cell */
   const grid = useMemo(() => {
     if (!results) return null;
     const filtered = xplayOnly ? results.filter((s) => s.is_native) : results;
     const hoursSet = new Set<number>();
-    const clubs = new Map<string, { name: string; dist: number; native: boolean; provider: string; fetched: string; byHour: Map<number, Slot> }>();
+    const clubs = new Map<string, { name: string; dist: number; native: boolean; provider: string; fetched: string; byHour: Map<number, Slot[]> }>();
     for (const s of filtered) {
       const h = new Date(s.starts_at).getHours();
       hoursSet.add(h);
@@ -128,8 +145,15 @@ const CourtFinder = () => {
         clubs.set(s.club_id, { name: s.club_name, dist: s.distance_m, native: s.is_native, provider: s.provider, fetched: s.fetched_at, byHour: new Map() });
       }
       const c = clubs.get(s.club_id)!;
-      const existing = c.byHour.get(h);
-      if (!existing || (s.price_cents ?? 1e9) < (existing.price_cents ?? 1e9)) c.byHour.set(h, s);
+      const arr = c.byHour.get(h) ?? [];
+      arr.push(s);
+      c.byHour.set(h, arr);
+    }
+    // sort each cell's variants by start time, then price
+    for (const c of clubs.values()) {
+      for (const arr of c.byHour.values()) {
+        arr.sort((a, b) => a.starts_at.localeCompare(b.starts_at) || (a.price_cents ?? 1e9) - (b.price_cents ?? 1e9));
+      }
     }
     const hours = [...hoursSet].sort((a, b) => a - b).slice(0, 6);
     const clubRows = [...clubs.entries()]
@@ -142,7 +166,15 @@ const CourtFinder = () => {
   const dayLabel = (d: number) => (d === 0 ? "Today" : d === 1 ? "Tomorrow" : format(addDays(new Date(), d), "EEE"));
   const minsAgo = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 
-  /* create the XPLAY match for an external slot (FC3b/FC4) */
+  const openSheet = (slots: Slot[]) => {
+    setSheet({ slots, native: slots[0].is_native });
+    setVariantIdx(0);
+    setSheetStage("detail");
+  };
+  const closeSheet = () => { setSheet(null); setSheetStage("detail"); setVariantIdx(0); };
+  const sel = sheet?.slots[variantIdx];
+
+  /* create the XPLAY match for an external slot */
   const createLinkedMatch = async (slot: Slot, booked: boolean) => {
     if (!user || creating) return;
     setCreating(true);
@@ -151,7 +183,6 @@ const CourtFinder = () => {
     const { data, error } = await supabase.from("matches").insert({
       organizer_id: user.id,
       club: slot.club_name,
-      // Playtomic court labels are resource UUIDs — don't surface those as court names
       court: slot.court_label && !/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(slot.court_label) ? slot.court_label : null,
       match_date: format(start, "yyyy-MM-dd"),
       match_time: format(start, "HH:mm"),
@@ -173,11 +204,10 @@ const CourtFinder = () => {
     }
     await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
     setCreating(false);
-    setSheet(null);
-    setSheetStage("detail");
+    closeSheet();
     toast({
-      title: booked ? "Linked match created — court booked ✓" : "Open match created",
-      description: booked ? "Players can join freely." : "Court pending — confirm it any time from the match page.",
+      title: booked ? "Linked match created — court booked ✓" : "Match created — gathering players",
+      description: booked ? "Players can join freely." : "Book the court any time — the link is on the match page.",
     });
     navigate(`/matches/${data.id}`);
   };
@@ -226,8 +256,7 @@ const CourtFinder = () => {
           <span className="font-display text-[11px] font-extrabold uppercase text-primary">Change</span>
         </button>
       ) : (
-        /* FC1 friendly permission ask */
-        <div className="rounded-[18px] p-4.5 p-4 bg-[#5924C6]/10 border border-[#5924C6]/40">
+        <div className="rounded-[18px] p-4 bg-[#5924C6]/10 border border-[#5924C6]/40">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-9 h-9 rounded-xl bg-[#5924C6]/30 flex items-center justify-center">
               <MapPin className="w-4 h-4 text-[#c4a5ff]" />
@@ -255,7 +284,7 @@ const CourtFinder = () => {
         </div>
       )}
 
-      {/* date chips — full week (collector holds 7 days of availability) */}
+      {/* date chips — full week */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {[0, 1, 2, 3, 4, 5, 6].map((d) => (
           <button
@@ -291,7 +320,6 @@ const CourtFinder = () => {
       {/* FC2 results */}
       {results && grid && grid.clubRows.length > 0 && (
         <div className="space-y-3">
-          {/* filter row */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {chip(`Radius ${radiusKm}km`, false, () => runSearch({ radiusKm: radiusKm === 5 ? 10 : 5 }))}
             {chip("XPLAY only", xplayOnly, () => setXplayOnly(!xplayOnly))}
@@ -300,7 +328,11 @@ const CourtFinder = () => {
             </button>
           </div>
 
-          {/* hour header */}
+          {/* how-to hint */}
+          <p className="text-[10.5px] text-muted-foreground/70 px-1">
+            Each cell = first free start time in that hour · tap to see every slot &amp; length.
+          </p>
+
           <div className="grid gap-1.5" style={{ gridTemplateColumns: `88px repeat(${grid.hours.length}, 1fr)` }}>
             <div />
             {grid.hours.map((h) => (
@@ -332,22 +364,25 @@ const CourtFinder = () => {
                   )}
                 </div>
                 {grid.hours.map((h) => {
-                  const slot = c.byHour.get(h);
-                  if (!slot)
-                    return <div key={h} className="h-10 rounded-lg bg-muted/20 border border-dashed border-border/30" />;
+                  const slots = c.byHour.get(h);
+                  if (!slots?.length)
+                    return <div key={h} className="h-11 rounded-lg bg-muted/20 border border-dashed border-border/30" />;
+                  const first = slots[0];
+                  const fromPrice = Math.min(...slots.map((s) => s.price_cents ?? Infinity));
                   return (
                     <button
                       key={h}
-                      onClick={() => { setSheet(slot); setSheetStage("detail"); }}
+                      onClick={() => openSheet(slots)}
                       className={cn(
-                        "h-10 rounded-lg flex flex-col items-center justify-center active:scale-95 transition-transform",
-                        slot.is_native ? "bg-primary text-primary-foreground" : "bg-muted/60 border border-border/60 text-foreground"
+                        "h-11 rounded-lg flex flex-col items-center justify-center active:scale-95 transition-transform",
+                        first.is_native ? "bg-primary text-primary-foreground" : "bg-muted/60 border border-border/60 text-foreground"
                       )}
                     >
-                      <span className="font-mono text-[13px] font-bold leading-none">
-                        {slot.price_cents != null ? `£${Math.round(slot.price_cents / 100)}` : format(new Date(slot.starts_at), "HH:mm")}
+                      <span className="font-mono text-[12px] font-bold leading-none">{format(new Date(first.starts_at), "HH:mm")}</span>
+                      <span className={cn("text-[9px] font-semibold mt-0.5", first.is_native ? "opacity-70" : "text-muted-foreground")}>
+                        {Number.isFinite(fromPrice) ? `£${Math.round(fromPrice / 100)}` : fmtDur(first.duration_mins)}
+                        {slots.length > 1 ? ` · ${slots.length}` : ""}
                       </span>
-                      {slot.is_native && <span className="font-display text-[6.5px] font-extrabold uppercase tracking-wider opacity-60 mt-0.5">book now</span>}
                     </button>
                   );
                 })}
@@ -355,7 +390,6 @@ const CourtFinder = () => {
             </div>
           ))}
 
-          {/* legend */}
           <div className="flex gap-4 items-center pt-1">
             <span className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
               <span className="w-3.5 h-3.5 rounded bg-primary inline-block" /> Book in-app
@@ -393,7 +427,6 @@ const CourtFinder = () => {
               <span className="bg-primary/15 text-primary rounded-full px-4 py-2 font-display text-[11px] font-extrabold uppercase">Go</span>
             </button>
           ))}
-          {/* escape hatch */}
           <div className="rounded-2xl p-4 bg-amber-400/10 border border-amber-400/40">
             <h4 className="font-display text-base font-black italic uppercase">Create an open match anyway</h4>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
@@ -409,30 +442,31 @@ const CourtFinder = () => {
         </div>
       )}
 
-      {/* ── FC3/FC4 slot sheet ── */}
+      {/* ── slot sheet (above tab bar, scroll-locked) ── */}
       <AnimatePresence>
-        {sheet && (
+        {sheet && sel && (
           <>
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => { setSheet(null); setSheetStage("detail"); }}
-              className="fixed inset-0 bg-black/70 z-50"
+              onClick={closeSheet}
+              className="fixed inset-0 bg-black/70 z-[60]"
             />
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
               className={cn(
-                "fixed left-0 right-0 bottom-0 z-50 bg-background rounded-t-[28px] p-5 pb-8 border-t",
-                sheet.is_native ? "border-primary/40" : "border-border/40"
+                "fixed left-0 right-0 bottom-0 z-[60] bg-background rounded-t-[28px] p-5 border-t max-h-[85dvh] overflow-y-auto",
+                sheet.native ? "border-primary/40" : "border-border/40"
               )}
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 28px)" }}
             >
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
 
               {sheetStage === "confirm" ? (
-                /* FC4 — Did you get the court? */
+                /* FC4 — after choosing to book externally first */
                 <div>
                   <div className="text-center mb-2">
-                    <span className="border border-border rounded-full px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground capitalize">{sheet.provider}</span>
+                    <span className="border border-border rounded-full px-2.5 py-0.5 text-[10px] font-bold text-muted-foreground capitalize">{sel.provider}</span>
                   </div>
                   <h3 className="font-display text-[24px] font-black italic uppercase text-center leading-[0.95]">
                     Did you get
@@ -440,10 +474,10 @@ const CourtFinder = () => {
                     the court?
                   </h3>
                   <p className="text-[13px] text-muted-foreground text-center mt-2.5 leading-relaxed">
-                    {sheet.club_name} · {format(new Date(sheet.starts_at), "EEE HH:mm")}. Confirm so your match shows the right status to players.
+                    {sel.club_name} · {format(new Date(sel.starts_at), "EEE HH:mm")} · {fmtDur(sel.duration_mins)}
                   </p>
                   <button
-                    onClick={() => createLinkedMatch(sheet, true)}
+                    onClick={() => createLinkedMatch(sel, true)}
                     disabled={creating}
                     className="mt-5 w-full flex items-center gap-3 bg-green-500 text-white rounded-2xl px-4 py-4 text-left active:scale-[0.98] transition-transform"
                   >
@@ -452,121 +486,118 @@ const CourtFinder = () => {
                     </span>
                     <span>
                       <span className="block font-display text-base font-black italic uppercase">Yes — court booked ✓</span>
-                      <span className="block text-[11px] opacity-85">Becomes a Linked Match · players can join freely</span>
+                      <span className="block text-[11px] opacity-85">Creates the match as booked · players join freely</span>
                     </span>
                   </button>
                   <button
-                    onClick={() => createLinkedMatch(sheet, false)}
+                    onClick={() => createLinkedMatch(sel, false)}
                     disabled={creating}
                     className="mt-2.5 w-full flex items-center gap-3 bg-[#FF6B35]/10 border border-[#FF6B35]/40 rounded-2xl px-4 py-4 text-left active:scale-[0.98] transition-transform"
                   >
                     <span className="w-9 h-9 rounded-full bg-[#FF6B35]/20 flex items-center justify-center flex-shrink-0">
-                      <AlertTriangle className="w-4.5 w-4 h-4 text-[#FF6B35]" />
+                      <AlertTriangle className="w-4 h-4 text-[#FF6B35]" />
                     </span>
                     <span>
                       <span className="block font-display text-base font-black italic uppercase text-[#FF8A5C]">Not yet</span>
-                      <span className="block text-[11px] text-[#FF8A5C]/80">Stays Court-pending · confirm later from the match page</span>
+                      <span className="block text-[11px] text-[#FF8A5C]/80">Creates it Court-pending · confirm later from the match page</span>
                     </span>
                   </button>
-                  <p className="text-[11px] text-muted-foreground/60 text-center mt-3.5 leading-relaxed">
-                    No rush — you can update this any time from the match page.
-                  </p>
-                </div>
-              ) : sheet.is_native ? (
-                /* FC3a — XPLAY slot */
-                <div>
-                  <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2.5 py-1 font-display text-[9px] font-extrabold uppercase text-primary mb-3">
-                    <Zap className="w-2.5 h-2.5 fill-primary" /> XPLAY club
-                  </span>
-                  <h3 className="font-display text-[22px] font-black italic uppercase leading-none">{sheet.club_name}</h3>
-                  <p className="text-[13px] text-muted-foreground mt-1.5">
-                    {sheet.court_label || "Court"} · {(sheet.distance_m / 1000).toFixed(1)} km away
-                  </p>
-                  <div className="flex gap-2.5 mt-4">
-                    <div className="flex-1 bg-muted/40 rounded-[14px] px-4 py-3.5">
-                      <div className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">{dayLabel(dayOffset)}</div>
-                      <div className="font-mono text-2xl font-bold mt-0.5">{format(new Date(sheet.starts_at), "HH:mm")}</div>
-                      <div className="text-[10.5px] text-muted-foreground">{sheet.duration_mins} min</div>
-                    </div>
-                    <div className="flex-1 bg-primary text-primary-foreground rounded-[14px] px-4 py-3.5">
-                      <div className="text-[9px] font-extrabold uppercase tracking-[0.12em] opacity-60">Court price</div>
-                      <div className="font-mono text-2xl font-bold mt-0.5">
-                        {sheet.price_cents != null ? `£${(sheet.price_cents / 100).toFixed(0)}` : "—"}
-                      </div>
-                      {sheet.price_cents != null && (
-                        <div className="text-[10.5px] opacity-60">£{(sheet.price_cents / 400).toFixed(2)} per player</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-3 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3.5 py-3">
-                    <Zap className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />
-                    <span className="text-xs">+100 XP for playing this match · <b className="text-amber-400">worth £1</b></span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSheet(null);
-                      navigate("/matches/create", {
-                        state: { prefillClubId: sheet.club_id, prefillClubName: sheet.club_name },
-                      });
-                    }}
-                    className="mt-4 w-full bg-primary text-primary-foreground rounded-[14px] py-4 font-display font-black italic text-[15px] uppercase tracking-wide active:scale-[0.98] transition-transform"
-                  >
-                    Book court & create match
-                  </button>
-                  <p className="text-[11px] text-muted-foreground/60 text-center mt-3">Court guaranteed instantly · paid in-app</p>
                 </div>
               ) : (
-                /* FC3b — external slot */
                 <div>
-                  <span className="border border-border rounded-full px-2.5 py-1 text-[10px] font-bold text-muted-foreground capitalize mb-3 inline-block">{sheet.provider}</span>
-                  <h3 className="font-display text-[22px] font-black italic uppercase leading-none">{sheet.club_name}</h3>
+                  {/* header */}
+                  {sheet.native ? (
+                    <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2.5 py-1 font-display text-[9px] font-extrabold uppercase text-primary mb-3">
+                      <Zap className="w-2.5 h-2.5 fill-primary" /> XPLAY club
+                    </span>
+                  ) : (
+                    <span className="border border-border rounded-full px-2.5 py-1 text-[10px] font-bold text-muted-foreground capitalize mb-3 inline-block">{sel.provider}</span>
+                  )}
+                  <h3 className="font-display text-[22px] font-black italic uppercase leading-none">{sel.club_name}</h3>
                   <p className="text-[13px] text-muted-foreground mt-1.5">
-                    {format(new Date(sheet.starts_at), "EEE · HH:mm")} · {(sheet.distance_m / 1000).toFixed(1)} km away
+                    {format(new Date(sel.starts_at), "EEE d MMM")} · {(sel.distance_m / 1000).toFixed(1)} km away
                   </p>
-                  <div className="bg-muted/40 rounded-[14px] px-4 py-3.5 mt-4">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-[9px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Indicative price</span>
-                      <span className="font-mono text-[22px] font-bold">
-                        {sheet.price_cents != null ? `£${(sheet.price_cents / 100).toFixed(0)}` : "see app"}
-                      </span>
+
+                  {/* variant picker — every slot in this hour: time · length · price */}
+                  <div className="mt-4">
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground mb-2">
+                      Pick a slot
                     </div>
-                    <div className="flex items-start gap-2 mt-2.5 pt-2.5 border-t border-border/40">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-[11px] text-muted-foreground leading-relaxed">
-                        Fetched {minsAgo(sheet.fetched_at)} min ago — confirm the exact price & slot on {sheet.provider} at booking.
-                      </span>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {sheet.slots.map((s, i) => (
+                        <button
+                          key={s.slot_id + s.duration_mins}
+                          onClick={() => setVariantIdx(i)}
+                          className={cn(
+                            "flex-shrink-0 rounded-xl px-3.5 py-2.5 text-center border transition-colors",
+                            i === variantIdx ? "bg-primary text-primary-foreground border-primary" : "bg-muted/40 border-border/50"
+                          )}
+                        >
+                          <div className="font-mono text-[15px] font-bold leading-none">{format(new Date(s.starts_at), "HH:mm")}</div>
+                          <div className={cn("text-[10px] font-semibold mt-1", i === variantIdx ? "opacity-75" : "text-muted-foreground")}>
+                            {fmtDur(s.duration_mins)}{s.price_cents != null ? ` · £${Math.round(s.price_cents / 100)}` : ""}
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="bg-primary/5 border border-primary/25 rounded-[14px] px-4 py-3 mt-3">
-                    <p className="text-xs leading-relaxed">
-                      We'll set up your XPLAY match for{" "}
-                      <b>{format(new Date(sheet.starts_at), "EEE HH:mm")} at {sheet.club_name}</b> — players can join while you book the court.
-                    </p>
-                  </div>
-                  <a
-                    href={sheet.booking_url ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => setTimeout(() => setSheetStage("confirm"), 600)}
-                    className="mt-4 w-full bg-primary text-primary-foreground rounded-[14px] py-4 font-display font-black italic text-[15px] uppercase tracking-wide flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                  >
-                    Book on {sheet.provider} <ExternalLink className="w-4 h-4" strokeWidth={2.5} />
-                  </a>
-                  <button
-                    onClick={() => createLinkedMatch(sheet, false)}
-                    disabled={creating}
-                    className="mt-2.5 w-full border border-border rounded-[14px] py-3.5 font-display text-[12.5px] font-bold uppercase tracking-wide text-foreground/70"
-                  >
-                    {creating ? "Creating…" : "Create match without booking yet"}
-                  </button>
+
+                  {sheet.native ? (
+                    /* FC3a — XPLAY slot */
+                    <>
+                      <div className="flex items-center gap-2 mt-3.5 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3.5 py-3">
+                        <Zap className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />
+                        <span className="text-xs">+100 XP for playing this match · <b className="text-amber-400">worth £1</b></span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          closeSheet();
+                          navigate("/matches/create", { state: { prefillClubId: sel.club_id, prefillClubName: sel.club_name } });
+                        }}
+                        className="mt-4 w-full bg-primary text-primary-foreground rounded-[14px] py-4 font-display font-black italic text-[15px] uppercase tracking-wide active:scale-[0.98] transition-transform"
+                      >
+                        Book court & create match
+                      </button>
+                      <p className="text-[11px] text-muted-foreground/60 text-center mt-3">Court guaranteed instantly · paid in-app</p>
+                    </>
+                  ) : (
+                    /* FC3b — external slot: ORGANIZE-FIRST (device feedback) */
+                    <>
+                      <div className="bg-primary/5 border border-primary/25 rounded-[14px] px-4 py-3 mt-3.5">
+                        <p className="text-xs leading-relaxed">
+                          We'll create your XPLAY match for{" "}
+                          <b>{format(new Date(sel.starts_at), "EEE HH:mm")} · {fmtDur(sel.duration_mins)}</b> at {sel.club_name} —
+                          players can join while you sort the court. The Playtomic booking link stays on the match page.
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-2 mt-2.5 px-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-[11px] text-muted-foreground leading-relaxed">
+                          Indicative price {sel.price_cents != null ? `£${Math.round(sel.price_cents / 100)}` : "—"} · fetched {minsAgo(sel.fetched_at)} min ago — confirm on {sel.provider} when booking.
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => createLinkedMatch(sel, false)}
+                        disabled={creating}
+                        className="mt-4 w-full bg-primary text-primary-foreground rounded-[14px] py-4 font-display font-black italic text-[15px] uppercase tracking-wide active:scale-[0.98] transition-transform"
+                      >
+                        {creating ? "Creating…" : "Create match · gather players"}
+                      </button>
+                      <a
+                        href={sel.booking_url ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setTimeout(() => setSheetStage("confirm"), 600)}
+                        className="mt-2.5 w-full border border-border rounded-[14px] py-3.5 font-display text-[12.5px] font-bold uppercase tracking-wide text-foreground/70 flex items-center justify-center gap-2"
+                      >
+                        Book on {sel.provider} first <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </>
+                  )}
                 </div>
               )}
 
-              <button
-                onClick={() => { setSheet(null); setSheetStage("detail"); }}
-                className="absolute top-4 right-4 p-1.5 text-muted-foreground"
-                aria-label="Close"
-              >
+              <button onClick={closeSheet} className="absolute top-4 right-4 p-1.5 text-muted-foreground" aria-label="Close">
                 <X className="w-5 h-5" />
               </button>
             </motion.div>

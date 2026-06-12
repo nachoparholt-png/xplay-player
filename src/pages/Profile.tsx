@@ -56,6 +56,15 @@ const Profile = () => {
   const [matchesLoading, setMatchesLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
 
+  // lock background scroll while the share sheet is open
+  useEffect(() => {
+    if (shareOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [shareOpen]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -467,14 +476,15 @@ const Profile = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShareOpen(false)}
-              className="fixed inset-0 bg-black/70 z-50"
+              className="fixed inset-0 bg-black/70 z-[60]"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed left-0 right-0 bottom-0 top-20 z-50 bg-background rounded-t-[28px] border-t border-border/40 p-5 pb-7 flex flex-col"
+              className="fixed left-0 right-0 bottom-0 top-20 z-[60] bg-background rounded-t-[28px] border-t border-border/40 p-5 flex flex-col"
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}
             >
               <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
               <div className="flex items-center justify-between mb-4">

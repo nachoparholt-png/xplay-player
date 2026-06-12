@@ -47,6 +47,7 @@ type Match = {
   cancelled_reason: string | null;
   /** External-court matches: 'booked' | 'not_booked'; null = XPLAY-native court */
   court_booking_status?: string | null;
+  external_booking_url?: string | null;
   duration_mins?: number | null;
 };
 
@@ -977,25 +978,37 @@ const MatchDetail = () => {
               </p>
             </div>
             {isOrganizer && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full h-9 rounded-lg text-xs font-semibold border-amber-400/40"
-                onClick={async () => {
-                  const { error } = await supabase
-                    .from("matches")
-                    .update({ court_booking_status: "booked" })
-                    .eq("id", match.id);
-                  if (error) {
-                    toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
-                  } else {
-                    toast({ title: "Court marked as booked", description: "Players will see the court is secured." });
-                    fetchMatch();
-                  }
-                }}
-              >
-                I've booked the court — mark as secured
-              </Button>
+              <div className="space-y-2">
+                {match.external_booking_url && (
+                  <a
+                    href={match.external_booking_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full h-9 rounded-lg text-xs font-semibold bg-amber-400 text-[#1A2833] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                  >
+                    Book the court on Playtomic ↗
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-9 rounded-lg text-xs font-semibold border-amber-400/40"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from("matches")
+                      .update({ court_booking_status: "booked" })
+                      .eq("id", match.id);
+                    if (error) {
+                      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+                    } else {
+                      toast({ title: "Court marked as booked", description: "Players will see the court is secured." });
+                      fetchMatch();
+                    }
+                  }}
+                >
+                  I've booked the court — mark as secured
+                </Button>
+              </div>
             )}
           </div>
         )}
