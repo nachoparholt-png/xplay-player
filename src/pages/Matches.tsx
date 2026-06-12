@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 import MatchCard from "@/components/MatchCard";
 import CreateMatchModal from "@/components/CreateMatchModal";
+import CreateFab from "@/components/CreateFab";
 import MatchJoinModal from "@/components/MatchJoinModal";
 import MatchBetSheet from "@/components/betting/MatchBetSheet";
 import { STAKES_ENABLED } from "@/lib/featureFlags";
@@ -33,6 +34,8 @@ type MatchRow = {
   organizer_id: string;
   deadline_at: string | null;
   visibility: string;
+  /** External-court matches: 'booked' | 'not_booked'; null = XPLAY-native court */
+  court_booking_status?: string | null;
 };
 
 type PlayerInfo = {
@@ -461,14 +464,10 @@ const Matches = () => {
                 </h1>
               </div>
 
-              {/* CREATE BUTTON */}
-              <button
-                onClick={() => setShowCreateMatch(true)}
-                className="w-10 h-10 rounded-[14px] bg-primary text-primary-foreground flex items-center justify-center text-2xl font-black hover:bg-primary/90 active:scale-95 transition-all"
-              >
-                +
-              </button>
             </div>
+
+            {/* CREATE — shared CreateFab so matches + tournaments have identical create UX */}
+            <CreateFab label="Create" onClick={() => setShowCreateMatch(true)} />
 
             {/* NEXT MATCH HERO (only if user has a future match) */}
             {tab === "my_matches" && !loading && (() => {

@@ -45,6 +45,8 @@ type Match = {
   score_deadline_at: string | null;
   score_winner: string | null;
   cancelled_reason: string | null;
+  /** External-court matches: 'booked' | 'not_booked'; null = XPLAY-native court */
+  court_booking_status?: string | null;
 };
 
 type EscrowLedger = {

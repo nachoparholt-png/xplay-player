@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,6 +14,7 @@ import type { Tournament } from "@/lib/tournaments/types";
 import { formatPrice } from "@/lib/shopify";
 import TournamentBetSheet from "@/components/betting/TournamentBetSheet";
 import { STAKES_ENABLED } from "@/lib/featureFlags";
+import CreateFab from "@/components/CreateFab";
 
 /* ── types ─────────────────────────────────────────── */
 type Tab = "all" | "open" | "my_entries" | "completed";
@@ -83,23 +84,8 @@ const TournamentsList = () => {
   const [tab, setTab] = useState<Tab>("open");
   const [skillFilter, setSkillFilter] = useState<SkillFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [fabExpanded, setFabExpanded] = useState(true);
   const [activeBetTournament, setActiveBetTournament] = useState<Tournament | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const lastScrollY = useRef(0);
-
-  // FAB scroll behaviour
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentY = window.scrollY;
-      if (currentY < 10) setFabExpanded(true);
-      else if (currentY > lastScrollY.current + 5) setFabExpanded(false);
-      else if (currentY < lastScrollY.current - 5) setFabExpanded(true);
-      lastScrollY.current = currentY;
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const fetchPlayerCounts = async (ids: string[]) => {
     if (ids.length === 0) return;
@@ -343,39 +329,8 @@ const TournamentsList = () => {
         </span>
       </div>
 
-      {/* FAB */}
-      <motion.button
-        onClick={() => navigate("/tournaments/new")}
-        className="fixed bottom-24 right-5 lg:bottom-8 lg:right-8 z-40 flex items-center justify-center bg-primary text-primary-foreground font-display font-black text-sm overflow-hidden h-14"
-        style={{ minWidth: 56 }}
-        whileTap={{ scale: 0.9 }}
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{
-          scale: 1,
-          opacity: 1,
-          width: fabExpanded ? 160 : 56,
-          borderRadius: 9999,
-          paddingLeft: fabExpanded ? 20 : 0,
-          paddingRight: fabExpanded ? 20 : 0,
-        }}
-        transition={{ duration: 0.25, ease: "easeInOut" }}
-      >
-        <Plus className="w-6 h-6 flex-shrink-0" />
-        <AnimatePresence>
-          {fabExpanded && (
-            <motion.span
-              key="label"
-              initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-              animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
-              exit={{ width: 0, opacity: 0, marginLeft: 0 }}
-              transition={{ duration: 0.2 }}
-              className="whitespace-nowrap overflow-hidden"
-            >
-              Create
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
+      {/* FAB — shared CreateFab so matches + tournaments have identical create UX */}
+      <CreateFab label="Create" onClick={() => navigate("/tournaments/new")} />
 
       {/* Tournament List */}
       {loading ? (
