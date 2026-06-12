@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
+import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
 
 interface SettingField {
   key: string;
@@ -23,7 +24,7 @@ const sections: { id: string; label: string; icon: typeof Gift; fields: SettingF
       { key: "welcome_points_amount", label: "Welcome Points Amount", type: "number" },
       { key: "points_per_match_played", label: "Points per Match Played", type: "number" },
       { key: "points_per_match_won", label: "Points per Match Won", type: "number" },
-      { key: "points_per_stake_action", label: "Points per Stake Action", type: "number" },
+      ...(STAKES_ENABLED ? [{ key: "points_per_stake_action", label: "Points per Stake Action", type: "number" } as SettingField] : []),
       { key: "profile_completion_points", label: "Profile Completion Points", type: "number" },
       { key: "campaign_bonus_points", label: "Campaign Bonus Points", type: "number" },
     ],
@@ -56,7 +57,8 @@ const sections: { id: string; label: string; icon: typeof Gift; fields: SettingF
       { key: "points_pack_4_bonus", label: "Pack 4 Bonus", type: "number" },
     ],
   },
-  {
+  // Staking Rules section gated behind STAKES_ENABLED — see src/lib/featureFlags.ts
+  ...(STAKES_ENABLED ? [{
     id: "staking", label: "Staking Rules", icon: Swords,
     fields: [
       { key: "stake_enabled", label: "Staking Enabled", type: "boolean" },
@@ -64,15 +66,15 @@ const sections: { id: string; label: string; icon: typeof Gift; fields: SettingF
       { key: "maximum_stake_points", label: "Maximum Stake", type: "number" },
       { key: "draw_refund_rule", label: "Draw Refund Rule", type: "text", description: "full, partial, or none" },
       { key: "points_distribution_rule", label: "Distribution Rule", type: "text", description: "winner_takes_all or proportional" },
-    ],
-  },
+    ] as SettingField[],
+  }] : []),
   {
     id: "ux", label: "UX & Copy", icon: Type,
     fields: [
       { key: "rewards_section_title", label: "Rewards Page Title", type: "text" },
       { key: "rewards_helper_text", label: "Helper Description", type: "textarea" },
       { key: "earn_section_title", label: "Earn Section Title", type: "text" },
-      { key: "stake_section_title", label: "Stake Section Title", type: "text" },
+      ...(STAKES_ENABLED ? [{ key: "stake_section_title", label: "Stake Section Title", type: "text" } as SettingField] : []),
       { key: "referral_section_title", label: "Referral Section Title", type: "text" },
       { key: "buy_points_section_title", label: "Buy Points Section Title", type: "text" },
     ],

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Enums } from "@/integrations/supabase/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 type PlayerRow = {
   id: string;
@@ -67,8 +68,8 @@ const AdminPlayers = () => {
 
     const { data, count } = await query;
 
-    // Fetch active stakes counts
-    if (data && data.length > 0) {
+    // Fetch active stakes counts — gated behind STAKES_ENABLED
+    if (STAKES_ENABLED && data && data.length > 0) {
       const userIds = data.map((p) => p.user_id);
       const { data: stakeCounts } = await supabase
         .from("match_stakes")
@@ -88,7 +89,7 @@ const AdminPlayers = () => {
         }))
       );
     } else {
-      setPlayers([]);
+      setPlayers(data || []);
     }
 
     setTotal(count || 0);
@@ -175,7 +176,9 @@ const AdminPlayers = () => {
                   <SortHeader col="padel_level" label="Level" />
                   <SortHeader col="padel_park_points" label="Points" />
                   <SortHeader col="total_matches" label="Matches" />
-                  <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3">Stakes</th>
+                  {STAKES_ENABLED && (
+                    <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-3">Stakes</th>
+                  )}
                   <SortHeader col="account_status" label="Status" />
                   <SortHeader col="created_at" label="Joined" />
                   <SortHeader col="last_active_at" label="Last Active" className="hidden lg:table-cell" />
@@ -212,7 +215,9 @@ const AdminPlayers = () => {
                       <span className="text-sm font-bold text-primary">{player.padel_park_points}</span>
                     </td>
                     <td className="py-3 px-3 text-sm">{player.total_matches}</td>
-                    <td className="py-3 px-3 text-sm">{player.active_stakes || 0}</td>
+                    {STAKES_ENABLED && (
+                      <td className="py-3 px-3 text-sm">{player.active_stakes || 0}</td>
+                    )}
                     <td className="py-3 px-3">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${statusColors[player.account_status] || ""}`}>
                         {player.account_status.replace("_", " ")}

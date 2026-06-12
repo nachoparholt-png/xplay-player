@@ -288,6 +288,25 @@ const ProfileSettings = () => {
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground" />
       </button>
+
+      {/* ── Legal ── */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Legal</p>
+        {[
+          { label: "Terms of Service", path: "/terms" },
+          { label: "Privacy Policy", path: "/privacy" },
+          { label: "XPLAY Points Programme Rules", path: "/programme-rules" },
+        ].map((item) => (
+          <button
+            key={item.path}
+            onClick={() => navigate(item.path)}
+            className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-container border border-border/30 hover:bg-surface-container-high transition-colors active:scale-[0.98]"
+          >
+            <p className="text-sm font-semibold">{item.label}</p>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

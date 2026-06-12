@@ -325,7 +325,7 @@ const TournamentDetail = () => {
           {tournament.visibility === "private" && tournament.status !== "draft" && (
             <Badge className="bg-amber-400/15 text-amber-400 text-[9px] font-black uppercase tracking-[0.14em]">Private</Badge>
           )}
-          {hasBetConfig && (
+          {STAKES_ENABLED && hasBetConfig && (
             <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Betting</Badge>
           )}
         </div>
@@ -430,8 +430,8 @@ const TournamentDetail = () => {
           )}
         </div>
 
-        {/* Betting Card - Tightened */}
-        {(hasBetConfig || isJoined) && (
+        {/* Betting Card — gated behind STAKES_ENABLED (see src/lib/featureFlags.ts) */}
+        {STAKES_ENABLED && (hasBetConfig || isJoined) && (
           <div className="rounded-[18px] bg-primary/[0.06] border border-primary/20 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-[10px] font-black text-primary uppercase tracking-[0.14em]">● Live Odds</div>

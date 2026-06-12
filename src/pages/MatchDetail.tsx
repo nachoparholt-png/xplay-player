@@ -666,14 +666,14 @@ const MatchDetail = () => {
           _user_id: p.user_id,
           _type: "warning",
           _title: "Match cancelled",
-          _body: `The match at ${match.club} on ${match.match_date} has been cancelled by the organizer.${stakes && stakes.some((s) => s.user_id === p.user_id) ? " Your staked points have been refunded." : ""}`,
+          _body: `The match at ${match.club} on ${match.match_date} has been cancelled by the organizer.${stakes && stakes.some((s) => s.user_id === p.user_id) ? " Your XPLAY Points have been refunded." : ""}`,
           _link: `/matches/${match.id}`,
         })
       ));
     }
 
     await addSystemMessage(match.id, "Match cancelled by the organizer");
-    toast({ title: "Match cancelled", description: "All players have been notified and stakes refunded." });
+    toast({ title: "Match cancelled", description: "All players have been notified and any points refunded." });
     setCancellingMatch(false);
     navigate("/matches");
   };
@@ -825,7 +825,7 @@ const MatchDetail = () => {
               <div className="flex items-start gap-2 pt-1 border-t border-border/30">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-amber-400/90">
-                  You were enrolled. Any stakes or payments have been refunded.
+                  You were enrolled. Any points or payments have been refunded.
                 </p>
               </div>
             )}
@@ -1084,8 +1084,8 @@ const MatchDetail = () => {
           <MatchResultTimeline events={timelineEvents} />
         )}
 
-        {/* Inline Betting Section */}
-        {isPreGame && id && match?.format === "social" && (
+        {/* Inline Betting Section — entirely gated behind STAKES_ENABLED */}
+        {STAKES_ENABLED && isPreGame && id && match?.format === "social" && (
           <div className="rounded-xl border border-border/50 bg-card p-4 opacity-50">
             <div className="flex items-center justify-center gap-2">
               <Zap className="w-4 h-4 text-muted-foreground" />
@@ -1344,7 +1344,7 @@ const MatchDetail = () => {
                   <div>
                     <p className="text-sm font-semibold">Cancel this match?</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      All players will be removed and notified. Any staked points will be refunded. This cannot be undone.
+                      All players will be removed and notified. Any XPLAY Points will be refunded. This cannot be undone.
                     </p>
                   </div>
                 </div>

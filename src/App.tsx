@@ -69,6 +69,8 @@ const Profile             = lazyWithRetry(() => import("./pages/Profile"));
 const ProfileSettings     = lazyWithRetry(() => import("./pages/ProfileSettings"));
 const PointsStore         = lazyWithRetry(() => import("./pages/PointsStore"));
 const ProgrammeRules      = lazyWithRetry(() => import("./pages/ProgrammeRules"));
+const Terms               = lazyWithRetry(() => import("./pages/Terms"));
+const Privacy             = lazyWithRetry(() => import("./pages/Privacy"));
 const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
 const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
 const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
@@ -152,6 +154,9 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          {/* Legal pages — public, reachable signed-out (App Store requirement) */}
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
           <Route path="/" element={<Navigate to="/matches" replace />} />
           <Route path="/matches" element={<ProtectedRoute><AppLayout><Matches /></AppLayout></ProtectedRoute>} />

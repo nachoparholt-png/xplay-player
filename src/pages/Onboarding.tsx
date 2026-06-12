@@ -73,6 +73,169 @@ const slideVariants = {
   exit: { opacity: 0, x: -40 },
 };
 
+/* ── Age gate + terms acceptance (WS2 — design ref: handoff O1) ── */
+
+const TERMS_VERSION = "2026-06-11";
+
+function AgeTermsStep({
+  onContinue,
+  saving,
+}: {
+  onContinue: (dobISO: string) => void;
+  saving: boolean;
+}) {
+  const [dd, setDd] = useState("");
+  const [mm, setMm] = useState("");
+  const [yyyy, setYyyy] = useState("");
+  const [confirm18, setConfirm18] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [underage, setUnderage] = useState(false);
+
+  const parseDob = (): Date | null => {
+    const d = parseInt(dd, 10);
+    const m = parseInt(mm, 10);
+    const y = parseInt(yyyy, 10);
+    if (!d || !m || !y || yyyy.length !== 4 || y < 1900) return null;
+    const date = new Date(Date.UTC(y, m - 1, d));
+    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== m - 1 || date.getUTCDate() !== d) return null;
+    if (date > new Date()) return null;
+    return date;
+  };
+
+  const ageFrom = (dob: Date): number => {
+    const now = new Date();
+    let age = now.getUTCFullYear() - dob.getUTCFullYear();
+    const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age--;
+    return age;
+  };
+
+  const handleContinue = () => {
+    setError(null);
+    const dob = parseDob();
+    if (!dob) {
+      setError("Please enter a valid date of birth.");
+      return;
+    }
+    if (ageFrom(dob) < 18) {
+      setUnderage(true);
+      return;
+    }
+    onContinue(dob.toISOString().slice(0, 10));
+  };
+
+  const canContinue = dd && mm && yyyy && confirm18 && acceptTerms && !saving;
+
+  if (underage) {
+    return (
+      <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center">
+        <div className="w-20 h-20 rounded-3xl bg-destructive/15 flex items-center justify-center mb-8">
+          <Sparkles className="w-10 h-10 text-destructive" />
+        </div>
+        <h1 className="font-display text-[28px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
+          See you<br />in a few years
+        </h1>
+        <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
+          XPLAY is for players aged 18 and over, so we can't set up your account today. Thanks
+          for your interest — we'd love to see you on court when you're 18.
+        </p>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col px-6 py-12 min-h-[80vh] justify-center max-w-md mx-auto w-full">
+      <h1 className="font-display text-[32px] font-black italic uppercase text-foreground mb-2 leading-[0.95]">
+        First, the<br /><span className="text-primary">important bit</span>
+      </h1>
+      <p className="text-[12px] text-muted-foreground leading-[1.6] mb-8">
+        XPLAY is for players aged 18 and over.
+      </p>
+
+      {/* DOB */}
+      <div className="bg-card border border-border/40 rounded-2xl p-4 mb-4">
+        <div className="text-[11px] font-display font-black uppercase tracking-[0.12em] text-primary mb-3">
+          Date of birth
+        </div>
+        <div className="flex gap-2">
+          <input
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            placeholder="DD"
+            value={dd}
+            onChange={(e) => setDd(e.target.value.replace(/\D/g, ""))}
+            className="flex-1 min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
+            aria-label="Day of birth"
+          />
+          <input
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={2}
+            placeholder="MM"
+            value={mm}
+            onChange={(e) => setMm(e.target.value.replace(/\D/g, ""))}
+            className="flex-1 min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
+            aria-label="Month of birth"
+          />
+          <input
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            placeholder="YYYY"
+            value={yyyy}
+            onChange={(e) => setYyyy(e.target.value.replace(/\D/g, ""))}
+            className="flex-[1.4] min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
+            aria-label="Year of birth"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setConfirm18(!confirm18)}
+          className="flex items-center gap-2.5 mt-4 text-left"
+        >
+          <span className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 transition-colors ${confirm18 ? "bg-primary" : "border border-border bg-background"}`}>
+            {confirm18 && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
+          </span>
+          <span className="text-[12.5px] text-foreground/85">
+            I confirm I'm <b>18 or over</b>
+          </span>
+        </button>
+      </div>
+
+      {/* Terms */}
+      <button
+        type="button"
+        onClick={() => setAcceptTerms(!acceptTerms)}
+        className="flex items-start gap-2.5 text-left mb-6"
+      >
+        <span className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 transition-colors ${acceptTerms ? "bg-primary" : "border border-border bg-background"}`}>
+          {acceptTerms && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
+        </span>
+        <span className="text-[12px] text-muted-foreground leading-[1.5]">
+          I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">
+            Privacy Policy
+          </a>
+          .
+        </span>
+      </button>
+
+      {error && <p className="text-xs text-destructive mb-4">{error}</p>}
+
+      <Button onClick={handleContinue} disabled={!canContinue} className="w-full h-12 rounded-xl font-bold text-base gap-2">
+        {saving ? "Saving…" : "Continue"} {!saving && <ChevronRight className="w-4 h-4" />}
+      </Button>
+    </motion.div>
+  );
+}
+
 function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center">
@@ -345,7 +508,7 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
   const features = [
     { icon: IconMatches, label: "Create or join matches" },
     { icon: MessageSquare, label: "Chat with players in match groups" },
-    { icon: Zap, label: "Stake points and compete" },
+    { icon: Zap, label: "Earn XPLAY Points as you compete" },
     { icon: Gift, label: "Earn rewards and redeem gift cards" },
   ];
 
@@ -588,14 +751,15 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
 
 /* ── Main Onboarding Page ── */
 
-type Step = "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "external-platform" | "level" | "court-side" | "intro" | "bonus";
+type Step = "age-terms" | "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "external-platform" | "level" | "court-side" | "intro" | "bonus";
 
 const Onboarding = () => {
   const navigate = useNavigate();
   const { user, refreshProfile } = useAuth();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<Step>("welcome");
+  const [step, setStep] = useState<Step>("age-terms");
+  const [savingAgeTerms, setSavingAgeTerms] = useState(false);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [recommendedLevel, setRecommendedLevel] = useState(3.0);
   const [selectedLevel, setSelectedLevel] = useState(3.0);
@@ -605,6 +769,29 @@ const Onboarding = () => {
   const [externalPlatformUsed, setExternalPlatformUsed] = useState(false);
   const [externalPlatformLevel, setExternalPlatformLevel] = useState<number | null>(null);
   const [externalPlatformMatches, setExternalPlatformMatches] = useState<number | null>(null);
+
+  // Age gate + terms acceptance — saved immediately so acceptance is recorded
+  // even if the user abandons onboarding before the final step.
+  const handleAgeTerms = async (dobISO: string) => {
+    if (!user || savingAgeTerms) return;
+    setSavingAgeTerms(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          date_of_birth: dobISO,
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: TERMS_VERSION,
+        })
+        .eq("user_id", user.id);
+      if (error) throw error;
+      setStep("welcome");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingAgeTerms(false);
+    }
+  };
 
   const handleQuizAnswer = (questionIndex: number, value: number) => {
     const qId = QUESTIONS[questionIndex].id;
@@ -711,6 +898,9 @@ const Onboarding = () => {
   return (
     <div className="min-h-screen bg-background overflow-y-auto">
       <AnimatePresence mode="wait">
+        {step === "age-terms" && (
+          <AgeTermsStep key="age-terms" onContinue={handleAgeTerms} saving={savingAgeTerms} />
+        )}
         {step === "welcome" && (
           <WelcomeStep key="welcome" onNext={() => setStep("quiz-0")} />
         )}

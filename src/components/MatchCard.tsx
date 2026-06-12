@@ -384,7 +384,8 @@ const MatchCard = ({
             >
               Join Match
             </button>
-            {matchFormat !== "social" && isBettingOpen ? (
+            {/* Bet button gated behind STAKES_ENABLED — see src/lib/featureFlags.ts */}
+            {STAKES_ENABLED && matchFormat !== "social" && isBettingOpen ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onBet?.(); }}
                 className="border border-secondary/30 text-secondary py-3.5 rounded-full font-display font-black text-xs uppercase tracking-widest active:bg-secondary/10 transition-colors"
@@ -409,7 +410,8 @@ const MatchCard = ({
               Open Match
             </button>
             <div className="flex items-center gap-2">
-              {matchFormat !== "social" && isBettingOpen && (
+              {/* Stakes/Bet button gated behind STAKES_ENABLED — see src/lib/featureFlags.ts */}
+              {STAKES_ENABLED && matchFormat !== "social" && isBettingOpen && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onBet?.(); }}
                   className="flex-1 border border-secondary/30 text-secondary py-3.5 rounded-full font-display font-black text-xs uppercase tracking-widest active:bg-secondary/10 transition-colors"

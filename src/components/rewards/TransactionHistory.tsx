@@ -16,7 +16,7 @@ interface TransactionHistoryProps {
 
 const typeLabels: Record<string, string> = {
   earned: "Earned",
-  staked: "Staked",
+  staked: "Points held",
   won: "Won",
   lost: "Lost",
   refunded: "Refunded",

@@ -1575,6 +1575,13 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          external_platform: boolean | null
+          external_platform_level: number | null
+          external_platform_matches: number | null
+          profile_completed_bonus_granted: boolean
+          date_of_birth: string | null
+          terms_accepted_at: string | null
+          terms_version: string | null
           display_name: string | null
           dominant_hand: string | null
           id: string
@@ -1613,6 +1620,13 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          external_platform?: boolean | null
+          external_platform_level?: number | null
+          external_platform_matches?: number | null
+          profile_completed_bonus_granted?: boolean
+          date_of_birth?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           display_name?: string | null
           dominant_hand?: string | null
           id?: string
@@ -1651,6 +1665,13 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          external_platform?: boolean | null
+          external_platform_level?: number | null
+          external_platform_matches?: number | null
+          profile_completed_bonus_granted?: boolean
+          date_of_birth?: string | null
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           display_name?: string | null
           dominant_hand?: string | null
           id?: string

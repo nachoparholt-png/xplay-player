@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import AdjustPointsModal from "@/components/admin/AdjustPointsModal";
 import { format } from "date-fns";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 type PlayerProfile = {
   id: string;
@@ -90,7 +91,10 @@ const AdminPlayerDetail = () => {
       supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("points_transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50),
       supabase.from("admin_notes").select("*").eq("target_user_id", userId).order("created_at", { ascending: false }),
-      supabase.from("match_stakes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50),
+      // match_stakes is locked while STAKES_ENABLED=false — skip the query
+      STAKES_ENABLED
+        ? supabase.from("match_stakes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50)
+        : Promise.resolve({ data: [] }),
     ]);
 
     setProfile(profileData);
@@ -177,7 +181,8 @@ const AdminPlayerDetail = () => {
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "points", label: "Points" },
-    { key: "stakes", label: "Stakes" },
+    // Stakes tab gated behind STAKES_ENABLED — see src/lib/featureFlags.ts
+    ...(STAKES_ENABLED ? ([{ key: "stakes", label: "Stakes" }] as const) : []),
     { key: "notes", label: "Notes" },
   ] as const;
 
@@ -349,7 +354,7 @@ const AdminPlayerDetail = () => {
         </div>
       )}
 
-      {tab === "stakes" && (
+      {STAKES_ENABLED && tab === "stakes" && (
         <div className="space-y-2">
           {stakes.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">No stakes yet</p>

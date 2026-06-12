@@ -188,6 +188,14 @@ const Auth = () => {
             {isLogin ? "Sign Up" : "Sign In"}
           </button>
         </p>
+
+        {/* Legal microcopy — WS2 compliance */}
+        <p className="text-center text-[11px] text-muted-foreground/60 leading-relaxed">
+          By continuing you agree to our{" "}
+          <a href="/terms" className="underline hover:text-muted-foreground">Terms of Service</a> and{" "}
+          <a href="/privacy" className="underline hover:text-muted-foreground">Privacy Policy</a>.
+          XPLAY is for players aged 18+.
+        </p>
       </motion.div>
     </div>
   );

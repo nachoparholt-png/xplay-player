@@ -598,7 +598,8 @@ const TournamentCard = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {t.status === "active" && onBet && !isCreator && (
+            {/* Bet button gated behind STAKES_ENABLED — see src/lib/featureFlags.ts */}
+            {STAKES_ENABLED && t.status === "active" && onBet && !isCreator && (
               <Button
                 size="sm"
                 variant="outline"

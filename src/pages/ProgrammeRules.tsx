@@ -96,8 +96,15 @@ const ProgrammeRules = () => {
       {/* Footer */}
       <div className="px-5 mt-8 text-[11px] text-muted-foreground/70 leading-relaxed">
         <p className="mb-2">
-          For the complete legal terms governing your XPLAY account, see the
-          Terms of Service available in Profile → Settings.
+          For the complete legal terms governing your XPLAY account, see the{" "}
+          <button onClick={() => navigate("/terms")} className="text-primary underline">
+            Terms of Service
+          </button>{" "}
+          and{" "}
+          <button onClick={() => navigate("/privacy")} className="text-primary underline">
+            Privacy Policy
+          </button>
+          .
         </p>
         <p>
           Questions? Contact support via the help link in Settings.

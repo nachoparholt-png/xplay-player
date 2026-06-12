@@ -18,6 +18,7 @@ import PlacesVenueInput from "@/components/PlacesVenueInput";
 import { type PlaceResult } from "@/hooks/useGooglePlaces";
 import { useMatchChat } from "@/hooks/useMatchChat";
 import { parsePlaytomicClipboard, findBestClubMatch } from "@/lib/parsePlaytomic";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 type ClubSelection = {
   id: string;
@@ -348,19 +349,14 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     const chatTitle = `${clubName}${courtValue ? ` — ${courtValue}` : ""}`;
     await getOrCreateMatchChat(data.id, chatTitle);
 
-    // Betting market (competitive matches only)
-    if (matchFormat !== "social") {
+    // Betting market (competitive matches only) — gated behind STAKES_ENABLED
+    if (STAKES_ENABLED && matchFormat !== "social") {
       try {
         const { error: marketErr } = await supabase.functions.invoke("create-match-market", {
           body: { match_id: data.id },
         });
         if (marketErr) {
           console.error("create-match-market failed:", marketErr);
-          toast({
-            title: "Match created, but betting market setup failed",
-            description: "You can still play — betting features may be unavailable for this match.",
-            variant: "destructive",
-          });
         }
       } catch (marketErr) {
         console.error("create-match-market exception:", marketErr);

@@ -18,6 +18,7 @@ import PlacesVenueInput from "@/components/PlacesVenueInput";
 import { type PlaceResult } from "@/hooks/useGooglePlaces";
 import { useMatchChat } from "@/hooks/useMatchChat";
 import { useClubCourtsForPlayer, usePlayerCourtAvailability } from "@/hooks/usePlayerCourtAvailability";
+import { STAKES_ENABLED } from "@/lib/featureFlags";
 
 const DEFAULT_OPEN = "06:00";
 const DEFAULT_CLOSE = "23:00";
@@ -212,8 +213,8 @@ const CreateMatch = () => {
         });
       }
 
-      // Create betting market for competitive matches (non-blocking — failure must not block navigation)
-      if (matchFormat !== "social") {
+      // Create betting market for competitive matches — gated behind STAKES_ENABLED
+      if (STAKES_ENABLED && matchFormat !== "social") {
         supabase.functions
           .invoke("create-match-market", { body: { match_id: data.id } })
           .catch((err) => console.error("create-match-market failed silently:", err));
@@ -556,7 +557,7 @@ const CreateMatch = () => {
                 <span>{f === "social" ? "Friendly" : "Competitive"}</span>
                 <br />
                 <span className="text-[10px] font-normal opacity-70">
-                  {f === "competitive" ? "Affects rating & stakes" : "No rating changes"}
+                  {f === "competitive" ? "Affects rating & XPLAY Points" : "No rating changes"}
                 </span>
               </button>
             ))}

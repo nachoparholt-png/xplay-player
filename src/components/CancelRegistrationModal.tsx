@@ -100,7 +100,7 @@ const CancelRegistrationModal = ({
           balance_before: profile.padel_park_points,
           balance_after: newBalance,
           related_match_id: matchId,
-          reason: "Stake refunded — player cancelled registration",
+          reason: "Points refunded — registration cancelled",
         });
       }
     }
@@ -210,7 +210,7 @@ const CancelRegistrationModal = ({
                   <Coins className="w-3 h-3 text-gold" />
                 </div>
                 <p className="text-muted-foreground">
-                  Your stake of <span className="font-semibold text-foreground">{activeStake.points_staked} XP</span> will be refunded
+                  Your <span className="font-semibold text-foreground">{activeStake.points_staked} XP</span> will be refunded
                 </p>
               </div>
             )}
