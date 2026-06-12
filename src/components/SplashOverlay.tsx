@@ -1,21 +1,38 @@
 /**
- * SplashOverlay — animated app-open logo splash.
- * ────────────────────────────────────────────────
- * Ported from the Claude Design handoff (design-handoff-jun13-splash, SP4 spec)
- * with the REAL logo asset and extra logo animation the prototype couldn't do:
- *  - sticker-slap: two echo copies of the logo converge into the lockup,
- *    matching the asset's own layered-offset style
- *  - rotation settle (-6° → 0) on the same spring as the scale overshoot
- *  - shine sweep across the logo after lockup
- * Background #100622 = the logo PNG's own ground (it has no alpha channel),
- * so the square asset blends seamlessly; exit crossfades to the app shell.
- * Timeline ≤2.5s · transform/opacity/filter only · reduced-motion variant.
+ * SplashOverlay — animated app-open splash. "Arcade boot" edition.
+ * ────────────────────────────────────────────────────────────────
+ * 13 Jun feedback (Ignacio): keep the retro/Atari vibe of the original
+ * splash + the handoff's retro mode, and animate the logo's PARTS —
+ * not the square asset.
+ *
+ * The logo PNG was sliced into three real parts (chroma-keyed alpha,
+ * recomposes pixel-perfect): X mark, play triangle, XPLAY wordmark.
+ *
+ * Sequence (~3.0s):
+ *  0.00  phosphor grid + CRT scanlines flicker in
+ *  0.15  square pixel ball serves in diagonally (segmented trail)
+ *  0.70  impact — flash + square ring; the X SLAMS in (stamped)
+ *  0.95  play triangle snaps in from the right, spring settle
+ *  1.25  wordmark reveals left→right in chunky steps with a lime cursor
+ *  1.80  lockup pulse + 2-frame chromatic glitch (amber/purple split)
+ *  1.95  tagline types character-by-character, blinking block cursor
+ *  3.00  exit fade
+ * Reduced-motion: 400ms fade+scale of the full logo.
  */
 import { useEffect, useState } from "react";
 import xplayLogo from "@/assets/xplay-logo-full.png";
+import partX from "@/assets/splash/logo-part-x.png";
+import partPlay from "@/assets/splash/logo-part-play.png";
+import partWordmark from "@/assets/splash/logo-part-wordmark.png";
+
+// · = the interpunct as an explicit escape — immune to any file-encoding mangling
+const TAGLINE = "PLAY \u00B7 COMPETE \u00B7 EARN";
+const TYPE_START = 1950;
+const TYPE_STEP = 30;
 
 const SplashOverlay = ({ onDone }: { onDone: () => void }) => {
   const [exiting, setExiting] = useState(false);
+  const [typed, setTyped] = useState("");
   const reduced = typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -25,10 +42,28 @@ const SplashOverlay = ({ onDone }: { onDone: () => void }) => {
       .then(({ SplashScreen }) => SplashScreen.hide())
       .catch(() => { /* web — no native splash */ });
 
-    const total = reduced ? 1200 : 2350;
+    const total = reduced ? 1200 : 3000;
     const t1 = setTimeout(() => setExiting(true), total);
     const t2 = setTimeout(onDone, total + 380);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+
+    // typed tagline (old-splash style, char by char)
+    let typer: ReturnType<typeof setInterval> | undefined;
+    const t3 = !reduced
+      ? setTimeout(() => {
+          let i = 0;
+          typer = setInterval(() => {
+            i += 1;
+            setTyped(TAGLINE.slice(0, i));
+            if (i >= TAGLINE.length && typer) clearInterval(typer);
+          }, TYPE_STEP);
+        }, TYPE_START)
+      : undefined;
+
+    return () => {
+      clearTimeout(t1); clearTimeout(t2);
+      if (t3) clearTimeout(t3);
+      if (typer) clearInterval(typer);
+    };
   }, [onDone, reduced]);
 
   return (
@@ -36,72 +71,95 @@ const SplashOverlay = ({ onDone }: { onDone: () => void }) => {
       aria-hidden
       className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden"
       style={{
-        background: "linear-gradient(180deg, #100622 0%, #0D0520 55%, #0A0F14 130%)",
+        background: "#08060F",
         opacity: exiting ? 0 : 1,
         transition: "opacity 380ms ease",
         pointerEvents: "none",
       }}
     >
       <style>{`
-        @keyframes xp-comet-move {
-          0%   { transform: translate(-46vw, -42vh) rotate(-38deg); }
-          100% { transform: translate(0, 0) rotate(-38deg); }
+        @keyframes xp-grid-in { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes xp-crtflick {
+          0%, 96% { opacity: 0.5; } 97% { opacity: 0.28; }
+          98% { opacity: 0.66; } 99% { opacity: 0.4; } 100% { opacity: 0.5; }
         }
-        @keyframes xp-comet-fade {
-          0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; }
+        @keyframes xp-ball-move {
+          0%   { transform: translate(-52vw, -44vh) rotate(-37deg); }
+          100% { transform: translate(0, 0) rotate(-37deg); }
         }
-        @keyframes xp-tail {
-          0% { transform: scaleX(0.6); } 55% { transform: scaleX(1.5); } 100% { transform: scaleX(0.04); }
+        @keyframes xp-ball-fade {
+          0% { opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; }
         }
         @keyframes xp-flash {
           0% { transform: scale(0.3); opacity: 0; }
-          35% { opacity: 0.9; }
+          35% { opacity: 0.95; }
           100% { transform: scale(2.4); opacity: 0; }
         }
         @keyframes xp-ring {
-          0% { transform: scale(0.4); opacity: 0; }
-          30% { opacity: 0.7; }
-          100% { transform: scale(3); opacity: 0; }
+          0% { transform: scale(0.4) rotate(45deg); opacity: 0; }
+          30% { opacity: 0.8; }
+          100% { transform: scale(3) rotate(45deg); opacity: 0; }
         }
-        @keyframes xp-logo-in {
-          0%   { transform: scale(0.4) rotate(-6deg); opacity: 0; }
-          10%  { opacity: 1; }
-          70%  { transform: scale(1.08) rotate(2deg); }
+        /* X — stamped in: huge → overshoot → seat */
+        @keyframes xp-x-slam {
+          0%   { transform: scale(2.6) rotate(-10deg); opacity: 0; }
+          45%  { transform: scale(0.92) rotate(2deg); opacity: 1; }
+          70%  { transform: scale(1.06) rotate(-1deg); }
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
-        @keyframes xp-echo-a {
-          0%   { transform: translate(-14px, 10px) scale(0.4) rotate(-6deg); opacity: 0; }
-          25%  { opacity: 0.45; }
-          100% { transform: translate(0, 0) scale(1); opacity: 0; }
+        /* play triangle — snaps in from the right, spring settle */
+        @keyframes xp-play-snap {
+          0%   { transform: translateX(58vw); opacity: 0; }
+          8%   { opacity: 1; }
+          62%  { transform: translateX(-7%); }
+          82%  { transform: translateX(3%); }
+          100% { transform: translateX(0); opacity: 1; }
         }
-        @keyframes xp-echo-b {
-          0%   { transform: translate(14px, -8px) scale(0.4) rotate(-6deg); opacity: 0; }
-          25%  { opacity: 0.45; }
-          100% { transform: translate(0, 0) scale(1); opacity: 0; }
+        /* wordmark — chunky stepped reveal left → right */
+        @keyframes xp-word-reveal {
+          0%   { clip-path: inset(0 100% 0 0); opacity: 1; }
+          100% { clip-path: inset(0 0% 0 0); opacity: 1; }
         }
-        @keyframes xp-glow {
-          0% { opacity: 0; } 40% { opacity: 0.85; } 100% { opacity: 0.4; }
+        @keyframes xp-word-cursor {
+          0%   { left: 0%; opacity: 1; }
+          92%  { opacity: 1; }
+          100% { left: 100%; opacity: 0; }
         }
         @keyframes xp-pulse {
-          0% { transform: scale(1); } 50% { transform: scale(1.035); } 100% { transform: scale(1); }
+          0% { transform: scale(1); } 50% { transform: scale(1.04); } 100% { transform: scale(1); }
         }
-        @keyframes xp-shine {
-          0% { transform: translateX(-130%) rotate(18deg); opacity: 0; }
-          15% { opacity: 0.55; }
-          100% { transform: translateX(130%) rotate(18deg); opacity: 0; }
+        @keyframes xp-glitch {
+          0%, 100% { transform: translate(0, 0) skewX(0deg); filter: none; }
+          25% { transform: translate(-3px, 1px) skewX(-2deg);
+                filter: drop-shadow(3px 0 0 rgba(255,191,0,0.8)) drop-shadow(-3px 0 0 rgba(89,36,198,0.8)); }
+          50% { transform: translate(2px, -1px) skewX(1.5deg);
+                filter: drop-shadow(-3px 0 0 rgba(255,191,0,0.8)) drop-shadow(3px 0 0 rgba(89,36,198,0.8)); }
+          75% { transform: translate(-1px, 0) skewX(0deg); filter: none; }
         }
-        @keyframes xp-tagline {
-          0% { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes xp-cursor-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
         @keyframes xp-fade-scale {
           0% { opacity: 0; transform: scale(0.96); }
           100% { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
+      {/* phosphor grid (handoff retro mode) */}
+      {!reduced && (
+        <div
+          className="absolute inset-0"
+          style={{
+            animation: "xp-grid-in 250ms ease-out both",
+            background: [
+              "radial-gradient(120% 80% at 50% 40%, rgba(205,255,101,0.07), transparent 62%)",
+              "repeating-linear-gradient(90deg, rgba(205,255,101,0.028) 0, rgba(205,255,101,0.028) 1px, transparent 1px, transparent 15px)",
+              "repeating-linear-gradient(0deg, rgba(205,255,101,0.028) 0, rgba(205,255,101,0.028) 1px, transparent 1px, transparent 15px)",
+            ].join(","),
+          }}
+        />
+      )}
+
       {reduced ? (
-        /* SP2 — reduced motion: simple fade + scale */
+        /* SP2 — reduced motion: simple fade + scale of the full logo */
         <img
           src={xplayLogo}
           alt=""
@@ -110,90 +168,131 @@ const SplashOverlay = ({ onDone }: { onDone: () => void }) => {
         />
       ) : (
         <>
-          {/* SP1 · serve — comet streak (0–950ms) */}
+          {/* serve — square pixel ball + segmented trail (0.15–0.70s) */}
           <div
             className="absolute"
             style={{
               animation:
-                "xp-comet-move 950ms cubic-bezier(0.55,0.06,0.90,0.25) both, xp-comet-fade 1000ms linear both",
+                "xp-ball-move 550ms cubic-bezier(0.55,0.06,0.90,0.25) 150ms both, xp-ball-fade 580ms linear 150ms both",
             }}
           >
             <div
               style={{
-                width: 180, height: 3, borderRadius: 999,
-                background: "linear-gradient(90deg, transparent, #CDFF65)",
+                width: 170, height: 12,
                 transformOrigin: "right center",
-                animation: "xp-tail 1000ms linear both",
-                boxShadow: "0 0 12px rgba(205,255,101,0.8)",
+                background:
+                  "repeating-linear-gradient(to left, rgba(205,255,101,0.95) 0, rgba(205,255,101,0.95) 9px, transparent 9px, transparent 17px)",
               }}
             />
             <div
               style={{
-                position: "absolute", right: -5, top: -4.5,
-                width: 12, height: 12, borderRadius: 999, background: "#CDFF65",
-                boxShadow: "0 0 18px 4px rgba(205,255,101,0.9)",
+                position: "absolute", right: -8, top: -2,
+                width: 16, height: 16, background: "#EAFFB0",
+                boxShadow: "0 0 0 4px rgba(205,255,101,0.25), 0 0 18px 5px rgba(205,255,101,0.85)",
               }}
             />
           </div>
 
-          {/* contact — flash + ring (900–1300ms) */}
+          {/* impact — flash + square ring (0.70s) */}
           <div
             className="absolute rounded-full"
             style={{
-              width: 120, height: 120,
+              width: 120, height: 120, mixBlendMode: "screen",
               background: "radial-gradient(circle, rgba(205,255,101,0.95) 0%, rgba(205,255,101,0) 70%)",
-              animation: "xp-flash 300ms cubic-bezier(0.16,1,0.30,1) 900ms both",
+              animation: "xp-flash 300ms cubic-bezier(0.16,1,0.30,1) 700ms both",
             }}
           />
           <div
-            className="absolute rounded-full border-2"
+            className="absolute"
             style={{
-              width: 130, height: 130, borderColor: "rgba(205,255,101,0.8)",
-              animation: "xp-ring 360ms cubic-bezier(0.16,1,0.30,1) 930ms both",
+              width: 110, height: 110, border: "3px solid rgba(205,255,101,0.8)",
+              animation: "xp-ring 360ms cubic-bezier(0.16,1,0.30,1) 720ms both",
             }}
           />
 
-          {/* settle — sticker-slap logo lockup (950ms →) */}
-          <div className="relative" style={{ animation: "xp-pulse 300ms ease-in-out 1700ms" }}>
-            {/* echo layers — the asset's own offset-sticker style, converging */}
+          {/* logo stage — the three REAL parts assemble into the lockup */}
+          <div
+            className="relative"
+            style={{
+              width: 200, height: 200,
+              animation: "xp-pulse 280ms ease-in-out 1800ms, xp-glitch 220ms steps(4) 1820ms",
+            }}
+          >
+            {/* X mark — slams in (box 10.4/19.4 · 42.6×48.4 % of 500px master) */}
             <img
-              src={xplayLogo} alt="" className="absolute inset-0 w-44 h-44 rounded-3xl"
-              style={{ animation: "xp-echo-a 550ms cubic-bezier(0.34,1.56,0.64,1) 950ms both", mixBlendMode: "screen" }}
-            />
-            <img
-              src={xplayLogo} alt="" className="absolute inset-0 w-44 h-44 rounded-3xl"
-              style={{ animation: "xp-echo-b 550ms cubic-bezier(0.34,1.56,0.64,1) 950ms both", mixBlendMode: "screen" }}
-            />
-            {/* main logo */}
-            <img
-              src={xplayLogo} alt="XPLAY" className="w-44 h-44 rounded-3xl relative"
+              src={partX} alt=""
+              className="absolute"
               style={{
-                animation: "xp-logo-in 550ms cubic-bezier(0.34,1.56,0.64,1) 950ms both, xp-glow 750ms ease-out 950ms both",
-                filter: "drop-shadow(0 0 24px rgba(205,255,101,0.45))",
+                left: "10.4%", top: "19.4%", width: "42.6%", height: "48.4%",
+                animation: "xp-x-slam 420ms cubic-bezier(0.22,1.4,0.36,1) 700ms both",
+                filter: "drop-shadow(0 0 18px rgba(205,255,101,0.4))",
               }}
             />
-            {/* shine sweep after lockup */}
-            <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
+            {/* play triangle — snaps in from the right (52.2/19.4 · 38×48.4) */}
+            <img
+              src={partPlay} alt=""
+              className="absolute"
+              style={{
+                left: "52.2%", top: "19.4%", width: "38%", height: "48.4%",
+                animation: "xp-play-snap 460ms cubic-bezier(0.34,1.45,0.64,1) 950ms both",
+                filter: "drop-shadow(0 0 18px rgba(205,255,101,0.4))",
+              }}
+            />
+            {/* wordmark — stepped arcade reveal (9.4/68.2 · 81.2×20) */}
+            <div
+              className="absolute"
+              style={{ left: "9.4%", top: "68.2%", width: "81.2%", height: "20%" }}
+            >
+              <img
+                src={partWordmark} alt="XPLAY"
+                className="absolute inset-0 w-full h-full"
+                style={{ animation: "xp-word-reveal 480ms steps(9, end) 1250ms both", opacity: 0 }}
+              />
               <div
+                className="absolute"
                 style={{
-                  position: "absolute", top: "-20%", bottom: "-20%", width: "34%",
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
-                  animation: "xp-shine 600ms ease-in-out 1750ms both",
+                  top: "-6%", bottom: "-6%", width: 7, background: "#CDFF65",
+                  boxShadow: "0 0 12px rgba(205,255,101,0.9)",
+                  animation: "xp-word-cursor 480ms steps(9, end) 1250ms both",
+                  opacity: 0,
                 }}
               />
             </div>
           </div>
 
-          {/* tagline */}
+          {/* tagline — typed char-by-char, blinking block cursor */}
           <div
-            className="absolute bottom-[18%] font-display text-[11px] font-extrabold uppercase"
+            className="absolute bottom-[17%] font-mono text-[11px] font-bold"
             style={{
-              color: "#B4CBD5", letterSpacing: "0.35em",
-              animation: "xp-tagline 400ms ease-out 1800ms both",
+              color: "#CDFF65",
+              letterSpacing: "0.22em",
+              textShadow: "0 0 9px rgba(205,255,101,0.85)",
+              minHeight: 16,
             }}
           >
-            Play · Compete · Earn
+            {typed}
+            {typed.length > 0 && typed.length <= TAGLINE.length && (
+              <span style={{ animation: "xp-cursor-blink 700ms step-end infinite" }}>▌</span>
+            )}
           </div>
+
+          {/* CRT scanlines + flicker — above everything */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "repeating-linear-gradient(0deg, rgba(0,0,0,0.30) 0, rgba(0,0,0,0.30) 1px, transparent 1px, transparent 3px)",
+              animation: "xp-crtflick 6s steps(40) infinite",
+            }}
+          />
+          {/* vignette */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(125% 120% at 50% 50%, transparent 55%, rgba(0,0,0,0.6) 100%)",
+            }}
+          />
         </>
       )}
     </div>
