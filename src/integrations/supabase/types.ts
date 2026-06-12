@@ -1164,6 +1164,7 @@ export type Database = {
           club: string
           court: string | null
           court_booking_status: string | null
+          duration_mins: number
           external_booking_url: string | null
           created_at: string
           deadline_at: string | null
@@ -1185,6 +1186,7 @@ export type Database = {
           club: string
           court?: string | null
           court_booking_status?: string | null
+          duration_mins?: number
           external_booking_url?: string | null
           created_at?: string
           deadline_at?: string | null

@@ -47,6 +47,7 @@ type Match = {
   cancelled_reason: string | null;
   /** External-court matches: 'booked' | 'not_booked'; null = XPLAY-native court */
   court_booking_status?: string | null;
+  duration_mins?: number | null;
 };
 
 type EscrowLedger = {
@@ -1007,7 +1008,7 @@ const MatchDetail = () => {
           </div>
           <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
             <Clock className="w-4 h-4 text-primary" />
-            <span>90 min</span>
+            <span>{(() => { const d = match.duration_mins ?? 90; return d < 60 ? `${d} min` : `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}` : ""}`; })()}</span>
           </div>
           <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
             <MapPin className="w-4 h-4 text-primary" />

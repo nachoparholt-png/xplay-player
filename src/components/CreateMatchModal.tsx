@@ -70,6 +70,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   // Shared form state
   const [matchDate, setMatchDate] = useState<Date | undefined>();
   const [matchTime, setMatchTime] = useState("");
+  const [durationMins, setDurationMins] = useState(90); // for venues without XPLAY slots
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
 
@@ -331,6 +332,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       price_per_player: 0,
       visibility,
       notes: notes || null,
+      // XPLAY slot → club-defined length; otherwise the organizer's pick
+      duration_mins: selectedSlot
+        ? Math.max(15, Math.round((new Date(selectedSlot.ends_at).getTime() - new Date(selectedSlot.starts_at).getTime()) / 60000))
+        : durationMins,
     }).select().single();
 
     if (error) {
@@ -768,6 +773,28 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                 </div>
               )}
               {errors.time && <p className="text-[11px] text-destructive px-1">Please pick a time slot</p>}
+
+              {/* Duration — only when the venue has no XPLAY-managed slots
+                  (slot-based bookings carry the club's own duration) */}
+              {!useSmartSlots && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium mr-1">Duration</span>
+                  {[60, 90, 120].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDurationMins(d)}
+                      className={cn(
+                        "px-3 py-2 rounded-full text-xs font-semibold transition-colors",
+                        durationMins === d
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted border border-border/30 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {d === 60 ? "1h" : d === 90 ? "1h 30" : "2h"}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ── Format + Level + Visibility ─────────────────────────────────── */}

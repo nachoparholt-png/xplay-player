@@ -73,6 +73,7 @@ const CreateMatch = () => {
   const isExternalCourt =
     venueMode === "other" || (venueMode === "xplay" && selectedClub?.source === "directory");
   const [courtBookedExternally, setCourtBookedExternally] = useState(false);
+  const [durationMins, setDurationMins] = useState(90); // external venues only
   const [customVenue, setCustomVenue] = useState<PlaceResult | null>(null);
   const [customCourt, setCustomCourt] = useState("");
 
@@ -208,6 +209,8 @@ const CreateMatch = () => {
       // External-court matches carry the organizer's booking attestation;
       // NULL means the court is managed/booked natively through XPLAY.
       court_booking_status: isExternalCourt ? (courtBookedExternally ? "booked" : "not_booked") : null,
+      // XPLAY slot → club-defined length; external venues → organizer's pick
+      duration_mins: !isExternalCourt && selectedSlot ? slotDuration : durationMins,
     }).select().single();
 
     if (error) {
@@ -582,6 +585,25 @@ const CreateMatch = () => {
                 </Select>
                 {errors.time && <p className="text-[11px] text-destructive mt-1">Please pick a time</p>}
               </div>
+            </div>
+
+            {/* Duration — external venues have no club-defined slot length */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium mr-1">Duration</span>
+              {[60, 90, 120].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDurationMins(d)}
+                  className={cn(
+                    "px-3 py-2 rounded-full text-xs font-semibold transition-colors",
+                    durationMins === d
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted border border-border/50 text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {d === 60 ? "1h" : d === 90 ? "1h 30" : "2h"}
+                </button>
+              ))}
             </div>
           </>
         ) : null}
