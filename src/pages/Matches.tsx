@@ -157,6 +157,7 @@ const MatchCarousel = ({
                   isEligible={true}
                   deadlineAt={match.deadline_at}
                   visibility={match.visibility}
+                  courtBookingStatus={match.court_booking_status}
                   onClick={() => navigate(`/matches/${match.id}`)}
                   onJoin={() => navigate(`/matches/${match.id}`)}
                   onBet={() => onBet(match)}

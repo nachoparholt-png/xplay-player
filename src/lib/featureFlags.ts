@@ -51,6 +51,18 @@ export const LOYALTY_ENABLED = true;
 export const XPLAY_PRO_ENABLED = false;
 
 /**
+ * ─── AVAILABILITY_ENABLED ────────────────────────────────────────────────────
+ * Layer 2 of the club directory (XPLAY_Club_Data_Availability_Design.md):
+ * aggregated court availability for non-XPLAY ("directory") clubs, collected
+ * from external providers (Playtomic first) and shown read-only with a
+ * deep-link to book on the host platform. Collectors are the most fragile
+ * part of the stack — flip this OFF to fall back to directory-only if a
+ * provider blocks or changes their endpoints. DB-side kill switch also
+ * exists: app_settings key 'availability_playtomic_enabled'.
+ */
+export const AVAILABILITY_ENABLED = true;
+
+/**
  * ─── POINTS_PURCHASE_ENABLED ─────────────────────────────────────────────────
  * Buying XPLAY Points for cash is the second bright legal line we cannot cross
  * (rule 2 of the rewards programme design — never sell points for money). If a

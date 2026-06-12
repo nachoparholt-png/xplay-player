@@ -61,6 +61,8 @@ export interface MatchCardProps {
   duration?: string;
   deadlineAt?: string | null;
   visibility?: string;
+  /** External-court matches: 'booked' | 'not_booked'; null/undefined = XPLAY-native court */
+  courtBookingStatus?: string | null;
   onClick?: () => void;
   onJoin?: () => void;
   onBet?: () => void;
@@ -237,6 +239,7 @@ const MatchCard = ({
   isEligible,
   deadlineAt,
   visibility,
+  courtBookingStatus,
   onClick,
   onJoin,
   onBet,
@@ -295,6 +298,17 @@ const MatchCard = ({
           <MapPin className="w-3.5 h-3.5" />
           <span className="text-xs font-semibold">{[club, court, city].filter(Boolean).join(" · ")}</span>
         </div>
+        {/* External-court booking attestation badge */}
+        {courtBookingStatus === "booked" && (
+          <span className="inline-flex items-center gap-1 mt-1.5 text-[9.5px] font-black uppercase tracking-wider text-green-500 border border-green-500/40 rounded-full px-2 py-0.5">
+            ✓ Court booked
+          </span>
+        )}
+        {courtBookingStatus === "not_booked" && (
+          <span className="inline-flex items-center gap-1 mt-1.5 text-[9.5px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5">
+            ⚠ Court not booked yet
+          </span>
+        )}
         {/* Deadline chip — only on open public matches with spots left */}
         {status === "open" && visibility !== "private" && spotsLeft > 0 && deadlineAt && (
           <div className="mt-2">

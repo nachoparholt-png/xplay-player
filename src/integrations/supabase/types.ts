@@ -172,6 +172,11 @@ export type Database = {
           city: string
           club_description: string | null
           club_name: string
+          claimed: boolean
+          external_provider: string | null
+          external_tenant_id: string | null
+          last_synced_at: string | null
+          source: string
           club_status: Database["public"]["Enums"]["club_status"]
           contact_email: string | null
           contact_phone: string | null
@@ -207,6 +212,11 @@ export type Database = {
           city?: string
           club_description?: string | null
           club_name: string
+          claimed: boolean
+          external_provider: string | null
+          external_tenant_id: string | null
+          last_synced_at: string | null
+          source: string
           club_status?: Database["public"]["Enums"]["club_status"]
           contact_email?: string | null
           contact_phone?: string | null
@@ -242,6 +252,11 @@ export type Database = {
           city?: string
           club_description?: string | null
           club_name?: string
+          claimed?: boolean
+          external_provider?: string | null
+          external_tenant_id?: string | null
+          last_synced_at?: string | null
+          source?: string
           club_status?: Database["public"]["Enums"]["club_status"]
           contact_email?: string | null
           contact_phone?: string | null
@@ -269,6 +284,45 @@ export type Database = {
           typical_active_hours?: string
           updated_at?: string
           website?: string | null
+        }
+        Relationships: []
+      }
+      external_court_slots: {
+        Row: {
+          booking_url: string | null
+          club_id: string
+          court_label: string | null
+          currency: string | null
+          duration_mins: number
+          fetched_at: string
+          id: string
+          price_cents: number | null
+          provider: string
+          starts_at: string
+        }
+        Insert: {
+          booking_url?: string | null
+          club_id: string
+          court_label?: string | null
+          currency?: string | null
+          duration_mins: number
+          fetched_at?: string
+          id?: string
+          price_cents?: number | null
+          provider: string
+          starts_at: string
+        }
+        Update: {
+          booking_url?: string | null
+          club_id?: string
+          court_label?: string | null
+          currency?: string | null
+          duration_mins?: number
+          fetched_at?: string
+          id?: string
+          price_cents?: number | null
+          provider?: string
+          starts_at?: string
         }
         Relationships: []
       }
@@ -656,7 +710,7 @@ export type Database = {
         Row: {
           active: boolean | null
           club_id: string
-          court_type: string | null
+          indoor: boolean | null
           created_at: string | null
           default_price_cents: number
           id: string
@@ -668,7 +722,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           club_id: string
-          court_type?: string | null
+          indoor?: boolean | null
           created_at?: string | null
           default_price_cents?: number
           id?: string
@@ -680,7 +734,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           club_id?: string
-          court_type?: string | null
+          indoor?: boolean | null
           created_at?: string | null
           default_price_cents?: number
           id?: string
@@ -1109,6 +1163,8 @@ export type Database = {
         Row: {
           club: string
           court: string | null
+          court_booking_status: string | null
+          external_booking_url: string | null
           created_at: string
           deadline_at: string | null
           format: Database["public"]["Enums"]["match_format"]
@@ -1128,6 +1184,8 @@ export type Database = {
         Insert: {
           club: string
           court?: string | null
+          court_booking_status?: string | null
+          external_booking_url?: string | null
           created_at?: string
           deadline_at?: string | null
           format?: Database["public"]["Enums"]["match_format"]
@@ -1147,6 +1205,8 @@ export type Database = {
         Update: {
           club?: string
           court?: string | null
+          court_booking_status?: string | null
+          external_booking_url?: string | null
           created_at?: string
           deadline_at?: string | null
           format?: Database["public"]["Enums"]["match_format"]

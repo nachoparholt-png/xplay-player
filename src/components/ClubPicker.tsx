@@ -10,6 +10,7 @@ type Club = {
   club_name: string;
   location: string;
   city: string | null;
+  source?: string; // 'xplay_partner' | 'directory'
 };
 
 interface Props {
@@ -29,8 +30,9 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
       setLoading(true);
       const { data } = await supabase
         .from("clubs")
-        .select("id, club_name, location, city")
+        .select("id, club_name, location, city, source")
         .eq("club_status", "active")
+        .order("source", { ascending: false }) // xplay_partner before directory
         .order("club_name");
       if (data) setClubs(data);
       setLoading(false);
@@ -95,7 +97,14 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
                     <Building2 className="w-5 h-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{club.club_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-sm truncate">{club.club_name}</p>
+                      {club.source === "directory" && (
+                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
+                          External booking
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3 h-3" /> {club.location || club.city || "—"}
                     </span>

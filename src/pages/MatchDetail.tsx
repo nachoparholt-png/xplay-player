@@ -955,6 +955,48 @@ const MatchDetail = () => {
           {match.court && <p className="text-sm text-muted-foreground mt-0.5">{match.court}</p>}
         </motion.div>
 
+        {/* External-court booking status (organizer attestation) */}
+        {match.court_booking_status === "booked" && (
+          <div className="flex items-center gap-2 rounded-xl border border-green-500/25 bg-green-500/5 px-3.5 py-2.5">
+            <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
+            <p className="text-xs text-foreground/80">
+              <b>Court booked</b> — the organizer confirmed the court on the club's booking system.
+            </p>
+          </div>
+        )}
+        {match.court_booking_status === "not_booked" && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 px-3.5 py-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-foreground/80">
+                <b>Court not booked yet</b> — this club isn't managed on XPLAY. The organizer
+                still needs to book the court on the club's own system.
+              </p>
+            </div>
+            {isOrganizer && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-9 rounded-lg text-xs font-semibold border-amber-400/40"
+                onClick={async () => {
+                  const { error } = await supabase
+                    .from("matches")
+                    .update({ court_booking_status: "booked" })
+                    .eq("id", match.id);
+                  if (error) {
+                    toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+                  } else {
+                    toast({ title: "Court marked as booked", description: "Players will see the court is secured." });
+                    fetchMatch();
+                  }
+                }}
+              >
+                I've booked the court — mark as secured
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Info pills */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">

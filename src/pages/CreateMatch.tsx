@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, Clock, MapPin, Building2, ChevronRight, ClipboardPaste, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, MapPin, Building2, ChevronRight, ClipboardPaste, AlertCircle, Loader2, Check, ExternalLink } from "lucide-react";
+import ExternalAvailability from "@/components/ExternalAvailability";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -47,6 +48,7 @@ type ClubSelection = {
   opening_time?: string;
   closing_time?: string;
   timezone?: string;
+  source?: string; // 'xplay_partner' | 'directory'
 };
 
 import { parsePlaytomicClipboard, findBestClubMatch } from "@/lib/parsePlaytomic";
@@ -64,6 +66,13 @@ const CreateMatch = () => {
 
   // Venue mode: 'xplay' = registered XPLAY club, 'other' = free-text via Google Places
   const [venueMode, setVenueMode] = useState<"xplay" | "other">("xplay");
+
+  // External-court matches (directory clubs + custom venues): the court is NOT
+  // booked through XPLAY — the organizer attests they've booked it on the
+  // club's own system. See XPLAY_Club_Data_Availability_Design.md.
+  const isExternalCourt =
+    venueMode === "other" || (venueMode === "xplay" && selectedClub?.source === "directory");
+  const [courtBookedExternally, setCourtBookedExternally] = useState(false);
   const [customVenue, setCustomVenue] = useState<PlaceResult | null>(null);
   const [customCourt, setCustomCourt] = useState("");
 
@@ -176,7 +185,10 @@ const CreateMatch = () => {
     setErrors({});
 
     const clubName  = venueMode === "xplay" ? selectedClub!.club_name : customVenue!.name;
-    const courtValue = venueMode === "xplay" ? (court || null) : (customCourt || null);
+    // Directory clubs use the manual court field (no XPLAY-managed courts)
+    const courtValue = venueMode === "xplay" && selectedClub?.source !== "directory"
+      ? (court || null)
+      : (customCourt || null);
     const matchDateStr = selectedSlotDate || format(matchDate!, "yyyy-MM-dd");
 
     setLoading(true);
@@ -193,6 +205,9 @@ const CreateMatch = () => {
       price_per_player: 0,
       visibility,
       notes: notes || null,
+      // External-court matches carry the organizer's booking attestation;
+      // NULL means the court is managed/booked natively through XPLAY.
+      court_booking_status: isExternalCourt ? (courtBookedExternally ? "booked" : "not_booked") : null,
     }).select().single();
 
     if (error) {
@@ -343,8 +358,8 @@ const CreateMatch = () => {
           }}
         />
 
-        {/* ── XPLAY mode: real court + availability picker ── */}
-        {venueMode === "xplay" && selectedClub ? (
+        {/* ── XPLAY partner club: real court + availability picker ── */}
+        {venueMode === "xplay" && selectedClub && selectedClub.source !== "directory" ? (
           <div className="space-y-4 rounded-2xl border border-border/40 bg-muted/30 p-4">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Court &amp; Time</p>
 
@@ -473,8 +488,40 @@ const CreateMatch = () => {
               </div>
             )}
           </div>
-        ) : venueMode === "other" ? (
+        ) : (venueMode === "other" || (venueMode === "xplay" && selectedClub)) ? (
           <>
+            {/* External court (directory club or custom venue): aggregated
+                availability + organizer booking attestation. The court itself
+                is booked on the club's own system, not through XPLAY. */}
+            {venueMode === "xplay" && selectedClub?.source === "directory" && (
+              <ExternalAvailability clubId={selectedClub.id} />
+            )}
+
+            <button
+              type="button"
+              onClick={() => setCourtBookedExternally(!courtBookedExternally)}
+              className={cn(
+                "w-full flex items-start gap-2.5 p-3.5 rounded-xl border text-left transition-colors",
+                courtBookedExternally
+                  ? "bg-primary/10 border-primary/30"
+                  : "bg-amber-400/5 border-amber-400/25"
+              )}
+            >
+              <span className={cn(
+                "w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+                courtBookedExternally ? "bg-primary" : "border border-border bg-background"
+              )}>
+                {courtBookedExternally && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
+              </span>
+              <span className="text-xs leading-relaxed">
+                <span className="font-semibold block">I've booked the court</span>
+                <span className="text-muted-foreground">
+                  This club isn't managed on XPLAY — book the court on the club's own system,
+                  then confirm here. Players will see whether the court is secured.
+                </span>
+              </span>
+            </button>
+
             {/* Other venue: free-text court */}
             <div>
               <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">Court (optional)</label>
