@@ -17,6 +17,7 @@ import MatchBetSheet from "@/components/betting/MatchBetSheet";
 import { STAKES_ENABLED } from "@/lib/featureFlags";
 import { format } from "date-fns";
 import ClubsExplorer from "@/components/clubs/ClubsExplorer";
+import CourtFinder from "@/components/courts/CourtFinder";
 import LiveTournamentBanner from "@/components/tournaments/live/LiveTournamentBanner";
 
 type MatchRow = {
@@ -36,6 +37,7 @@ type MatchRow = {
   visibility: string;
   /** External-court matches: 'booked' | 'not_booked'; null = XPLAY-native court */
   court_booking_status?: string | null;
+  external_booking_url?: string | null;
 };
 
 type PlayerInfo = {
@@ -72,7 +74,7 @@ const toStatus = (s: string): MatchStatusUI => {
 };
 
 type Tab = "open" | "my_matches";
-type TopTab = "matches" | "clubs";
+type TopTab = "matches" | "courts" | "clubs";
 
 const ACTIVE_STATUSES = ["open", "almost_full", "full", "awaiting_score", "score_submitted", "pending_review", "review_requested"] as const;
 
@@ -161,6 +163,7 @@ const MatchCarousel = ({
                   deadlineAt={match.deadline_at}
                   visibility={match.visibility}
                   courtBookingStatus={match.court_booking_status}
+                  externalProvider={match.external_booking_url?.includes("playtomic") ? "Playtomic" : null}
                   onClick={() => navigate(`/matches/${match.id}`)}
                   onJoin={() => navigate(`/matches/${match.id}`)}
                   onBet={() => onBet(match)}
@@ -438,6 +441,16 @@ const Matches = () => {
             Matches
           </button>
           <button
+            onClick={() => setTopTab("courts")}
+            className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
+              topTab === "courts"
+                ? "border-b-2 border-primary text-foreground"
+                : "border-b-2 border-transparent text-muted-foreground"
+            }`}
+          >
+            Courts
+          </button>
+          <button
             onClick={() => setTopTab("clubs")}
             className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
               topTab === "clubs"
@@ -449,7 +462,9 @@ const Matches = () => {
           </button>
         </div>
 
-        {topTab === "clubs" ? (
+        {topTab === "courts" ? (
+          <CourtFinder />
+        ) : topTab === "clubs" ? (
           <ClubsExplorer />
         ) : (
           <>

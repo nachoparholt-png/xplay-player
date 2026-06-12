@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, MapPin, Building2, ChevronRight, ClipboardPaste, AlertCircle, Loader2, Check, ExternalLink } from "lucide-react";
 import ExternalAvailability from "@/components/ExternalAvailability";
@@ -74,6 +74,25 @@ const CreateMatch = () => {
     venueMode === "other" || (venueMode === "xplay" && selectedClub?.source === "directory");
   const [courtBookedExternally, setCourtBookedExternally] = useState(false);
   const [durationMins, setDurationMins] = useState(90); // external venues only
+
+  // Court Finder FC3a prefill: arriving from a tapped XPLAY slot
+  const routerLocation = useLocation();
+  useEffect(() => {
+    const prefillId = (routerLocation.state as { prefillClubId?: string } | null)?.prefillClubId;
+    if (!prefillId) return;
+    supabase
+      .from("clubs")
+      .select("id, club_name, location, city, opening_time, closing_time, timezone, source")
+      .eq("id", prefillId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setVenueMode("xplay");
+          setSelectedClub(data as ClubSelection);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [customVenue, setCustomVenue] = useState<PlaceResult | null>(null);
   const [customCourt, setCustomCourt] = useState("");
 

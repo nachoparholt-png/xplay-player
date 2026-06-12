@@ -63,6 +63,8 @@ export interface MatchCardProps {
   visibility?: string;
   /** External-court matches: 'booked' | 'not_booked'; null/undefined = XPLAY-native court */
   courtBookingStatus?: string | null;
+  /** Host platform name for external-court matches (e.g. "Playtomic") */
+  externalProvider?: string | null;
   onClick?: () => void;
   onJoin?: () => void;
   onBet?: () => void;
@@ -240,6 +242,7 @@ const MatchCard = ({
   deadlineAt,
   visibility,
   courtBookingStatus,
+  externalProvider,
   onClick,
   onJoin,
   onBet,
@@ -298,15 +301,23 @@ const MatchCard = ({
           <MapPin className="w-3.5 h-3.5" />
           <span className="text-xs font-semibold">{[club, court, city].filter(Boolean).join(" · ")}</span>
         </div>
-        {/* External-court booking attestation badge */}
-        {courtBookingStatus === "booked" && (
-          <span className="inline-flex items-center gap-1 mt-1.5 text-[9.5px] font-black uppercase tracking-wider text-green-500 border border-green-500/40 rounded-full px-2 py-0.5">
-            ✓ Court booked
-          </span>
-        )}
-        {courtBookingStatus === "not_booked" && (
-          <span className="inline-flex items-center gap-1 mt-1.5 text-[9.5px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5">
-            ⚠ Court not booked yet
+        {/* External-court booking attestation badge + host-platform chip (design FC5) */}
+        {(courtBookingStatus === "booked" || courtBookingStatus === "not_booked") && (
+          <span className="inline-flex items-center gap-1.5 mt-1.5">
+            {courtBookingStatus === "booked" ? (
+              <span className="inline-flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-green-500 border border-green-500/40 rounded-full px-2 py-0.5">
+                ✓ Court booked
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5">
+                ⚠ Court not booked yet
+              </span>
+            )}
+            {externalProvider && (
+              <span className="text-[9px] font-bold text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
+                {externalProvider}
+              </span>
+            )}
           </span>
         )}
         {/* Deadline chip — only on open public matches with spots left */}

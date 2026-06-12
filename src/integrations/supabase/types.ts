@@ -3280,6 +3280,33 @@ export type Database = {
         Args: { p_market_id: string; p_stake: number; p_team: string }
         Returns: undefined
       }
+      search_court_availability: {
+        Args: {
+          _lat: number
+          _lng: number
+          _radius_m?: number
+          _from?: string
+          _to?: string
+        }
+        Returns: {
+          club_id: string
+          club_name: string
+          source: string
+          provider: string
+          distance_m: number
+          latitude: number
+          longitude: number
+          slot_id: string
+          court_label: string | null
+          starts_at: string
+          duration_mins: number
+          price_cents: number | null
+          currency: string | null
+          booking_url: string | null
+          is_native: boolean
+          fetched_at: string
+        }[]
+      }
       increment_points: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
