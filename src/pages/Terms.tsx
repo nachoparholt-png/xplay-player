@@ -4,19 +4,17 @@
  * Public route (/terms) — reachable signed-out (App Store review requires a
  * working EULA/terms link). Loyalty-programme aligned; no stakes/wagering.
  *
- * TODO before solicitor review / Gate C:
- *  - Replace COMPANY_NAME / COMPANY_DETAILS placeholders with the registered
- *    legal entity (name, company number, registered address).
- *  - Confirm CONTACT_EMAIL.
+ * Entity confirmed by Ignacio 12 Jun 2026: Hana Blossom Limited.
+ * TODO at solicitor review: add company number + registered address.
  */
 
 import { ChevronLeft, ScrollText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-export const TERMS_VERSION = "2026-06-11";
+export const TERMS_VERSION = "2026-06-12";
 
-const COMPANY_NAME = "XPLAY"; // TODO: registered legal entity name
-const CONTACT_EMAIL = "support@xplay.app"; // TODO: confirm support address
+const COMPANY_NAME = "Hana Blossom Limited, trading as XPLAY";
+const CONTACT_EMAIL = "hello@joinxplay.com";
 
 const SECTIONS: { title: string; body: string[] }[] = [
   {
