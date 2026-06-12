@@ -1,14 +1,22 @@
+/**
+ * Profile — rebranded per design handoff flow4-profile.jsx (PR1/PR2/PR4).
+ * ────────────────────────────────────────────────────────────────────────
+ * PR1: player-card hero (identity + level/win-rate/form), prominent XP block,
+ *      recent matches, rails, warn-styled sign out.
+ * PR2: shareable player card bottom sheet (native share w/ clipboard fallback).
+ * PR4: new-player empty state (no sad charts; missions + find-a-match push).
+ * Note: the app-wide top bar (AppLayout) already shows the XPLAY logo +
+ * points chip, so the mockup's logo strip is not duplicated here.
+ */
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { ChevronRight, Settings, LogOut } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronRight, Settings, LogOut, Share2, Zap, BarChart3, CreditCard, Bell, Check, X, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { STAKES_ENABLED } from "@/lib/featureFlags";
+import { toast } from "@/hooks/use-toast";
+import xplayLogo from "@/assets/xplay-logo-full.png";
 
-import SkillBadge from "@/components/SkillBadge";
-import PlayerRatingCard from "@/components/PlayerRatingCard";
-import RatingEvolutionChart from "@/components/RatingEvolutionChart";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type RecentMatch = {
@@ -21,28 +29,32 @@ type RecentMatch = {
   venue: string;
 };
 
-const levelToCategory = (level: number | null): 1 | 2 | 3 | 4 | 5 => {
-  if (!level) return 5;
-  if (level >= 6) return 1;
-  if (level >= 4.5) return 2;
-  if (level >= 3) return 3;
-  if (level >= 1.5) return 4;
-  return 5;
-};
+const FormDots = ({ results, size = 22 }: { results: ("W" | "L")[]; size?: number }) => (
+  <div className="flex gap-1.5">
+    {results.length === 0 ? (
+      <span className="font-mono text-lg text-muted-foreground">—</span>
+    ) : (
+      results.map((r, i) => (
+        <div
+          key={i}
+          style={{ width: size, height: size }}
+          className={`rounded-md flex items-center justify-center font-mono font-bold text-[11px] ${
+            r === "W" ? "bg-primary text-primary-foreground" : "bg-[#FF6B35]/20 text-[#FF6B35]"
+          }`}
+        >
+          {r}
+        </div>
+      ))
+    )}
+  </div>
+);
 
 const Profile = () => {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeStakeCount, setActiveStakeCount] = useState(0);
   const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user || !STAKES_ENABLED) return;
-    supabase.from("match_stakes").select("id", { count: "exact", head: true })
-      .eq("user_id", user.id).eq("status", "active")
-      .then(({ count }) => setActiveStakeCount(count || 0));
-  }, [user]);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -94,7 +106,8 @@ const Profile = () => {
         };
 
         const built: RecentMatch[] = history.map((h) => {
-          const match = h.matches as MatchRow | null;
+          // double-cast: generated types miss the match_players→profiles relation
+          const match = h.matches as unknown as MatchRow | null;
           const matchPlayers = match?.match_players || [];
 
           const myPlayer = matchPlayers.find((p) => p.user_id === user.id);
@@ -148,243 +161,458 @@ const Profile = () => {
     fetchRecentMatches();
   }, [user]);
 
-  const winRate =
-    profile && profile.total_matches > 0
-      ? `${Math.round((profile.wins / profile.total_matches) * 100)}%`
-      : "0%";
+  const totalMatches = profile?.total_matches ?? 0;
+  const wins = profile?.wins ?? 0;
+  const winRate = totalMatches > 0 ? `${Math.round((wins / totalMatches) * 100)}%` : "—";
+  const level = profile?.padel_level ? profile.padel_level.toFixed(1) : "—";
+  const points = profile?.padel_park_points ?? 0;
+  const lifetimeEarned = profile?.lifetime_earned ?? points;
+  const memberNo = user ? `#${user.id.replace(/-/g, "").slice(0, 4).toUpperCase()}` : "#----";
+  const isNewPlayer = totalMatches === 0;
 
+  const formResults: ("W" | "L")[] = recentMatches
+    .slice(0, 5)
+    .map((m) => (m.result === "win" ? "W" : "L"))
+    .reverse();
+  let streak = 0;
+  for (let i = recentMatches.length - 1 >= 0 ? 0 : 0; i < recentMatches.length; i++) {
+    if (recentMatches[i].result === "win") streak++;
+    else break;
+  }
+
+  const handleNativeShare = async () => {
+    const text = `My XPLAY player card — Level ${level}, ${winRate} win rate${streak > 1 ? `, ${streak}W streak` : ""}. Find me on court ⚡`;
+    const url = "https://xplay-player.vercel.app";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "My XPLAY player card", text, url });
+      } else {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        toast({ title: "Copied to clipboard" });
+      }
+    } catch {
+      /* user cancelled */
+    }
+  };
+
+  /* ── PR4 · new-player empty state ───────────────────────────── */
+  if (isNewPlayer) {
+    return (
+      <div className="px-4 py-5 space-y-4">
+        {/* fresh player card */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-[22px] p-5 bg-gradient-to-br from-surface-container to-background border border-border/40 relative overflow-hidden"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-muted/40 border-2 border-dashed border-primary/40 flex items-center justify-center flex-shrink-0">
+              <span className="font-display text-2xl font-black italic text-foreground/50">
+                {profile?.display_name?.[0]?.toUpperCase() || "P"}
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-display text-[22px] font-black italic uppercase leading-none truncate">
+                {profile?.display_name || "Player"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                {profile?.location || "—"} · new player
+              </p>
+              <span className="inline-flex items-center gap-1.5 mt-2 bg-primary/10 rounded-full px-2.5 py-1">
+                <Zap className="w-3 h-3 text-primary fill-primary" />
+                <span className="font-mono text-[11px] font-bold text-primary">
+                  Level {level} · confirmed after 1st match
+                </span>
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate("/profile/settings")}
+            className="absolute top-4 right-4 p-2 text-muted-foreground active:scale-95"
+            aria-label="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </motion.div>
+
+        {/* primary push */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="rounded-[20px] p-6 text-center bg-gradient-to-br from-primary to-[#A8D648] text-primary-foreground"
+        >
+          <h3 className="font-display text-2xl font-black italic uppercase leading-[0.95]">
+            Play your first
+            <br />
+            match to begin
+          </h3>
+          <p className="text-xs font-semibold mt-2 opacity-75">
+            Your level, form and stats unlock the moment you step on court.
+          </p>
+          <button
+            onClick={() => navigate("/matches")}
+            className="mt-4 w-full bg-[#1A2833] text-primary rounded-xl py-3.5 font-display font-extrabold text-sm uppercase tracking-wide active:scale-[0.98] transition-transform"
+          >
+            Find a match →
+          </button>
+        </motion.div>
+
+        {/* first-week missions */}
+        <div className="px-1 pt-1">
+          <span className="text-[11px] font-black tracking-[0.14em] uppercase text-muted-foreground">
+            First-week missions · +75 XP bonus
+          </span>
+        </div>
+        <div className="space-y-2">
+          {[
+            { label: "Complete your profile", xp: "+20", done: !!profile?.onboarding_completed },
+            { label: "Join your first match", xp: "+30", done: false },
+            { label: "Invite a friend", xp: "+25", done: false },
+          ].map((m) => (
+            <div
+              key={m.label}
+              className={`flex items-center gap-3 rounded-[14px] px-3.5 py-3 border ${
+                m.done ? "bg-green-500/10 border-green-500/30" : "bg-card border-border/40"
+              }`}
+            >
+              <div
+                className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center ${
+                  m.done ? "bg-green-500" : "bg-muted border-2 border-border"
+                }`}
+              >
+                {m.done && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+              </div>
+              <span
+                className={`flex-1 text-[13px] font-bold ${
+                  m.done ? "text-foreground/50 line-through" : "text-foreground"
+                }`}
+              >
+                {m.label}
+              </span>
+              <span className="font-mono text-xs font-bold text-primary">{m.xp} XP</span>
+            </div>
+          ))}
+        </div>
+
+        {/* XP starter */}
+        <div className="rounded-2xl px-4 py-3.5 bg-amber-400/10 border border-amber-400/30 flex items-center gap-3">
+          <Zap className="w-5 h-5 text-amber-400 fill-amber-400 flex-shrink-0" />
+          <p className="text-xs text-foreground/85 leading-relaxed">
+            You've got <b className="text-amber-400">{points.toLocaleString()} XP</b> to start ·
+            worth £{(points / 100).toFixed(2)} in rewards
+          </p>
+        </div>
+
+        <button
+          onClick={signOut}
+          className="w-full py-3.5 rounded-xl border border-[#FF6B35]/25 text-[#FF6B35] font-display font-extrabold text-xs uppercase tracking-[0.06em] active:scale-[0.98] transition-transform"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  /* ── PR1 · player-card profile home ─────────────────────────── */
   return (
-    <div className="px-6 py-6 space-y-6">
-      {/* IDENTITY HERO - Row layout */}
+    <div className="px-4 py-5 space-y-4">
+      {/* PLAYER CARD hero */}
       <motion.section
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="rounded-[22px] p-5 relative overflow-hidden bg-gradient-to-br from-surface-container to-background border border-primary/20"
       >
-        <div className="flex items-center gap-3 flex-1">
-          {/* Avatar */}
-          <div className="w-14 h-14 rounded-full bg-primary p-0.5 flex-shrink-0">
+        {/* ghost level */}
+        <div className="absolute -right-8 -top-10 opacity-[0.06] pointer-events-none select-none">
+          <span className="font-display font-black italic text-primary leading-[0.8]" style={{ fontSize: 200 }}>
+            {level}
+          </span>
+        </div>
+
+        <div className="flex gap-3.5 items-center relative">
+          <div className="w-16 h-16 rounded-full p-0.5 bg-gradient-to-br from-primary to-[#5924C6] flex-shrink-0">
             <Avatar className="w-full h-full">
               <AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
-              <AvatarFallback className="text-lg font-black bg-primary text-primary-foreground">
+              <AvatarFallback className="font-display text-2xl font-black italic bg-surface-container text-primary">
                 {profile?.display_name?.[0]?.toUpperCase() || "P"}
               </AvatarFallback>
             </Avatar>
           </div>
-          {/* Name & location */}
-          <div className="flex-1 min-w-0">
-            <h2 className="font-display text-[22px] font-black italic uppercase text-foreground leading-tight">
+          <div className="flex-1 min-w-0 pr-16">
+            <h2 className="font-display text-[24px] font-black italic uppercase leading-none truncate">
               {profile?.display_name || "Player"}
             </h2>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {profile?.location || "No location"}
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {[profile?.location, profile?.preferred_club].filter(Boolean).join(" · ") || "—"}
             </p>
+            <span className="inline-flex items-center gap-1.5 mt-1.5 bg-primary/10 rounded-full px-2.5 py-0.5">
+              <Zap className="w-3 h-3 text-primary fill-primary" />
+              <span className="font-mono text-[11px] font-bold text-primary">Member {memberNo}</span>
+            </span>
           </div>
         </div>
-        {/* Settings button */}
+
+        {/* share pill */}
+        <button
+          onClick={() => setShareOpen(true)}
+          className="absolute top-4 right-4 flex items-center gap-1.5 bg-primary/15 rounded-full px-3 py-1.5 active:scale-95 transition-transform"
+        >
+          <Share2 className="w-3.5 h-3.5 text-primary" />
+          <span className="font-display text-[10px] font-extrabold uppercase tracking-wide text-primary">Share</span>
+        </button>
+
+        {/* stat strip */}
+        <div className="flex mt-4 pt-4 border-t border-border/40 relative">
+          <div className="flex-1">
+            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Level</div>
+            <div className="font-mono text-[26px] font-bold text-primary leading-tight">{level}</div>
+          </div>
+          <div className="flex-1 border-l border-border/40 pl-3.5">
+            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Win rate</div>
+            <div className="font-mono text-[26px] font-bold leading-tight">{winRate}</div>
+          </div>
+          <div className="flex-1 border-l border-border/40 pl-3.5">
+            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Form</div>
+            <div className="mt-1.5"><FormDots results={formResults} /></div>
+          </div>
+        </div>
+
         <button
           onClick={() => navigate("/profile/settings")}
-          className="p-2 active:scale-95 transition-transform ml-2"
+          className="absolute bottom-4 right-4 p-1.5 text-muted-foreground active:scale-95"
+          aria-label="Settings"
         >
-          <Settings className="w-5 h-5 text-foreground" />
+          <Settings className="w-4 h-4" />
         </button>
       </motion.section>
 
-      {/* 2 INSIGHT CARDS */}
+      {/* XP POINTS presence */}
       <motion.section
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 gap-2"
+        className="rounded-[18px] px-4.5 p-4 flex items-center justify-between bg-gradient-to-br from-[#FFBF00] to-[#E6A500] text-[#1A2833]"
       >
-        {/* Card 1: Level (primary bg) */}
-        <div className="flex-1 p-3 rounded-[14px] bg-primary text-primary-foreground">
-          <div className="font-display text-[22px] font-black italic leading-[0.95]">
-            {profile?.padel_level ? profile.padel_level.toFixed(1) : "—"}
+        <div>
+          <div className="font-display text-[10px] font-extrabold uppercase tracking-[0.16em] opacity-70">
+            XPLAY Points
           </div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.08em] opacity-70 mt-0.5">Level</div>
-          <div className="text-[9px] opacity-60 mt-1">
-            {profile?.padel_level ? `Cat ${levelToCategory(profile.padel_level)}` : "Unrated"}
+          <div className="flex items-baseline gap-1.5 mt-0.5">
+            <span className="font-mono text-3xl font-bold leading-none">{points.toLocaleString()}</span>
+            <span className="font-display text-base font-black italic">XP</span>
           </div>
-        </div>
-
-        {/* Card 2: Win Rate (ghost card) */}
-        <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
-          <div className="font-display text-[22px] font-black italic leading-[0.95] text-foreground">
-            {winRate}
-          </div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground opacity-70 mt-0.5">Win Rate</div>
-          <div className="text-[9px] text-muted-foreground opacity-60 mt-1">
-            {profile?.total_matches ? `${profile.wins || 0} of ${profile.total_matches}` : "No matches"}
+          <div className="text-[11.5px] font-bold mt-1 opacity-70">
+            worth £{(points / 100).toFixed(2)} · {lifetimeEarned.toLocaleString()} earned all-time
           </div>
         </div>
+        <button
+          onClick={() => navigate("/rewards")}
+          className="bg-[#1A2833] text-primary rounded-xl px-4 py-3 font-display text-xs font-extrabold uppercase tracking-wide active:scale-95 transition-transform"
+        >
+          Rewards →
+        </button>
       </motion.section>
 
-      {/* FORM CHART CARD */}
-      {user && (
-        <motion.section
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-card rounded-[18px] border border-border/[0.07] p-4"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase">
-              Form · Last 90 Days
-            </div>
-            <div className="text-[11px] font-bold text-primary">
-              ▲ Trending up
-            </div>
-          </div>
-          <RatingEvolutionChart userId={user.id} />
-        </motion.section>
-      )}
-
-      {/* 3 COLLAPSED RAILS */}
+      {/* Recent matches */}
       <motion.section
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="space-y-2"
+      >
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] font-black tracking-[0.14em] uppercase text-muted-foreground">
+            Recent matches
+          </span>
+          <button
+            onClick={() => navigate("/matches")}
+            className="text-[11px] font-bold text-primary"
+          >
+            See all
+          </button>
+        </div>
+        {matchesLoading ? (
+          [0, 1, 2].map((i) => (
+            <div key={i} className="h-[58px] rounded-xl bg-muted/40 animate-pulse" />
+          ))
+        ) : recentMatches.length === 0 ? (
+          <div className="bg-card rounded-xl p-5 text-center border border-border/40">
+            <p className="text-sm text-muted-foreground font-medium">No rated matches yet</p>
+          </div>
+        ) : (
+          recentMatches.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 bg-card border border-border/40 rounded-xl px-3.5 py-3">
+              <div
+                className={`w-7 h-7 rounded-md flex-shrink-0 flex items-center justify-center font-mono font-bold text-xs ${
+                  m.result === "win" ? "bg-primary text-primary-foreground" : "bg-[#FF6B35]/20 text-[#FF6B35]"
+                }`}
+              >
+                {m.result === "win" ? "W" : "L"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-[13px] font-bold truncate">vs {m.opponent}</div>
+                <div className="text-[11px] text-muted-foreground truncate">{m.venue} · {m.date}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className={`font-mono text-xs font-bold ${m.result === "win" ? "text-primary" : "text-[#FF6B35]"}`}>
+                  {m.ratingChange}
+                </div>
+                <div className="text-[9px] text-muted-foreground font-bold uppercase">rating</div>
+              </div>
+            </div>
+          ))
+        )}
+      </motion.section>
+
+      {/* Rails */}
+      <motion.section
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
         className="space-y-2"
       >
-        {/* Rail 1: Rating & history */}
-        <button
-          onClick={() => navigate("/matches")}
-          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
-        >
-          <div className="text-[16px]">📊</div>
-          <div className="flex-1 text-left">
-            <div className="text-[13px] font-bold text-foreground">Rating & History</div>
-            <div className="text-[10px] text-muted-foreground mt-[2px]">
-              {profile?.total_matches || 0} matches · {profile?.wins || 0} W · {(profile?.total_matches || 0) - (profile?.wins || 0)} L
+        {[
+          {
+            icon: <BarChart3 className="w-[18px] h-[18px] text-primary" />,
+            title: "Rating & history",
+            sub: `${totalMatches} matches · ${wins} W · ${totalMatches - wins} L`,
+            to: "/matches",
+          },
+          {
+            icon: <CreditCard className="w-[18px] h-[18px] text-primary" />,
+            title: "Payments & subscriptions",
+            sub: "Bookings, orders & receipts",
+            to: "/bookings",
+          },
+          {
+            icon: <Bell className="w-[18px] h-[18px] text-primary" />,
+            title: "Notifications & privacy",
+            sub: "Match alerts · profile visibility",
+            to: "/profile/settings",
+          },
+        ].map((r) => (
+          <button
+            key={r.title}
+            onClick={() => navigate(r.to)}
+            className="w-full flex items-center gap-3 px-4 py-3.5 bg-card border border-border/40 rounded-[14px] active:scale-[0.98] transition-transform text-left"
+          >
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              {r.icon}
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-        </button>
-
-        {/* Rail 2: Payments & subscriptions */}
-        <button
-          onClick={() => navigate("/bookings")}
-          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
-        >
-          <div className="text-[16px]">💳</div>
-          <div className="flex-1 text-left">
-            <div className="text-[13px] font-bold text-foreground">Payments & Subscriptions</div>
-            <div className="text-[10px] text-muted-foreground mt-[2px]">
-              {(profile?.padel_park_points ?? 0).toLocaleString()} XP · Bookings
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold">{r.title}</div>
+              <div className="text-[11.5px] text-muted-foreground truncate">{r.sub}</div>
             </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-        </button>
-
-        {/* Rail 3: Notifications & privacy */}
-        <button
-          onClick={() => navigate("/profile/settings")}
-          className="w-full p-[14px_16px] bg-card/30 rounded-[14px] flex items-center gap-3 border border-border/[0.05] active:scale-[0.98] transition-transform"
-        >
-          <div className="text-[16px]">🔔</div>
-          <div className="flex-1 text-left">
-            <div className="text-[13px] font-bold text-foreground">Notifications & Privacy</div>
-            <div className="text-[10px] text-muted-foreground mt-[2px]">Match reminders on</div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground/30" />
-        </button>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+          </button>
+        ))}
       </motion.section>
 
-      {/* Recent Matches */}
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-sm font-display font-black text-muted-foreground uppercase tracking-widest">Recent Matches</h3>
-          <button className="text-[10px] font-bold text-primary uppercase tracking-widest">View All</button>
-        </div>
-        <div className="space-y-3">
-          {matchesLoading ? (
-            [0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="bg-card/30 rounded-[14px] p-4 space-y-2 animate-pulse"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2 flex-1">
-                    <div className="h-3 w-32 bg-muted rounded" />
-                    <div className="h-4 w-40 bg-muted rounded" />
-                  </div>
-                  <div className="h-5 w-16 bg-muted rounded" />
-                </div>
-              </div>
-            ))
-          ) : recentMatches.length === 0 ? (
-            <div className="bg-card/30 rounded-[14px] p-6 text-center">
-              <p className="text-sm text-muted-foreground font-medium">No matches played yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Join a match to see your history here</p>
-            </div>
-          ) : (
-            recentMatches.map((match, i) => (
-              <motion.div
-                key={match.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.05 }}
-                className="bg-card/30 rounded-[14px] p-4 space-y-2 active:scale-[0.98] transition-transform"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] font-black px-2 py-0.5 rounded italic ${
-                          match.result === "win"
-                            ? "bg-primary/20 text-primary"
-                            : "bg-destructive/20 text-destructive"
-                        }`}
-                      >
-                        {match.result === "win" ? "WIN" : "LOSS"}
-                      </span>
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {match.date}
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-display font-bold tracking-tight">
-                      vs {match.opponent}
-                    </h4>
-                    <p className="text-[10px] text-muted-foreground">{match.venue}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div
-                      className={`font-display font-black text-sm ${
-                        match.result === "win" ? "text-primary" : "text-destructive"
-                      }`}
-                    >
-                      {match.ratingChange}
-                    </div>
-                    <div className="text-[9px] text-muted-foreground font-bold">RATING</div>
-                  </div>
-                </div>
-              </motion.div>
-            ))
-          )}
-        </div>
-      </motion.section>
-
-      {/* Sign Out */}
-      <motion.section
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="pt-4 pb-4"
-      >
+      {/* Sign out */}
+      <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="pt-1 pb-3">
         <button
           onClick={signOut}
-          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-surface-container border border-border/30 hover:bg-surface-container-high transition-colors active:scale-[0.98] text-sm font-semibold"
+          className="w-full py-3.5 rounded-xl border border-[#FF6B35]/25 text-[#FF6B35] font-display font-extrabold text-xs uppercase tracking-[0.06em] active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
         >
-          <LogOut className="w-4 h-4 text-muted-foreground" />
+          <LogOut className="w-3.5 h-3.5" />
           Sign out
         </button>
       </motion.section>
+
+      {/* ── PR2 · shareable player card sheet ──────────────────── */}
+      <AnimatePresence>
+        {shareOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShareOpen(false)}
+              className="fixed inset-0 bg-black/70 z-50"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed left-0 right-0 bottom-0 top-20 z-50 bg-background rounded-t-[28px] border-t border-border/40 p-5 pb-7 flex flex-col"
+            >
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mb-4" />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-xl font-black italic uppercase">Your player card</h3>
+                <button onClick={() => setShareOpen(false)} className="p-1.5 text-muted-foreground" aria-label="Close">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* THE CARD */}
+              <div className="flex-1 rounded-[22px] relative overflow-hidden border border-primary/25 p-5 bg-gradient-to-br from-[#5924C6] via-[#0D1820] to-[#1A2833]">
+                <div className="absolute -right-8 -bottom-14 opacity-10 pointer-events-none select-none">
+                  <span className="font-display font-black italic text-primary leading-[0.7]" style={{ fontSize: 260 }}>
+                    {level}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start relative">
+                  <img src={xplayLogo} alt="XPLAY" className="h-7 w-auto object-contain" />
+                  <span className="font-mono text-[10px] text-white/50">{memberNo}</span>
+                </div>
+                <div className="mt-6 relative">
+                  <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-br from-primary to-[#5924C6]">
+                    <Avatar className="w-full h-full">
+                      <AvatarImage src={profile?.avatar_url || ""} className="object-cover" />
+                      <AvatarFallback className="font-display text-xl font-black italic bg-[#1A2833] text-primary">
+                        {profile?.display_name?.[0]?.toUpperCase() || "P"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                  <div className="font-display text-[32px] font-black italic uppercase text-white leading-[0.95] mt-3.5">
+                    {profile?.display_name || "Player"}
+                  </div>
+                  <div className="text-xs text-white/60 mt-1.5">
+                    {[profile?.location, profile?.preferred_club].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <div className="absolute left-5 right-5 bottom-5">
+                  <div className="flex gap-2.5">
+                    {[
+                      { l: "Level", v: level, c: "text-primary" },
+                      { l: "Win rate", v: winRate, c: "text-white" },
+                      { l: "Streak", v: streak > 0 ? `${streak}W` : "—", c: "text-amber-400" },
+                    ].map((s) => (
+                      <div key={s.l} className="flex-1 bg-white/[0.06] border border-white/10 rounded-[14px] px-3 py-2.5">
+                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-white/50">{s.l}</div>
+                        <div className={`font-mono text-2xl font-bold leading-tight ${s.c}`}>{s.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <FormDots results={formResults} size={20} />
+                    <span className="text-[11px] text-white/50">last 5 · play on XPLAY</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* actions */}
+              <div className="flex gap-2.5 mt-4">
+                <button
+                  onClick={handleNativeShare}
+                  className="flex-1 bg-primary text-primary-foreground rounded-[13px] py-3.5 font-display font-black italic text-sm uppercase tracking-wide active:scale-[0.98] transition-transform"
+                >
+                  Share
+                </button>
+                <button
+                  onClick={handleNativeShare}
+                  className="w-[52px] rounded-[13px] bg-muted flex items-center justify-center active:scale-95 transition-transform"
+                  aria-label="More share options"
+                >
+                  <Download className="w-5 h-5 text-foreground" />
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
