@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Save, Lock, PlayCircle, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Camera, Save, Lock, PlayCircle, ChevronRight, Trash2, AlertTriangle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -330,6 +330,18 @@ const ProfileSettings = () => {
           </button>
         ))}
       </div>
+
+      {/* ── Sign out ── */}
+      <button
+        onClick={async () => { await signOut(); navigate("/auth"); }}
+        className="w-full flex items-center justify-between p-4 rounded-2xl bg-surface-container border border-border/30 hover:bg-surface-container-high transition-colors active:scale-[0.98]"
+      >
+        <div className="flex items-center gap-3">
+          <LogOut className="w-4 h-4 text-muted-foreground" />
+          <p className="text-sm font-semibold">Sign out</p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
 
       {/* ── Danger zone — Apple 5.1.1(v) requires in-app account deletion ── */}
       <div className="space-y-2 pt-2">

@@ -379,8 +379,9 @@ const Profile = () => {
       >
         <button
           onClick={signOut}
-          className="text-[11px] text-muted-foreground/60 font-semibold active:scale-95 transition-transform"
+          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-surface-container border border-border/30 hover:bg-surface-container-high transition-colors active:scale-[0.98] text-sm font-semibold"
         >
+          <LogOut className="w-4 h-4 text-muted-foreground" />
           Sign out
         </button>
       </motion.section>
