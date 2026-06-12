@@ -497,13 +497,18 @@ const Matches = () => {
               const hours = Math.floor(diff / (1000 * 60 * 60));
               const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
               return (
-                <motion.div
+                <motion.button
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-[22px] bg-primary p-5 space-y-2"
+                  onClick={() => navigate(`/matches/${nextMatch.id}`)}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full text-left rounded-[22px] bg-primary p-5 space-y-2 cursor-pointer hover:brightness-105 transition-[filter]"
                 >
-                  <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
-                    ● YOUR NEXT · IN {`${hours}H ${mins}M`}
+                  <div className="flex items-center justify-between">
+                    <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
+                      ● YOUR NEXT · IN {`${hours}H ${mins}M`}
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-primary-foreground/60">View →</span>
                   </div>
                   <div className="font-display text-[26px] font-black italic uppercase text-primary-foreground leading-tight">
                     {nextMatch.match_time?.slice(0, 5) ?? "TBD"} · COURT {nextMatch.court || "?"}
@@ -511,7 +516,7 @@ const Matches = () => {
                   <div className="text-[11px] font-semibold text-primary-foreground/75">
                     {nextMatch.club} · {nextMatch.format} · {nextMatch.playerCount} confirmed
                   </div>
-                </motion.div>
+                </motion.button>
               );
             })()}
 

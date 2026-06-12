@@ -91,7 +91,22 @@ const ProfileSettings = () => {
     }
 
     const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-    setForm((prev) => ({ ...prev, avatar_url: data.publicUrl }));
+    // cache-bust so the new image shows immediately (same path on re-upload)
+    const url = `${data.publicUrl}?v=${Date.now()}`;
+    setForm((prev) => ({ ...prev, avatar_url: url }));
+
+    // Persist IMMEDIATELY — previously the new photo only saved if the user
+    // also tapped "Save Changes", so it vanished on navigation (bug report 12 Jun)
+    const { error: persistError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: url })
+      .eq("user_id", user.id);
+    if (persistError) {
+      toast({ title: "Couldn't save photo", description: persistError.message, variant: "destructive" });
+    } else {
+      await refreshProfile();
+      toast({ title: "Photo updated" });
+    }
     setUploading(false);
   };
 

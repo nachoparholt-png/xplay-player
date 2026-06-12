@@ -255,14 +255,14 @@ const CourtFinder = () => {
         </div>
       )}
 
-      {/* date chips */}
-      <div className="flex gap-2">
-        {[0, 1, 2].map((d) => (
+      {/* date chips — full week (collector holds 7 days of availability) */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {[0, 1, 2, 3, 4, 5, 6].map((d) => (
           <button
             key={d}
             onClick={() => setDayOffset(d)}
             className={cn(
-              "flex-1 py-2.5 rounded-xl text-center transition-colors",
+              "flex-shrink-0 min-w-[76px] py-2.5 px-3 rounded-xl text-center transition-colors",
               dayOffset === d ? "bg-primary text-primary-foreground" : "bg-muted/40 border border-border/40 text-foreground/80"
             )}
           >
@@ -270,9 +270,6 @@ const CourtFinder = () => {
             <div className="font-mono text-[10px] opacity-70 mt-0.5">{format(addDays(new Date(), d), "d MMM")}</div>
           </button>
         ))}
-        <div className="w-11 rounded-xl bg-muted/40 border border-border/40 flex items-center justify-center">
-          <Calendar className="w-4 h-4 text-foreground/60" />
-        </div>
       </div>
 
       {/* time windows */}

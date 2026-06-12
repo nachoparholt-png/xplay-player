@@ -30,13 +30,28 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
   };
 
   const handleShare = async () => {
-    if (navigator.share && referralLink) {
-      try {
-        await navigator.share({ title: "Join XPLAY", text: "Join me on XPLAY — compete, earn XP, and win rewards. Sign up with my link:", url: referralLink });
-      } catch { /* ignore */ }
-    } else {
-      handleCopy();
+    if (!referralLink) return;
+    const payload = { title: "Join XPLAY", text: "Join me on XPLAY — compete, earn XP, and win rewards. Sign up with my link:", url: referralLink };
+    // 1) Native share sheet (WhatsApp etc.) via Capacitor plugin, if installed
+    try {
+      const cap = await import("@capacitor/share");
+      await cap.Share.share(payload);
+      return;
+    } catch (e) {
+      if (e instanceof Error && /cancel/i.test(e.message)) return; // user dismissed sheet
+      // plugin not installed → fall through
     }
+    // 2) Web Share API where available
+    try {
+      if (navigator.share) {
+        await navigator.share(payload);
+        return;
+      }
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return; // user dismissed
+    }
+    // 3) Guaranteed fallback: copy + visible toast
+    handleCopy();
   };
 
   return (

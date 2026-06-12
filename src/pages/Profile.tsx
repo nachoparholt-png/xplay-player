@@ -183,136 +183,35 @@ const Profile = () => {
   const handleNativeShare = async () => {
     const text = `My XPLAY player card — Level ${level}, ${winRate} win rate${streak > 1 ? `, ${streak}W streak` : ""}. Find me on court ⚡`;
     const url = "https://xplay-player.vercel.app";
+    // 1) native share sheet via Capacitor plugin
+    try {
+      const cap = await import("@capacitor/share");
+      await cap.Share.share({ title: "My XPLAY player card", text, url });
+      return;
+    } catch (e) {
+      if (e instanceof Error && /cancel/i.test(e.message)) return;
+    }
+    // 2) Web Share API
     try {
       if (navigator.share) {
         await navigator.share({ title: "My XPLAY player card", text, url });
-      } else {
-        await navigator.clipboard.writeText(`${text} ${url}`);
-        toast({ title: "Copied to clipboard" });
+        return;
       }
-    } catch {
-      /* user cancelled */
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
     }
+    // 3) guaranteed fallback
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    toast({ title: "Copied to clipboard", description: "Paste it anywhere to share." });
   };
 
-  /* ── PR4 · new-player empty state ───────────────────────────── */
-  if (isNewPlayer) {
-    return (
-      <div className="px-4 py-5 space-y-4">
-        {/* fresh player card */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-[22px] p-5 bg-gradient-to-br from-surface-container to-background border border-border/40 relative overflow-hidden"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-muted/40 border-2 border-dashed border-primary/40 flex items-center justify-center flex-shrink-0">
-              <span className="font-display text-2xl font-black italic text-foreground/50">
-                {profile?.display_name?.[0]?.toUpperCase() || "P"}
-              </span>
-            </div>
-            <div className="min-w-0">
-              <h2 className="font-display text-[22px] font-black italic uppercase leading-none truncate">
-                {profile?.display_name || "Player"}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                {profile?.location || "—"} · new player
-              </p>
-              <span className="inline-flex items-center gap-1.5 mt-2 bg-primary/10 rounded-full px-2.5 py-1">
-                <Zap className="w-3 h-3 text-primary fill-primary" />
-                <span className="font-mono text-[11px] font-bold text-primary">
-                  Level {level} · confirmed after 1st match
-                </span>
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate("/profile/settings")}
-            className="absolute top-4 right-4 p-2 text-muted-foreground active:scale-95"
-            aria-label="Settings"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-        </motion.div>
-
-        {/* primary push */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="rounded-[20px] p-6 text-center bg-gradient-to-br from-primary to-[#A8D648] text-primary-foreground"
-        >
-          <h3 className="font-display text-2xl font-black italic uppercase leading-[0.95]">
-            Play your first
-            <br />
-            match to begin
-          </h3>
-          <p className="text-xs font-semibold mt-2 opacity-75">
-            Your level, form and stats unlock the moment you step on court.
-          </p>
-          <button
-            onClick={() => navigate("/matches")}
-            className="mt-4 w-full bg-[#1A2833] text-primary rounded-xl py-3.5 font-display font-extrabold text-sm uppercase tracking-wide active:scale-[0.98] transition-transform"
-          >
-            Find a match →
-          </button>
-        </motion.div>
-
-        {/* first-week missions */}
-        <div className="px-1 pt-1">
-          <span className="text-[11px] font-black tracking-[0.14em] uppercase text-muted-foreground">
-            First-week missions · +75 XP bonus
-          </span>
-        </div>
-        <div className="space-y-2">
-          {[
-            { label: "Complete your profile", xp: "+20", done: !!profile?.onboarding_completed },
-            { label: "Join your first match", xp: "+30", done: false },
-            { label: "Invite a friend", xp: "+25", done: false },
-          ].map((m) => (
-            <div
-              key={m.label}
-              className={`flex items-center gap-3 rounded-[14px] px-3.5 py-3 border ${
-                m.done ? "bg-green-500/10 border-green-500/30" : "bg-card border-border/40"
-              }`}
-            >
-              <div
-                className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center ${
-                  m.done ? "bg-green-500" : "bg-muted border-2 border-border"
-                }`}
-              >
-                {m.done && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-              </div>
-              <span
-                className={`flex-1 text-[13px] font-bold ${
-                  m.done ? "text-foreground/50 line-through" : "text-foreground"
-                }`}
-              >
-                {m.label}
-              </span>
-              <span className="font-mono text-xs font-bold text-primary">{m.xp} XP</span>
-            </div>
-          ))}
-        </div>
-
-        {/* XP starter */}
-        <div className="rounded-2xl px-4 py-3.5 bg-amber-400/10 border border-amber-400/30 flex items-center gap-3">
-          <Zap className="w-5 h-5 text-amber-400 fill-amber-400 flex-shrink-0" />
-          <p className="text-xs text-foreground/85 leading-relaxed">
-            You've got <b className="text-amber-400">{points.toLocaleString()} XP</b> to start ·
-            worth £{(points / 100).toFixed(2)} in rewards
-          </p>
-        </div>
-
-        <button
-          onClick={signOut}
-          className="w-full py-3.5 rounded-xl border border-[#FF6B35]/25 text-[#FF6B35] font-display font-extrabold text-xs uppercase tracking-[0.06em] active:scale-[0.98] transition-transform"
-        >
-          Sign out
-        </button>
-      </div>
-    );
-  }
+  // PR4 adjusted per Ignacio (12 Jun): stats stay VISIBLE for new players
+  // (zeroed strip in the hero) — only the lower sections swap to missions/push.
+  const missions = [
+    { label: "Complete your profile", xp: "+20", done: !!profile?.onboarding_completed },
+    { label: "Join your first match", xp: "+30", done: totalMatches > 0 },
+    { label: "Invite a friend", xp: "+25", done: false },
+  ];
 
   /* ── PR1 · player-card profile home ─────────────────────────── */
   return (
@@ -413,6 +312,45 @@ const Profile = () => {
           Rewards →
         </button>
       </motion.section>
+
+      {/* New player: first-match push + missions (stats above stay visible, zeroed) */}
+      {isNewPlayer && (
+        <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="space-y-3">
+          <div className="rounded-[20px] p-5 text-center bg-gradient-to-br from-primary to-[#A8D648] text-primary-foreground">
+            <h3 className="font-display text-xl font-black italic uppercase leading-[0.95]">
+              Play your first match to begin
+            </h3>
+            <p className="text-xs font-semibold mt-1.5 opacity-75">
+              Your win rate, form and history fill in the moment you step on court.
+            </p>
+            <button
+              onClick={() => navigate("/matches")}
+              className="mt-3.5 w-full bg-[#1A2833] text-primary rounded-xl py-3 font-display font-extrabold text-sm uppercase tracking-wide active:scale-[0.98] transition-transform"
+            >
+              Find a match →
+            </button>
+          </div>
+          <div className="px-1">
+            <span className="text-[11px] font-black tracking-[0.14em] uppercase text-muted-foreground">
+              First-week missions · +75 XP bonus
+            </span>
+          </div>
+          {missions.map((m) => (
+            <div
+              key={m.label}
+              className={`flex items-center gap-3 rounded-[14px] px-3.5 py-3 border ${
+                m.done ? "bg-green-500/10 border-green-500/30" : "bg-card border-border/40"
+              }`}
+            >
+              <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center ${m.done ? "bg-green-500" : "bg-muted border-2 border-border"}`}>
+                {m.done && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+              </div>
+              <span className={`flex-1 text-[13px] font-bold ${m.done ? "text-foreground/50 line-through" : "text-foreground"}`}>{m.label}</span>
+              <span className="font-mono text-xs font-bold text-primary">{m.xp} XP</span>
+            </div>
+          ))}
+        </motion.section>
+      )}
 
       {/* Recent matches */}
       <motion.section

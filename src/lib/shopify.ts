@@ -140,6 +140,15 @@ export async function storefrontApiRequest(query: string, variables: Record<stri
   const data = await response.json();
 
   if (data.errors) {
+    // GraphQL can return PARTIAL errors (e.g. a field denied by token scope)
+    // alongside perfectly usable data. Only treat it as fatal when there is
+    // no data at all — otherwise warn and return what we got.
+    // (This was the "Product not found" bug: quantityAvailable ACCESS_DENIED
+    // threw away an otherwise complete product response.)
+    if (data.data && Object.values(data.data).some((v) => v != null)) {
+      console.warn("Shopify partial errors:", data.errors.map((e: { message: string }) => e.message).join(", "));
+      return data;
+    }
     throw new Error(`Shopify error: ${data.errors.map((e: { message: string }) => e.message).join(', ')}`);
   }
 
@@ -237,7 +246,6 @@ export const PRODUCT_BY_HANDLE_QUERY = `
               currencyCode
             }
             availableForSale
-            quantityAvailable
             selectedOptions {
               name
               value
