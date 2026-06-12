@@ -151,7 +151,8 @@ const CourtFinder = () => {
     const { data, error } = await supabase.from("matches").insert({
       organizer_id: user.id,
       club: slot.club_name,
-      court: slot.court_label,
+      // Playtomic court labels are resource UUIDs — don't surface those as court names
+      court: slot.court_label && !/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(slot.court_label) ? slot.court_label : null,
       match_date: format(start, "yyyy-MM-dd"),
       match_time: format(start, "HH:mm"),
       format: "social",
