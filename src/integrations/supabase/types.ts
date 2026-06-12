@@ -3262,14 +3262,23 @@ export type Database = {
       match_visibility: "public" | "private"
       message_type: "user_message" | "system_message"
       points_transaction_type:
-        | "earned"
-        | "staked"
-        | "won"
-        | "lost"
-        | "refunded"
-        | "manual_adjustment"
-        | "admin_correction"
+        | "earn"
+        | "spend"
+        | "admin_credit"
+        | "admin_debit"
+        | "stake"
+        | "stake_win"
+        | "stake_refund"
         | "purchase"
+        | "referral"
+        | "play_match"
+        | "win_match_bonus"
+        | "complete_profile"
+        | "daily_check_in"
+        | "weekly_streak"
+        | "referral_complete"
+        | "tournament_play"
+        | "xplay_pro_multiplier"
       stake_status: "active" | "won" | "lost" | "settled" | "cancelled"
       tournament_format: "groups" | "americano" | "king_of_court"
       tournament_player_status: "confirmed" | "cancelled"
@@ -3433,14 +3442,23 @@ export const Constants = {
       match_visibility: ["public", "private"],
       message_type: ["user_message", "system_message"],
       points_transaction_type: [
-        "earned",
-        "staked",
-        "won",
-        "lost",
-        "refunded",
-        "manual_adjustment",
-        "admin_correction",
+        "earn",
+        "spend",
+        "admin_credit",
+        "admin_debit",
+        "stake",
+        "stake_win",
+        "stake_refund",
         "purchase",
+        "referral",
+        "play_match",
+        "win_match_bonus",
+        "complete_profile",
+        "daily_check_in",
+        "weekly_streak",
+        "referral_complete",
+        "tournament_play",
+        "xplay_pro_multiplier",
       ],
       stake_status: ["active", "won", "lost", "settled", "cancelled"],
       tournament_format: ["groups", "americano", "king_of_court"],

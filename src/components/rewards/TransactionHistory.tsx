@@ -14,14 +14,26 @@ interface TransactionHistoryProps {
   transactions: Transaction[];
 }
 
+// Labels for the REAL points_transaction_type enum values
+// (earn/spend/admin_credit/... — the old keys never matched the DB enum)
 const typeLabels: Record<string, string> = {
-  earned: "Earned",
-  staked: "Points held",
-  won: "Won",
-  lost: "Lost",
-  refunded: "Refunded",
-  manual_adjustment: "Adjustment",
-  admin_correction: "Correction",
+  earn: "Earned",
+  spend: "Redeemed",
+  admin_credit: "Adjustment",
+  admin_debit: "Adjustment",
+  stake: "Points held",
+  stake_win: "Points won",
+  stake_refund: "Refunded",
+  purchase: "Purchased",
+  referral: "Referral",
+  play_match: "Match played",
+  win_match_bonus: "Win bonus",
+  complete_profile: "Profile complete",
+  daily_check_in: "Daily check-in",
+  weekly_streak: "Weekly streak",
+  referral_complete: "Referral",
+  tournament_play: "Tournament",
+  xplay_pro_multiplier: "Pro bonus",
 };
 
 const TransactionHistory = ({ transactions }: TransactionHistoryProps) => {

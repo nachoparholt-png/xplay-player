@@ -642,7 +642,7 @@ const MatchDetail = () => {
           await supabase.from("profiles").update({ padel_park_points: newBalance }).eq("user_id", stake.user_id);
           await supabase.from("points_transactions").insert({
             user_id: stake.user_id,
-            transaction_type: "refunded",
+            transaction_type: "stake_refund", // enum has no 'refunded' — insert silently failed before
             amount: stake.points_staked,
             balance_before: prof.padel_park_points,
             balance_after: newBalance,

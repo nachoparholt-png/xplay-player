@@ -95,7 +95,7 @@ const CancelRegistrationModal = ({
 
         await supabase.from("points_transactions").insert({
           user_id: user.id,
-          transaction_type: "refunded",
+          transaction_type: "stake_refund", // enum has no 'refunded' — insert silently failed before
           amount: activeStake.points_staked,
           balance_before: profile.padel_park_points,
           balance_after: newBalance,

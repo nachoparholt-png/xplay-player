@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Camera, Save, Lock, PlayCircle, ChevronRight } from "lucide-react";
+import { ArrowLeft, Camera, Save, Lock, PlayCircle, ChevronRight, Trash2, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,13 +15,36 @@ import { useTour } from "@/contexts/TourContext";
 
 
 const ProfileSettings = () => {
-  const { profile, user, refreshProfile } = useAuth();
+  const { profile, user, refreshProfile, signOut } = useAuth();
   const levelAlreadySet = profile?.padel_level != null;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { startTour } = useTour();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  // Apple 5.1.1(v) + Privacy Policy §7 — permanent account deletion
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE" || deleting) return;
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account", {
+        body: { confirm: "DELETE" },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Account deleted", description: "Your account and personal data have been removed." });
+      await signOut();
+      navigate("/auth");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Please try again or contact support.";
+      toast({ title: "Couldn't delete account", description: message, variant: "destructive" });
+      setDeleting(false);
+    }
+  };
 
   const [form, setForm] = useState({
     display_name: "",
@@ -306,6 +329,69 @@ const ProfileSettings = () => {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
         ))}
+      </div>
+
+      {/* ── Danger zone — Apple 5.1.1(v) requires in-app account deletion ── */}
+      <div className="space-y-2 pt-2">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Danger zone</p>
+        {!deleteOpen ? (
+          <button
+            onClick={() => setDeleteOpen(true)}
+            className="w-full flex items-center justify-between p-4 rounded-2xl bg-destructive/5 border border-destructive/20 hover:bg-destructive/10 transition-colors active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              <p className="text-sm font-semibold text-destructive">Delete account</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-destructive/60" />
+          </button>
+        ) : (
+          <div className="p-4 rounded-2xl bg-destructive/5 border border-destructive/30 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold">Delete your account permanently?</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  This removes your profile, personal data and sign-in immediately and cannot be
+                  undone. Unredeemed XPLAY Points are forfeited. Transaction records are kept in
+                  anonymised form where the law requires it.
+                </p>
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] text-muted-foreground font-medium mb-1.5 block">
+                Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm
+              </label>
+              <Input
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+                placeholder="DELETE"
+                className="h-11 rounded-xl bg-muted border-destructive/30 font-mono"
+                autoCapitalize="characters"
+                autoCorrect="off"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setDeleteOpen(false); setDeleteConfirmText(""); }}
+                disabled={deleting}
+                className="flex-1 h-11 rounded-xl font-semibold"
+              >
+                Keep my account
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== "DELETE" || deleting}
+                className="flex-1 h-11 rounded-xl font-semibold gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? "Deleting…" : "Delete forever"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
