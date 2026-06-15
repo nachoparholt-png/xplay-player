@@ -10,7 +10,7 @@
  */
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Settings, LogOut, Share2, Zap, BarChart3, CreditCard, Bell, Check, X, Download } from "lucide-react";
+import { ChevronRight, Settings, LogOut, Share2, BarChart3, CreditCard, Bell, Check, X, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -176,7 +176,6 @@ const Profile = () => {
   const level = profile?.padel_level ? profile.padel_level.toFixed(1) : "—";
   const points = profile?.padel_park_points ?? 0;
   const lifetimeEarned = profile?.lifetime_earned ?? points;
-  const memberNo = user ? `#${user.id.replace(/-/g, "").slice(0, 4).toUpperCase()}` : "#----";
   const isNewPlayer = totalMatches === 0;
 
   const formResults: ("W" | "L")[] = recentMatches
@@ -254,10 +253,6 @@ const Profile = () => {
             <p className="text-xs text-muted-foreground mt-1 truncate">
               {[profile?.location, profile?.preferred_club].filter(Boolean).join(" · ") || "—"}
             </p>
-            <span className="inline-flex items-center gap-1.5 mt-1.5 bg-primary/10 rounded-full px-2.5 py-0.5">
-              <Zap className="w-3 h-3 text-primary fill-primary" />
-              <span className="font-mono text-[11px] font-bold text-primary">Member {memberNo}</span>
-            </span>
           </div>
         </div>
 
@@ -503,7 +498,6 @@ const Profile = () => {
                 </div>
                 <div className="flex justify-between items-start relative">
                   <img src={xplayLogo} alt="XPLAY" className="h-7 w-auto object-contain" />
-                  <span className="font-mono text-[10px] text-white/50">{memberNo}</span>
                 </div>
                 <div className="mt-6 relative">
                   <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-br from-primary to-[#5924C6]">

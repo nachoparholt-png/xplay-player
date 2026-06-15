@@ -25,3 +25,7 @@ dist-ssr
 .vercel
 .env
 .env*.local
+
+# build cache junk
+vite.config.ts.timestamp-*
+vitest.config.ts.timestamp-*
