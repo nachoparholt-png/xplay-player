@@ -204,6 +204,33 @@ export default function MyMatchTab(props: MyMatchTabProps) {
               </button>
             </div>
 
+            {/* Enter score — players self-report the result of their own in-progress match
+                (was previously only available after the match flipped to awaiting_score/completed,
+                which left players with no way to report a live match themselves). */}
+            {nextMatch.status === 'in_progress' && (
+              <div style={{ marginTop: 14 }}>
+                <button
+                  onClick={() => onUploadScore(nextMatch)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    width: '100%',
+                    background: XP.navy, color: XP.lime, borderRadius: 12,
+                    padding: '10px 14px', height: 44,
+                    fontFamily: "'Lexend', sans-serif", fontWeight: 900, fontStyle: 'italic',
+                    textTransform: 'uppercase', fontSize: 13, letterSpacing: '.04em',
+                    border: `1.5px solid ${XP.lime}`, cursor: 'pointer',
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 11l3 3L22 4" />
+                    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                  </svg>
+                  Enter score
+                </button>
+              </div>
+            )}
+
             {/* Help button / pill */}
             <div style={{ marginTop: 14 }}>
               {myOpenHelp ? (
