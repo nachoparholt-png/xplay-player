@@ -25,12 +25,15 @@ function todayISO(): string {
 }
 
 export function useDailyCheckIn(): void {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const firedRef = useRef(false);
 
   useEffect(() => {
     if (!LOYALTY_ENABLED) return;
     if (!session?.user?.id) return;
+    // No points before the user has accepted the ToS and finished onboarding —
+    // otherwise brand-new signups get awarded on the age-gate screen.
+    if (!profile?.onboarding_completed) return;
     if (firedRef.current) return;
 
     const userId = session.user.id;
@@ -52,5 +55,5 @@ export function useDailyCheckIn(): void {
         }
         localStorage.setItem(key, today);
       });
-  }, [session?.user?.id]);
+  }, [session?.user?.id, profile?.onboarding_completed]);
 }

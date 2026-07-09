@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Sparkles, Trophy, MessageSquare, Zap, Gift, Check, BarChart3, Globe } from "lucide-react";
@@ -8,6 +8,8 @@ import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+// Single source of truth for the ToS version — stamped onto profiles at acceptance.
+import { TERMS_VERSION } from "@/pages/Terms";
 
 /* ── Quiz Data ── */
 
@@ -75,13 +77,44 @@ const slideVariants = {
 
 /* ── Age gate + terms acceptance (WS2 — design ref: handoff O1) ── */
 
-const TERMS_VERSION = "2026-06-11";
+/** Age (in whole years) from an ISO date string or Date, UTC-based. */
+function ageFromDob(dob: Date | string): number {
+  const d = typeof dob === "string" ? new Date(dob) : dob;
+  const now = new Date();
+  let age = now.getUTCFullYear() - d.getUTCFullYear();
+  const monthDiff = now.getUTCMonth() - d.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < d.getUTCDate())) age--;
+  return age;
+}
+
+/** Persistent under-18 block screen. Offers sign-out so the user isn't stuck. */
+function UnderageBlock({ onSignOut }: { onSignOut: () => void }) {
+  return (
+    <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center">
+      <div className="w-20 h-20 rounded-3xl bg-destructive/15 flex items-center justify-center mb-8">
+        <Sparkles className="w-10 h-10 text-destructive" />
+      </div>
+      <h1 className="font-display text-[28px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
+        See you<br />in a few years
+      </h1>
+      <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs mb-10">
+        XPLAY is for players aged 18 and over, so we can't set up your account today. Thanks
+        for your interest — we'd love to see you on court when you're 18.
+      </p>
+      <Button variant="outline" onClick={onSignOut} className="h-11 rounded-xl font-bold text-sm px-8">
+        Sign out
+      </Button>
+    </motion.div>
+  );
+}
 
 function AgeTermsStep({
   onContinue,
+  onUnderage,
   saving,
 }: {
   onContinue: (dobISO: string) => void;
+  onUnderage: (dobISO: string) => void;
   saving: boolean;
 }) {
   const [dd, setDd] = useState("");
@@ -90,7 +123,6 @@ function AgeTermsStep({
   const [confirm18, setConfirm18] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [underage, setUnderage] = useState(false);
 
   const parseDob = (): Date | null => {
     const d = parseInt(dd, 10);
@@ -103,14 +135,6 @@ function AgeTermsStep({
     return date;
   };
 
-  const ageFrom = (dob: Date): number => {
-    const now = new Date();
-    let age = now.getUTCFullYear() - dob.getUTCFullYear();
-    const monthDiff = now.getUTCMonth() - dob.getUTCMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && now.getUTCDate() < dob.getUTCDate())) age--;
-    return age;
-  };
-
   const handleContinue = () => {
     setError(null);
     const dob = parseDob();
@@ -118,31 +142,16 @@ function AgeTermsStep({
       setError("Please enter a valid date of birth.");
       return;
     }
-    if (ageFrom(dob) < 18) {
-      setUnderage(true);
+    const dobISO = dob.toISOString().slice(0, 10);
+    if (ageFromDob(dob) < 18) {
+      // Persist the failed DOB so a page reload can't bypass the gate.
+      onUnderage(dobISO);
       return;
     }
-    onContinue(dob.toISOString().slice(0, 10));
+    onContinue(dobISO);
   };
 
   const canContinue = dd && mm && yyyy && confirm18 && acceptTerms && !saving;
-
-  if (underage) {
-    return (
-      <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center">
-        <div className="w-20 h-20 rounded-3xl bg-destructive/15 flex items-center justify-center mb-8">
-          <Sparkles className="w-10 h-10 text-destructive" />
-        </div>
-        <h1 className="font-display text-[28px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
-          See you<br />in a few years
-        </h1>
-        <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
-          XPLAY is for players aged 18 and over, so we can't set up your account today. Thanks
-          for your interest — we'd love to see you on court when you're 18.
-        </p>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col px-6 py-12 min-h-[80vh] justify-center max-w-md mx-auto w-full">
@@ -755,11 +764,38 @@ type Step = "age-terms" | "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "external
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { user, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
 
   const [step, setStep] = useState<Step>("age-terms");
   const [savingAgeTerms, setSavingAgeTerms] = useState(false);
+  // Persistent under-18 block: once a failing DOB is on the profile, the gate
+  // can't be bypassed by reloading and re-entering a different date.
+  const [underageBlocked, setUnderageBlocked] = useState(
+    () => !!profile?.date_of_birth && ageFromDob(profile.date_of_birth) < 18
+  );
+
+  useEffect(() => {
+    if (profile?.date_of_birth && ageFromDob(profile.date_of_birth) < 18) {
+      setUnderageBlocked(true);
+    }
+  }, [profile?.date_of_birth]);
+
+  const handleUnderage = async (dobISO: string) => {
+    setUnderageBlocked(true);
+    if (!user) return;
+    // Save the DOB (without terms acceptance) so the block persists across reloads.
+    await supabase
+      .from("profiles")
+      .update({ date_of_birth: dobISO })
+      .eq("user_id", user.id);
+    refreshProfile();
+  };
+
+  const handleUnderageSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [recommendedLevel, setRecommendedLevel] = useState(3.0);
   const [selectedLevel, setSelectedLevel] = useState(3.0);
@@ -898,8 +934,11 @@ const Onboarding = () => {
   return (
     <div className="min-h-screen bg-background overflow-y-auto">
       <AnimatePresence mode="wait">
-        {step === "age-terms" && (
-          <AgeTermsStep key="age-terms" onContinue={handleAgeTerms} saving={savingAgeTerms} />
+        {underageBlocked && (
+          <UnderageBlock key="underage-block" onSignOut={handleUnderageSignOut} />
+        )}
+        {!underageBlocked && step === "age-terms" && (
+          <AgeTermsStep key="age-terms" onContinue={handleAgeTerms} onUnderage={handleUnderage} saving={savingAgeTerms} />
         )}
         {step === "welcome" && (
           <WelcomeStep key="welcome" onNext={() => setStep("quiz-0")} />
