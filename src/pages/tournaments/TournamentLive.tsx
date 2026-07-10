@@ -7,7 +7,7 @@
  * coordinates the Help, Opponent-Stats, and Score-Upload sheets.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,7 +38,14 @@ export default function TournamentLive() {
   const [helps,      setHelps]      = useState<HelpRequestRow[]>([]);
   const [loading,    setLoading]    = useState(true);
 
-  const [tab, setTab] = useState<LiveTabId>('match');
+  /* Deep-linkable tab (e.g. /tournaments/:id/live?tab=bracket from the
+     bracket shortcut on TournamentDetail) */
+  const [searchParams] = useSearchParams();
+  const initialTab = (['match', 'schedule', 'bracket', 'stats'] as LiveTabId[])
+    .includes(searchParams.get('tab') as LiveTabId)
+    ? (searchParams.get('tab') as LiveTabId)
+    : 'match';
+  const [tab, setTab] = useState<LiveTabId>(initialTab);
 
   /* Sheets */
   const [helpMatch,    setHelpMatch]    = useState<TMatchRow | null>(null);
@@ -341,6 +348,27 @@ export default function TournamentLive() {
           cursor: 'pointer',
         }}>
         <ArrowLeft size={18} />
+      </button>
+
+      {/* Bracket shortcut — always visible top-right, Apple Sports style */}
+      <button
+        onClick={() => setTab('bracket')}
+        aria-label="Open bracket"
+        style={{
+          position: 'fixed', top: 'max(14px, env(safe-area-inset-top))', right: 12, zIndex: 30,
+          width: 36, height: 36, borderRadius: 18,
+          background: tab === 'bracket' ? 'rgba(205,255,101,.18)' : 'rgba(0,0,0,.35)',
+          border: tab === 'bracket' ? '1px solid rgba(205,255,101,.45)' : '1px solid rgba(255,255,255,.1)',
+          color: tab === 'bracket' ? XP.lime : 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', transition: 'background .2s ease, border-color .2s ease',
+        }}>
+        {/* mini bracket glyph */}
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 6h5M3 18h5M8 6v4M8 18v-4M8 12h6" />
+          <circle cx="18" cy="12" r="2.6" />
+        </svg>
       </button>
 
       <TournHeader

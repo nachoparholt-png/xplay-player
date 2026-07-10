@@ -328,6 +328,21 @@ const TournamentDetail = () => {
           {STAKES_ENABLED && hasBetConfig && (
             <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Betting</Badge>
           )}
+          {/* Bracket shortcut — always available once the tournament is published
+              (Apple Sports-style header button, deep-links to the bracket tab) */}
+          {tournament.status !== "draft" && (
+            <button
+              onClick={() => navigate(`/tournaments/${tournament.id}/live?tab=bracket`)}
+              aria-label="Open bracket"
+              className="w-8 h-8 rounded-[10px] bg-card flex items-center justify-center hover:bg-card/80 transition-colors text-primary"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h5M3 18h5M8 6v4M8 18v-4M8 12h6" />
+                <circle cx="18" cy="12" r="2.6" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
