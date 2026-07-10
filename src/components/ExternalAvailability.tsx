@@ -58,10 +58,16 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
       if (stale) {
         setRefreshing(true);
         try {
-          // on-demand collect (fails soft — collector may be rate-limited/off)
-          await supabase.functions.invoke("collect-playtomic-availability", {
-            body: { mode: "collect", club_id: clubId, days: 2 },
-          });
+          // on-demand collect (fails soft — collector may be rate-limited/off).
+          // Fire both aggregators; each is a no-op unless this club is mapped to it.
+          await Promise.allSettled([
+            supabase.functions.invoke("collect-playtomic-availability", {
+              body: { mode: "collect", club_id: clubId, days: 2 },
+            }),
+            supabase.functions.invoke("collect-padelmates-availability", {
+              body: { mode: "collect", club_id: clubId, days: 2 },
+            }),
+          ]);
           data = await fetchSlots();
         } catch {
           /* keep whatever we had */

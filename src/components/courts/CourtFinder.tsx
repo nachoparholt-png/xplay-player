@@ -237,7 +237,7 @@ const CourtFinder = () => {
             <span className="text-primary">anywhere.</span>
           </h2>
           <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed">
-            One search across XPLAY clubs and Playtomic. No more checking four apps.
+            One search across XPLAY clubs, Playtomic and Padelmates. No more checking four apps.
           </p>
         </div>
       )}
