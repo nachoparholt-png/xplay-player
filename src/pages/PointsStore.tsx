@@ -139,8 +139,8 @@ const PointsStore = () => {
             <Users className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-display font-bold text-foreground">Share & Earn 50 XPLAY Points</p>
-            <p className="text-xs text-muted-foreground">Invite a friend and earn points when they sign up</p>
+            <p className="text-sm font-display font-bold text-foreground">Share & Earn 500 XPLAY Points</p>
+            <p className="text-xs text-muted-foreground">Invite a friend and earn points when they play their first match</p>
           </div>
           <Share2 className="w-4 h-4 text-primary shrink-0" />
         </button>
@@ -170,7 +170,7 @@ const PointsStore = () => {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Share your referral code with friends. When they sign up using your link, you'll earn <span className="text-primary font-semibold">50 XPLAY points</span>.
+                Share your referral code with friends. When they sign up using your link and play their first match, you'll earn <span className="text-primary font-semibold">500 XPLAY points</span>.
               </p>
             </div>
 
@@ -217,7 +217,7 @@ const PointsStore = () => {
                 <span className="text-sm text-muted-foreground">{referralCount} friend{referralCount !== 1 ? "s" : ""} joined</span>
                 <div className="flex items-center gap-1">
                   <Zap className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-display text-sm font-bold text-primary">+{referralCount * 50} earned</span>
+                  <span className="font-display text-sm font-bold text-primary">+{referralCount * 500} earned</span>
                 </div>
               </div>
             )}

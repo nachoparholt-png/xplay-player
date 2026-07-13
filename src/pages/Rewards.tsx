@@ -486,7 +486,7 @@ const Rewards = () => {
         enabled={getSetting("referral_program_enabled", "true") === "true"}
         referralCode={referralCode}
         referralCount={(referrals as ReferralRow[]).filter(r => r.referral_status === "completed").length}
-        inviterPoints={getSetting("referral_points_inviter", "200")}
+        inviterPoints={getSetting("referral_points_inviter", "500")} /* default = point_rules.referral_complete base_points */
       />
 
       {/* ── Buy Points (gated behind POINTS_PURCHASE_ENABLED — legal bright line: ── */}

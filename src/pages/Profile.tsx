@@ -306,7 +306,7 @@ const Profile = () => {
             <span className="font-display text-base font-black italic">XP</span>
           </div>
           <div className="text-[11.5px] font-bold mt-1 opacity-70">
-            worth £{(points / 100).toFixed(2)} · {lifetimeEarned.toLocaleString()} earned all-time
+            £{(points / 100).toFixed(2)} catalogue value · {lifetimeEarned.toLocaleString()} earned all-time
           </div>
         </div>
         <button
@@ -417,20 +417,20 @@ const Profile = () => {
         {[
           {
             icon: <BarChart3 className="w-[18px] h-[18px] text-primary" />,
-            title: "Rating & history",
+            title: "My matches",
             sub: `${totalMatches} matches · ${wins} W · ${totalMatches - wins} L`,
             to: "/matches",
           },
           {
             icon: <CreditCard className="w-[18px] h-[18px] text-primary" />,
-            title: "Payments & subscriptions",
-            sub: "Bookings, orders & receipts",
+            title: "My bookings",
+            sub: "Court bookings & receipts",
             to: "/bookings",
           },
           {
             icon: <Bell className="w-[18px] h-[18px] text-primary" />,
-            title: "Notifications & privacy",
-            sub: "Match alerts · profile visibility",
+            title: "Settings",
+            sub: "Account, notifications & privacy",
             to: "/profile/settings",
           },
         ].map((r) => (

@@ -37,7 +37,7 @@ const PointsBalanceChip = ({ compact = false }: PointsBalanceChipProps) => {
   return (
     <button
       onClick={() => navigate("/rewards")}
-      aria-label={`${balance} XPLAY Points — redeemable for goods worth £${equivalentPounds}`}
+      aria-label={`${balance} XPLAY Points — £${equivalentPounds} of catalogue value`}
       title={`100 XPLAY Points = £1 of catalogue value\nYour balance: ~£${equivalentPounds}`}
       className={`
         inline-flex items-center gap-1.5 rounded-full

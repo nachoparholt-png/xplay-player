@@ -130,6 +130,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const hash = new URLSearchParams(parsed.hash.replace("#", ""));
       const query = new URLSearchParams(parsed.search);
 
+      // Password-recovery deep links carry ?flow=recovery — persist the flag
+      // so RecoveryRedirect (App.tsx) routes the restored session to
+      // /auth/reset, where the user sets their new password.
+      if ((query.get("flow") ?? hash.get("flow")) === "recovery") {
+        localStorage.setItem("xplay_recovery_pending", "1");
+      }
+
       // PKCE flow: exchange the short-lived code for a session
       const code = query.get("code") ?? hash.get("code");
       if (code) {

@@ -200,6 +200,7 @@ const Matches = () => {
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);
   const [pendingMatches, setPendingMatches] = useState<EnrichedMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [tab, setTab] = useState<Tab>("my_matches");
   const [showCreateMatch, setShowCreateMatch] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -279,6 +280,7 @@ const Matches = () => {
   const fetchMatches = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setFetchError(false);
 
     try {
       if (tab === "my_matches") {
@@ -286,6 +288,8 @@ const Matches = () => {
           supabase.from("match_players").select("match_id").eq("user_id", user.id).in("status", ["confirmed", "waitlist"]),
           supabase.from("matches").select("id").eq("organizer_id", user.id),
         ]);
+
+        if (joinsRes.error || orgRes.error) throw joinsRes.error ?? orgRes.error;
 
         const matchIds = [...new Set([
           ...(joinsRes.data || []).map((j) => j.match_id),
@@ -299,7 +303,7 @@ const Matches = () => {
         }
 
         const today = new Date().toISOString().split("T")[0];
-        const { data: matchData } = await supabase
+        const { data: matchData, error: matchErr } = await supabase
           .from("matches")
           .select("*")
           .in("id", matchIds)
@@ -307,19 +311,21 @@ const Matches = () => {
           .gte("match_date", today)
           .order("match_date", { ascending: true })
           .order("match_time", { ascending: true });
+        if (matchErr) throw matchErr;
 
         const enriched = await enrichMatches(matchData || []);
         setMatches(enriched);
 
       } else {
         const today = new Date().toISOString().split("T")[0];
-        const { data: matchData } = await supabase
+        const { data: matchData, error: matchErr } = await supabase
           .from("matches")
           .select("*")
           .in("status", ["open", "almost_full"])
           .gte("match_date", today) // defensive: never show past matches even if cron is briefly behind
           .order("match_date", { ascending: true })
           .order("match_time", { ascending: true });
+        if (matchErr) throw matchErr;
 
         let enriched = await enrichMatches(matchData || []);
         enriched = enriched.filter((m) => m.spotsLeft > 0);
@@ -328,6 +334,7 @@ const Matches = () => {
     } catch (err) {
       console.error("Error fetching matches:", err);
       setMatches([]);
+      setFetchError(true);
     }
 
     setLoading(false);
@@ -479,7 +486,7 @@ const Matches = () => {
             <CreateFab label="Create" onClick={() => setShowCreateMatch(true)} />
 
             {/* NEXT MATCH HERO (only if user has a future match) */}
-            {tab === "my_matches" && !loading && (() => {
+            {tab === "my_matches" && !loading && !fetchError && (() => {
               const now = new Date();
               const nextMatch = matches.find((m) => {
                 if (!m.match_date || !m.match_time) return false;
@@ -555,8 +562,25 @@ const Matches = () => {
               </div>
             )}
 
+            {/* ERROR STATE — a failed fetch must not masquerade as "no matches
+                exist" (offline users were seeing the empty state) */}
+            {!loading && fetchError && (
+              <div className="rounded-[18px] border border-destructive/20 bg-destructive/5 p-6 text-center space-y-3">
+                <p className="text-sm font-semibold text-foreground">Couldn't load matches</p>
+                <p className="text-xs text-muted-foreground">
+                  Check your connection and try again.
+                </p>
+                <button
+                  onClick={() => { fetchMatches(); fetchPendingMatches(); }}
+                  className="px-5 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             {/* EMPTY STATE (open tab only) */}
-            {!loading && tab === "open" && displayedMatches.length === 0 && (
+            {!loading && !fetchError && tab === "open" && displayedMatches.length === 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -577,7 +601,7 @@ const Matches = () => {
             )}
 
             {/* MATCH CARDS (my_matches — carousel list style) */}
-            {!loading && tab === "my_matches" && (() => {
+            {!loading && !fetchError && tab === "my_matches" && (() => {
               // Split: matches that still need players vs confirmed/full
               const today = new Date().toISOString().split("T")[0];
               const needsPlayers = displayedMatches.filter(
@@ -670,7 +694,7 @@ const Matches = () => {
             })()}
 
             {/* MATCH CARDS (open — grid/list style) */}
-            {!loading && displayedMatches.length > 0 && tab === "open" && (
+            {!loading && !fetchError && displayedMatches.length > 0 && tab === "open" && (
               <div className="space-y-3">
                 {displayedMatches.map((match) => (
                   <motion.button

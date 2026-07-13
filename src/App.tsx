@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminProvider } from "@/contexts/AdminContext";
 import { TourProvider } from "@/contexts/TourContext";
@@ -54,6 +54,7 @@ import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 
 // ── Lazy loaded (loaded on demand when user navigates there) ────────────────
+const ResetPassword       = lazyWithRetry(() => import("./pages/ResetPassword"));
 const CreateMatch         = lazyWithRetry(() => import("./pages/CreateMatch"));
 const MatchDetail         = lazyWithRetry(() => import("./pages/MatchDetail"));
 const PostMatchStats      = lazyWithRetry(() => import("./pages/PostMatchStats"));
@@ -143,6 +144,27 @@ const RouteErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
 };
 
+// After a password-recovery link signs the user in (web callback or iOS deep
+// link), route them to /auth/reset so they actually set a new password. The
+// flag is set when the reset email is requested / the recovery link arrives,
+// and cleared by the ResetPassword page (save or skip).
+const RecoveryRedirect = () => {
+  const { session } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (
+      session &&
+      localStorage.getItem("xplay_recovery_pending") === "1" &&
+      location.pathname !== "/auth/reset" &&
+      !location.pathname.startsWith("/auth/callback")
+    ) {
+      navigate("/auth/reset", { replace: true });
+    }
+  }, [session, location.pathname, navigate]);
+  return null;
+};
+
 const AppRoutes = () => {
   useCartSync();
   usePushNotifications();
@@ -150,10 +172,13 @@ const AppRoutes = () => {
   usePointsEarnedToasts();
   return (
     <RouteErrorBoundary>
+      <RecoveryRedirect />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          {/* Set-new-password after a recovery link (self-guards on session) */}
+          <Route path="/auth/reset" element={<ResetPassword />} />
           {/* Legal pages — public, reachable signed-out (App Store requirement) */}
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />

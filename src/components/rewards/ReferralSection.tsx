@@ -67,7 +67,7 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
         className="card-elevated p-4 space-y-3"
       >
         <p className="text-sm text-muted-foreground">
-          Invite players to join XPLAY and earn <span className="text-primary font-semibold">50 XPLAY points</span> when they sign up through your link.
+          Invite players to join XPLAY and earn <span className="text-primary font-semibold">{inviterPoints} XPLAY points</span> when they play their first match after signing up through your link.
         </p>
 
         {referralCode && (
@@ -98,7 +98,7 @@ const ReferralSection = ({ title, enabled, referralCode, referralCount, inviterP
             <span className="text-sm text-muted-foreground">{referralCount} friend{referralCount !== 1 ? "s" : ""} joined</span>
             <div className="flex items-center gap-1">
               <Zap className="w-3.5 h-3.5 text-primary" />
-              <span className="stat-number text-sm text-primary">+{referralCount * 50} XPLAY earned</span>
+              <span className="stat-number text-sm text-primary">+{referralCount * Number(inviterPoints || 0)} XPLAY earned</span>
             </div>
           </div>
         )}

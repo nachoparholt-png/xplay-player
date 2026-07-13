@@ -8,7 +8,14 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const run = async () => {
-      const code = new URLSearchParams(window.location.search).get("code");
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      // Password-recovery links carry ?flow=recovery (and the requesting
+      // device also set the localStorage flag) — route those to /auth/reset
+      // so the user is actually asked for a new password.
+      const isRecovery =
+        params.get("flow") === "recovery" ||
+        localStorage.getItem("xplay_recovery_pending") === "1";
 
       if (!code) {
         // No code in URL — nothing to exchange, go back to login
@@ -22,14 +29,14 @@ const AuthCallback = () => {
         // so there is no timing ambiguity with onAuthStateChange.
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
-        navigate("/matches", { replace: true });
+        navigate(isRecovery ? "/auth/reset" : "/matches", { replace: true });
       } catch (err: any) {
         console.error("[AuthCallback] exchange failed:", err);
         // Fallback: detectSessionInUrl may have already exchanged the code
         // and stored the session — if so, just proceed.
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          navigate("/matches", { replace: true });
+          navigate(isRecovery ? "/auth/reset" : "/matches", { replace: true });
           return;
         }
         setErrorMsg(err?.message ?? "Sign-in failed");

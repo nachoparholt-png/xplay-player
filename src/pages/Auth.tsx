@@ -16,6 +16,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
 
@@ -61,6 +63,30 @@ const Auth = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setLoading(true);
+    try {
+      // The recovery link deep-links back into the app; the pending-recovery
+      // flag routes the restored session to /auth/reset so the user actually
+      // gets asked for a new password (see RecoveryRedirect in App.tsx).
+      localStorage.setItem("xplay_recovery_pending", "1");
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: Capacitor.isNativePlatform()
+          ? "xplay://auth/callback?flow=recovery"
+          : window.location.origin + "/auth/callback?flow=recovery",
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (error: any) {
+      localStorage.removeItem("xplay_recovery_pending");
+      toast({ title: "Couldn't send reset email", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -116,6 +142,55 @@ const Auth = () => {
           <p className="text-muted-foreground text-sm tracking-wide">Play. Compete. Rise.</p>
         </div>
 
+        {forgotMode ? (
+          /* ── Forgot password view ── */
+          <div className="space-y-4">
+            {resetSent ? (
+              <div className="text-center space-y-3">
+                <p className="text-sm text-foreground font-medium">Check your inbox</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  We've sent a password reset link to <span className="text-foreground">{email}</span>.
+                  Open it on this device to set a new password.
+                </p>
+                <button
+                  onClick={() => { setForgotMode(false); setResetSent(false); }}
+                  className="text-primary text-sm font-medium hover:underline"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground text-center leading-relaxed">
+                  Enter your email and we'll send you a link to reset your password.
+                </p>
+                <form onSubmit={handleForgotPassword} className="space-y-3">
+                  <Input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-xl bg-muted border-border/50"
+                    required
+                  />
+                  <Button type="submit" className="w-full h-12 rounded-xl font-semibold gap-2" disabled={loading}>
+                    Send reset link
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </form>
+                <p className="text-center">
+                  <button
+                    onClick={() => setForgotMode(false)}
+                    className="text-muted-foreground text-sm hover:text-foreground"
+                  >
+                    Back to sign in
+                  </button>
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+        <>
         {/* Google */}
         <Button
           variant="outline"
@@ -170,6 +245,18 @@ const Auth = () => {
             </button>
           </div>
 
+          {isLogin && (
+            <p className="text-right -mt-1">
+              <button
+                type="button"
+                onClick={() => { setForgotMode(true); setResetSent(false); }}
+                className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                Forgot password?
+              </button>
+            </p>
+          )}
+
           <Button
             type="submit"
             className="w-full h-12 rounded-xl font-semibold gap-2"
@@ -189,6 +276,8 @@ const Auth = () => {
             {isLogin ? "Sign Up" : "Sign In"}
           </button>
         </p>
+        </>
+        )}
 
         {/* Legal microcopy — WS2 compliance */}
         <p className="text-center text-[11px] text-muted-foreground/60 leading-relaxed">

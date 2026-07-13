@@ -351,7 +351,9 @@ const TournamentDetail = () => {
         {/* Title Hero */}
         <div>
           <div className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-2">
-            🏆 {tournament.tournament_type === "pairs" ? "Round robin" : "Individual"} · {tournament.player_count} {tournament.tournament_type === "pairs" ? "pairs" : "players"}
+            {/* Real format from format_type — previously every pairs tournament
+                was labelled "Round robin" regardless of its actual format */}
+            🏆 {(tournament.format_type || "tournament").replace(/_/g, " ")} · {tournament.player_count} {tournament.tournament_type === "pairs" ? "pairs" : "players"}
           </div>
           <h1 className="font-display text-[30px] font-black italic uppercase text-foreground leading-[0.9] tracking-[-0.02em]">
             {tournament.name}
@@ -729,12 +731,32 @@ const TournamentDetail = () => {
                 </button>
               )}
               {isJoined && !isCreator && (
-                <button
-                  onClick={handleLeave}
-                  className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all"
-                >
-                  Leave Tournament
-                </button>
+                // Confirmation dialog — leaving is destructive (loses the slot,
+                // and can forfeit a paid ticket), so it must not fire on one tap
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all">
+                      Leave Tournament
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Leave this tournament?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You'll give up your spot in "{tournament.name}"
+                        {((tournament as typeof tournament & { ticket_price_cents?: number | null }).ticket_price_cents ?? 0) > 0
+                          ? " and your entry ticket may not be refunded — check with the organiser"
+                          : ""}. You can rejoin later if spots are still available.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="rounded-xl">Stay</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleLeave} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Leave
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
               {isCreator && (
                 <button
