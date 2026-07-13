@@ -313,9 +313,7 @@ function QuizStep({
       <h2 className="font-display text-[28px] font-black italic uppercase text-foreground leading-[0.95] tracking-[-0.02em] mb-[10px]">
         {q.question}
       </h2>
-      <p className="text-[12px] text-muted-foreground leading-[1.5] mb-6">
-        {/* Optional subtitle - customize per question if needed */}
-      </p>
+
 
       {/* ANSWER OPTIONS - A/B/C/D/E lettered */}
       <div className="flex-1 space-y-2">
@@ -433,7 +431,7 @@ function LevelStep({
           step={0.5}
           className="w-full"
         />
-        <div className="flex justify-between mt-1.5 text-[9px] text-muted-foreground font-medium">
+        <div className="flex justify-between mt-1.5 text-[11px] text-muted-foreground font-medium">
           <span>0.5</span>
           <span>3.5</span>
           <span>7.0</span>
@@ -542,12 +540,14 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
         <Trophy className="w-8 h-8 text-primary" />
       </motion.div>
 
+      {/* Differentiated from the opening WelcomeStep — this is the wrap-up,
+          not a second welcome */}
       <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-4 leading-[0.95]">
-        Welcome to<br />XPLAY
+        You're<br />all set
       </h2>
 
       <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs mb-8">
-        XPLAY helps players connect and compete. The more you play and grow the community, the more XPLAY Points (XP) you earn.
+        Your profile is ready. Here's what you can do from day one — the more you play, the more XPLAY Points (XP) you earn.
       </p>
 
       <div className="w-full max-w-xs space-y-2.5 mb-10">

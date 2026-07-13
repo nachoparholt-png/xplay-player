@@ -212,7 +212,7 @@ const ClubMarketTab = ({ clubId, clubName, membershipDiscount = 0 }: ClubMarketT
                     <span className="text-xs font-black text-foreground">
                       £{(effPrice / 100).toFixed(2)}
                       {membershipDiscount > 0 && p.price_cents > 0 && effPrice < p.price_cents && (
-                        <span className="ml-1 text-muted-foreground line-through text-[9px]">
+                        <span className="ml-1 text-muted-foreground line-through text-[11px]">
                           £{(p.price_cents / 100).toFixed(2)}
                         </span>
                       )}
@@ -222,7 +222,7 @@ const ClubMarketTab = ({ clubId, clubName, membershipDiscount = 0 }: ClubMarketT
                     <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
                       {effXp} XP
                       {membershipDiscount > 0 && p.xp_price !== null && effXp < p.xp_price && (
-                        <span className="ml-1 text-muted-foreground line-through text-[9px]">{p.xp_price}</span>
+                        <span className="ml-1 text-muted-foreground line-through text-[11px]">{p.xp_price}</span>
                       )}
                     </span>
                   )}

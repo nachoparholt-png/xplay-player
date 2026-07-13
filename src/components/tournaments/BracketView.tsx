@@ -105,7 +105,7 @@ const BracketView = ({ rounds }: BracketViewProps) => {
                 {round.label}
               </h3>
               {isCurrent && (
-                <Badge variant="outline" className="text-[9px] bg-primary/10 text-primary border-primary/20 gap-1">
+                <Badge variant="outline" className="text-[11px] bg-primary/10 text-primary border-primary/20 gap-1">
                   <Zap className="w-2.5 h-2.5" />
                   Current Round
                 </Badge>
@@ -209,12 +209,12 @@ const BracketMatchCard = ({
             {court && time && <span>·</span>}
             {time && <span>{time}</span>}
             {m.isUserMatch && (
-              <Badge variant="outline" className="text-[8px] border-primary/30 text-primary ml-1 py-0">
+              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary ml-1 py-0">
                 YOUR MATCH
               </Badge>
             )}
           </div>
-          <Badge variant="outline" className={`text-[8px] py-0 ${badge.cls}`}>
+          <Badge variant="outline" className={`text-[10px] py-0 ${badge.cls}`}>
             {badge.label}
           </Badge>
         </div>

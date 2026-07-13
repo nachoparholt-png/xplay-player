@@ -309,7 +309,7 @@ export default function TournamentFixtureView({
                           </span>
                         )}
                         {teamSize === 2 && names.length > 0 && (
-                          <span className="ml-1.5 text-[9px] text-muted-foreground/40">doubles pair</span>
+                          <span className="ml-1.5 text-[11px] text-muted-foreground/40">doubles pair</span>
                         )}
                       </div>
                     </div>

@@ -85,7 +85,7 @@ const PlayerBubble = ({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="text-[9px] font-bold text-primary max-w-[60px] truncate text-center leading-tight mt-1"
+            className="text-[11px] font-bold text-primary max-w-[60px] truncate text-center leading-tight mt-1"
           >
             Tap to switch
           </motion.span>
@@ -95,7 +95,7 @@ const PlayerBubble = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="text-[9px] font-medium text-foreground max-w-[60px] truncate text-center leading-tight mt-1"
+            className="text-[11px] font-medium text-foreground max-w-[60px] truncate text-center leading-tight mt-1"
           >
             {player.display_name || "TBD"}
           </motion.span>
@@ -124,7 +124,7 @@ const EmptySlot = ({ interactive, onClick }: { interactive?: boolean; onClick?: 
         <span className="text-xs text-muted-foreground/40">?</span>
       )}
     </div>
-    <span className={`text-[9px] mt-1 ${interactive ? "text-primary/50 font-medium" : "text-muted-foreground/40"}`}>
+    <span className={`text-[11px] mt-1 ${interactive ? "text-primary/50 font-medium" : "text-muted-foreground/40"}`}>
       {interactive ? "Join" : "Empty"}
     </span>
   </motion.button>
@@ -180,7 +180,7 @@ const PadelCourtView = ({ teamA, teamB, interactive, currentUserId, onEmptySlotC
           </div>
         </div>
         <div className="absolute top-1 left-2">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-px rounded-full">Team A</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-px rounded-full">Team A</span>
         </div>
 
         {/* Team B */}
@@ -207,7 +207,7 @@ const PadelCourtView = ({ teamA, teamB, interactive, currentUserId, onEmptySlotC
           </div>
         </div>
         <div className="absolute bottom-1 left-2">
-          <span className="text-[8px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-1.5 py-px rounded-full">Team B</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary bg-secondary/10 px-1.5 py-px rounded-full">Team B</span>
         </div>
       </div>
     </motion.div>

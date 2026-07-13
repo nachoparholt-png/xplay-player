@@ -577,7 +577,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                                   {c.nickname || c.name}
                                 </span>
                                 {(c.court_type || c.surface) && (
-                                  <span className={cn("text-[9px] mt-0.5", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                                  <span className={cn("text-[11px] mt-0.5", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
                                     {[c.court_type, c.surface].filter(Boolean).join(" · ")}
                                   </span>
                                 )}
@@ -734,10 +734,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                           )}
                         >
                           <span className="text-xs font-bold">{time}</span>
-                          <span className={cn("text-[9px]", isSelected ? "text-primary-foreground/70" : "text-emerald-400/70")}>
+                          <span className={cn("text-[11px]", isSelected ? "text-primary-foreground/70" : "text-emerald-400/70")}>
                             {durationMins} min
                           </span>
-                          <span className="text-[9px] font-semibold uppercase tracking-wide mt-0.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide mt-0.5">
                             {price}
                           </span>
                           {isSelected && (

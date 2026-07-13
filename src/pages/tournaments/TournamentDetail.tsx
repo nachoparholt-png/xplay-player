@@ -318,16 +318,16 @@ const TournamentDetail = () => {
         </button>
         <div className="flex items-center gap-2">
           {tournament.visibility === "draft" && tournament.status === "draft" && (
-            <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Draft</Badge>
+            <Badge className="bg-primary/15 text-primary text-[10px] font-black uppercase tracking-[0.14em]">Draft</Badge>
           )}
           {tournament.visibility === "public" && (
-            <Badge className="bg-purple-500/20 text-purple-300 text-[9px] font-black uppercase tracking-[0.14em]">Public</Badge>
+            <Badge className="bg-purple-500/20 text-purple-300 text-[10px] font-black uppercase tracking-[0.14em]">Public</Badge>
           )}
           {tournament.visibility === "private" && tournament.status !== "draft" && (
-            <Badge className="bg-amber-400/15 text-amber-400 text-[9px] font-black uppercase tracking-[0.14em]">Private</Badge>
+            <Badge className="bg-amber-400/15 text-amber-400 text-[10px] font-black uppercase tracking-[0.14em]">Private</Badge>
           )}
           {STAKES_ENABLED && hasBetConfig && (
-            <Badge className="bg-primary/15 text-primary text-[9px] font-black uppercase tracking-[0.14em]">Betting</Badge>
+            <Badge className="bg-primary/15 text-primary text-[10px] font-black uppercase tracking-[0.14em]">Betting</Badge>
           )}
           {/* Bracket shortcut — always available once the tournament is published
               (Apple Sports-style header button, deep-links to the bracket tab) */}
@@ -417,7 +417,7 @@ const TournamentDetail = () => {
                 <span className="text-[14px] text-muted-foreground/40 font-normal not-italic ml-0.5">/{tournament.player_count}</span>
               </div>
             </div>
-            <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
               {tournament.tournament_type === "pairs" ? "Pairs" : "Players"} Joined
             </div>
           </div>
@@ -430,7 +430,7 @@ const TournamentDetail = () => {
                   {tournament.prize_pool}
                 </div>
               </div>
-              <div className="text-[9px] font-bold text-amber-400/70 uppercase tracking-[0.1em] mt-1.5">
+              <div className="text-[10px] font-bold text-amber-400/70 uppercase tracking-[0.1em] mt-1.5">
                 XP Prize Pool
               </div>
             </div>
@@ -441,7 +441,7 @@ const TournamentDetail = () => {
                   {spotsLeft}
                 </div>
               </div>
-              <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
+              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
                 Spots Left
               </div>
             </div>
@@ -461,9 +461,9 @@ const TournamentDetail = () => {
               <div className="grid grid-cols-3 gap-2">
                 {phaseOddsPreview.map(p => (
                   <div key={p.stage} className="rounded-[12px] bg-background/50 border border-border/[0.06] p-[10px_6px] text-center">
-                    <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.1em]">{formatLabel(p.stage)}</p>
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.1em]">{formatLabel(p.stage)}</p>
                     <p className="font-display text-[17px] font-black italic text-primary leading-none mt-0.5">×{p.multiplier.toFixed(2)}</p>
-                    <p className="text-[8px] text-muted-foreground mt-1">{p.tier}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">{p.tier}</p>
                   </div>
                 ))}
               </div>
@@ -601,22 +601,22 @@ const TournamentDetail = () => {
                   )}
                   {p.role === "organiser" && (
                     // Not playing — won't appear in the bracket
-                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser only</Badge>
+                    <Badge variant="outline" className="text-[11px] ml-auto">Organiser only</Badge>
                   )}
                   {p.role === "organiser_player" && (
                     // Organising AND playing — counts toward the bracket
-                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser · playing</Badge>
+                    <Badge variant="outline" className="text-[11px] ml-auto">Organiser · playing</Badge>
                   )}
                   {p.user_id === tournament.created_by
                     && p.role !== "organiser"
                     && p.role !== "organiser_player" && (
-                    <Badge variant="outline" className="text-[9px] ml-auto">Organiser</Badge>
+                    <Badge variant="outline" className="text-[11px] ml-auto">Organiser</Badge>
                   )}
                   {p.partner_status === "pending" && (
-                    <Badge variant="outline" className="text-[9px] ml-auto text-warning border-warning/40">⏳ Partner pending</Badge>
+                    <Badge variant="outline" className="text-[11px] ml-auto text-warning border-warning/40">⏳ Partner pending</Badge>
                   )}
                   {p.partner_status === "confirmed" && tournament.tournament_type === "pairs" && (
-                    <Badge variant="outline" className="text-[9px] ml-auto text-primary border-primary/40">✓ Paired</Badge>
+                    <Badge variant="outline" className="text-[11px] ml-auto text-primary border-primary/40">✓ Paired</Badge>
                   )}
                 </div>
               );
@@ -674,20 +674,29 @@ const TournamentDetail = () => {
         )}
       </div>
 
-      {/* Sticky CTA Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background to-transparent">
-        <div className="flex flex-col gap-2">
+      {/* Sticky CTA Footer — sits ABOVE the AppLayout bottom nav (which is
+          fixed bottom-0 z-50, ~98px tall + safe-area). The old version used a
+          transparent gradient anchored at bottom-0, so (a) the nav covered the
+          last button(s) and (b) the "Need at least 2 players" hint rendered
+          semi-transparently on top of page content and was unreadable.
+          Fix: solid blurred panel, z-40 (below nav/modals), and a bottom
+          padding that reserves exactly the nav's height + safe-area. */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/[0.08] px-4 pt-3"
+        style={{ paddingBottom: "calc(var(--bottom-nav-clearance, 98px) + 8px)" }}
+      >
+        <div className="flex flex-col gap-2 max-w-4xl mx-auto">
           {tournament.status === "draft" && isCreator && (
             <>
               {playingCount < 2 && (
-                <p className="text-xs text-center text-muted-foreground pb-1">
-                  Need at least 2 players to launch ({playingCount}/{tournament.player_count} joined)
+                <p className="text-[11px] text-center text-muted-foreground">
+                  Need at least 2 players to launch · {playingCount}/{tournament.player_count} joined
                 </p>
               )}
               <button
                 onClick={handleLaunch}
-                disabled={launching}
-                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-50 transition-all"
+                disabled={launching || playingCount < 2}
+                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none transition-all"
               >
                 <span>Launch tournament</span>
                 <span>🏆</span>
@@ -759,21 +768,51 @@ const TournamentDetail = () => {
                 </AlertDialog>
               )}
               {isCreator && (
-                <button
-                  onClick={() => setInviteOpen(true)}
-                  className="w-full h-[54px] rounded-[16px] border border-primary/30 text-primary font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Invite Players
-                </button>
+                // Invite + Delete share one compact row so the creator's footer
+                // stack stays short (Launch is the only full-height primary CTA).
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setInviteOpen(true)}
+                    className="flex-1 h-[48px] rounded-[14px] border border-primary/30 text-primary font-display text-[13px] font-black italic uppercase tracking-[0.04em] hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    Invite Players
+                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        aria-label="Delete tournament"
+                        className="w-[48px] h-[48px] shrink-0 rounded-[14px] border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete tournament?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete "{tournament.name}" and all associated data. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               )}
             </>
           )}
 
-          {isCreator && (
+          {/* Standalone Delete — only for creators of finished/cancelled
+              tournaments (draft/active creators get it inline next to Invite). */}
+          {isCreator && tournament.status !== "draft" && tournament.status !== "active" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all flex items-center justify-center gap-2">
+                <button className="w-full h-[48px] rounded-[14px] border border-destructive/30 text-destructive font-display text-[13px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all flex items-center justify-center gap-2">
                   <Trash2 className="w-4 h-4" />
                   Delete
                 </button>

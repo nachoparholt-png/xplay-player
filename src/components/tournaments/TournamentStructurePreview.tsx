@@ -306,7 +306,7 @@ const TournamentStructurePreview = ({
             >
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold">{g.label}</span>
-                <Badge variant="outline" className="text-[9px]">
+                <Badge variant="outline" className="text-[11px]">
                   {g.teams.length} teams
                 </Badge>
               </div>
@@ -345,7 +345,7 @@ const TournamentStructurePreview = ({
             >
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold">Group {g.groupId}</span>
-                <Badge variant="outline" className="text-[9px]">
+                <Badge variant="outline" className="text-[11px]">
                   {g.teams.length} teams
                 </Badge>
               </div>

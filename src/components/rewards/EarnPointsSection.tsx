@@ -58,7 +58,7 @@ const EarnPointsSection = ({ title, settings: _settings }: EarnPointsSectionProp
             <div className="flex items-center justify-between">
               <m.icon className={`w-4 h-4 ${m.highlight ? "text-primary" : "text-muted-foreground"}`} />
               <span className={`font-mono text-sm font-bold ${m.highlight ? "text-primary" : "text-foreground"}`}>
-                {m.points} <span className="text-[9px] font-display">XP</span>
+                {m.points} <span className="text-[11px] font-display">XP</span>
               </span>
             </div>
             <span className="text-xs font-semibold leading-tight">{m.title}</span>

@@ -147,7 +147,7 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
             <button
               key={s}
               onClick={() => onChange(s)}
-              className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+              className={`w-11 h-11 rounded-lg font-bold text-sm transition-all ${
                 value === s
                   ? "bg-primary text-primary-foreground shadow-md"
                   : "bg-muted/50 text-muted-foreground hover:bg-muted"

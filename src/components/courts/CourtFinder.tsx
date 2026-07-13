@@ -250,7 +250,7 @@ const CourtFinder = () => {
         >
           <MapPin className="w-[18px] h-[18px] text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-[9px] font-extrabold uppercase tracking-[0.1em] text-muted-foreground">Searching near</div>
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-muted-foreground">Searching near</div>
             <div className="text-[15px] font-bold truncate">{coords.label} · {radiusKm} km</div>
           </div>
           <span className="font-display text-[11px] font-extrabold uppercase text-primary">Change</span>
@@ -347,18 +347,18 @@ const CourtFinder = () => {
                 <span className="font-mono text-[10px] text-muted-foreground">{(c.dist / 1000).toFixed(1)} km</span>
                 <span className="ml-auto">
                   {c.native ? (
-                    <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2 py-0.5 font-display text-[8.5px] font-extrabold uppercase text-primary">
+                    <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2 py-0.5 font-display text-[10px] font-extrabold uppercase text-primary">
                       <Zap className="w-2.5 h-2.5 fill-primary" /> XPLAY club
                     </span>
                   ) : (
-                    <span className="border border-border rounded-full px-2 py-0.5 text-[9px] font-bold text-muted-foreground capitalize">{c.provider}</span>
+                    <span className="border border-border rounded-full px-2 py-0.5 text-[11px] font-bold text-muted-foreground capitalize">{c.provider}</span>
                   )}
                 </span>
               </div>
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `88px repeat(${grid.hours.length}, 1fr)` }}>
                 <div className="flex items-center">
                   {!c.native && (
-                    <span className="font-mono text-[8.5px] text-muted-foreground/60 leading-tight">
+                    <span className="font-mono text-[10px] text-muted-foreground/60 leading-tight">
                       fetched<br />{minsAgo(c.fetched)} min ago
                     </span>
                   )}
@@ -379,7 +379,7 @@ const CourtFinder = () => {
                       )}
                     >
                       <span className="font-mono text-[12px] font-bold leading-none">{format(new Date(first.starts_at), "HH:mm")}</span>
-                      <span className={cn("text-[9px] font-semibold mt-0.5", first.is_native ? "opacity-70" : "text-muted-foreground")}>
+                      <span className={cn("text-[11px] font-semibold mt-0.5", first.is_native ? "opacity-70" : "text-muted-foreground")}>
                         {Number.isFinite(fromPrice) ? `£${Math.round(fromPrice / 100)}` : fmtDur(first.duration_mins)}
                         {slots.length > 1 ? ` · ${slots.length}` : ""}
                       </span>
@@ -507,7 +507,7 @@ const CourtFinder = () => {
                 <div>
                   {/* header */}
                   {sheet.native ? (
-                    <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2.5 py-1 font-display text-[9px] font-extrabold uppercase text-primary mb-3">
+                    <span className="inline-flex items-center gap-1 bg-primary/15 border border-primary/40 rounded-full px-2.5 py-1 font-display text-[10px] font-extrabold uppercase text-primary mb-3">
                       <Zap className="w-2.5 h-2.5 fill-primary" /> XPLAY club
                     </span>
                   ) : (

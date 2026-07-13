@@ -177,7 +177,7 @@ const InvitePlayerModal = ({
         <div className="flex items-center gap-1.5">
           <p className="text-sm font-semibold truncate">{p.display_name || "Player"}</p>
           {sideBadge(p.preferred_side) && (
-            <span className="text-[8.5px] font-black font-mono text-muted-foreground border border-border rounded px-1 py-px shrink-0">
+            <span className="text-[10px] font-black font-mono text-muted-foreground border border-border rounded px-1 py-px shrink-0">
               {sideBadge(p.preferred_side)}
             </span>
           )}

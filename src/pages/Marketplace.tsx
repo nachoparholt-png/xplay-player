@@ -139,7 +139,7 @@ const Marketplace = () => {
               )}
               {/* EDITOR'S PICK badge */}
               <div className="absolute top-3 left-3">
-                <span className="bg-primary text-primary-foreground text-[9px] font-black tracking-[0.18em] uppercase px-2.5 py-1 rounded-full">
+                <span className="bg-primary text-primary-foreground text-[10px] font-black tracking-[0.18em] uppercase px-2.5 py-1 rounded-full">
                   Editor's Pick
                 </span>
               </div>
@@ -203,7 +203,7 @@ const Marketplace = () => {
                 )}
               >
                 {cat}
-                <span className="text-[9px] font-black opacity-60">{count}</span>
+                <span className="text-[11px] font-black opacity-60">{count}</span>
               </button>
             ))}
           </div>
@@ -281,7 +281,7 @@ const Marketplace = () => {
                   {/* Name + subtitle */}
                   <div className="flex-1 min-w-0">
                     {vendor && (
-                      <div className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide">
+                      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                         {vendor}
                       </div>
                     )}

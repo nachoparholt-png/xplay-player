@@ -181,12 +181,18 @@ const MatchCarousel = ({
             <button
               key={i}
               onClick={() => api?.scrollTo(i)}
-              className={`rounded-full transition-all duration-300 ${
-                i === current
-                  ? "w-6 h-2 bg-primary"
-                  : "w-2 h-2 bg-muted-foreground/30"
-              }`}
-            />
+              aria-label={`Go to slide ${i + 1}`}
+              className="p-2 -m-1 flex items-center justify-center"
+            >
+              {/* visual dot stays small; the padded button gives a ~32px hit area */}
+              <span
+                className={`rounded-full transition-all duration-300 ${
+                  i === current
+                    ? "w-6 h-2 bg-primary"
+                    : "w-2 h-2 bg-muted-foreground/30"
+                }`}
+              />
+            </button>
           ))}
         </div>
       )}
@@ -506,7 +512,7 @@ const Matches = () => {
                   className="w-full text-left rounded-[22px] bg-primary p-5 space-y-2 cursor-pointer hover:brightness-105 transition-[filter]"
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-[9px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
+                    <div className="text-[10px] font-black tracking-[0.18em] uppercase text-primary-foreground/70">
                       ● YOUR NEXT · IN {`${hours}H ${mins}M`}
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-wider text-primary-foreground/60">View →</span>
@@ -649,7 +655,7 @@ const Matches = () => {
                                     {match.match_date ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMM") : "TBD"} · {match.match_time?.slice(0, 5) ?? ""}
                                   </p>
                                 </div>
-                                <span className="text-[9px] font-black text-amber-400 bg-amber-400/15 px-2 py-1 rounded-full shrink-0">
+                                <span className="text-[11px] font-black text-amber-400 bg-amber-400/15 px-2 py-1 rounded-full shrink-0">
                                   {spotsNeeded} SPOT{spotsNeeded !== 1 ? "S" : ""} LEFT
                                 </span>
                               </div>
@@ -751,7 +757,7 @@ const Matches = () => {
                     {/* SPOTS LEFT BADGE */}
                     {match.spotsLeft <= 2 && (
                       <div className="absolute top-4 right-4">
-                        <span className="text-[9px] font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full">
+                        <span className="text-[11px] font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full">
                           {match.spotsLeft} SPOT{match.spotsLeft === 1 ? "" : "S"}
                         </span>
                       </div>

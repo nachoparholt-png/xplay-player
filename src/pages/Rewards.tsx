@@ -408,7 +408,7 @@ const Rewards = () => {
                         {canAfford ? "Redeem" : "View"}
                       </button>
                       {!canAfford && costNum && (
-                        <div className="text-[9.5px] font-bold text-amber-400 mt-1">
+                        <div className="text-[11px] font-bold text-amber-400 mt-1">
                           {(costNum - userPoints).toLocaleString()} more pts
                         </div>
                       )}
@@ -524,8 +524,8 @@ const Rewards = () => {
       {POINTS_PURCHASE_ENABLED && (
         <motion.button
           onClick={() => scrollTo(buyRef)}
-          className="fixed bottom-24 right-5 z-40 flex items-center justify-center bg-primary text-primary-foreground shadow-lg font-black text-sm overflow-hidden h-12"
-          style={{ minWidth: 48 }}
+          className="fixed right-5 z-40 flex items-center justify-center bg-primary text-primary-foreground shadow-lg font-black text-sm overflow-hidden h-12"
+          style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)", minWidth: 48 }}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           initial={{ scale: 0, opacity: 0 }}

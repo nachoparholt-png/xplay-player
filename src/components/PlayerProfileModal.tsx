@@ -281,15 +281,15 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
               {/* Stats Row */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-surface-container-low rounded-xl p-3 flex flex-col items-center">
-                  <span className="text-[9px] text-primary font-bold uppercase tracking-widest mb-0.5">Matches</span>
+                  <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-0.5">Matches</span>
                   <span className="text-lg font-display font-black">{profile.total_matches}</span>
                 </div>
                 <div className="bg-surface-container-low rounded-xl p-3 flex flex-col items-center">
-                  <span className="text-[9px] text-primary font-bold uppercase tracking-widest mb-0.5">Win Rate</span>
+                  <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-0.5">Win Rate</span>
                   <span className="text-lg font-display font-black text-primary">{winRate}</span>
                 </div>
                 <div className="bg-surface-container-low rounded-xl p-3 flex flex-col items-center">
-                  <span className="text-[9px] text-primary font-bold uppercase tracking-widest mb-0.5">Reliability</span>
+                  <span className="text-[10px] text-primary font-bold uppercase tracking-widest mb-0.5">Reliability</span>
                   <span className="text-base font-display font-black">{reliabilityLabel}</span>
                 </div>
               </div>
@@ -353,17 +353,17 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
                         <div className="flex flex-col items-center bg-primary/10 rounded-lg py-2">
                           <Trophy className="w-4 h-4 text-primary mb-1" />
                           <span className="text-lg font-display font-black text-primary">{h2h.wins}</span>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Wins</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Wins</span>
                         </div>
                         <div className="flex flex-col items-center bg-muted/50 rounded-lg py-2">
                           <Minus className="w-4 h-4 text-muted-foreground mb-1" />
                           <span className="text-lg font-display font-black">{h2h.draws}</span>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Draws</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Draws</span>
                         </div>
                         <div className="flex flex-col items-center bg-destructive/10 rounded-lg py-2">
                           <Swords className="w-4 h-4 text-destructive mb-1" />
                           <span className="text-lg font-display font-black text-destructive">{h2h.losses}</span>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">Losses</span>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Losses</span>
                         </div>
                       </div>
 

@@ -138,7 +138,7 @@ const TimeSlotGrid = ({ slots, selectedTime, onSelectTime, pricingWindows = [], 
               </p>
               {pw && (
                 <span className={cn(
-                  "inline-block text-[8px] font-bold uppercase tracking-wider mt-1.5 px-2 py-0.5 rounded-full",
+                  "inline-block text-[10px] font-bold uppercase tracking-wider mt-1.5 px-2 py-0.5 rounded-full",
                   PRICING_COLORS[pw.color] || PRICING_COLORS.default
                 )}>
                   {pw.name}

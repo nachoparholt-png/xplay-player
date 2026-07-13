@@ -117,7 +117,7 @@ const DeadlineChip = ({ deadlineAt }: { deadlineAt?: string | null }) => {
   const { label, urgent } = useDeadlineCountdown(deadlineAt);
   if (!label) return null;
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
       urgent
         ? "bg-red-500/15 text-red-400 border border-red-500/20"
         : "bg-primary/10 text-primary/70 border border-primary/15"
@@ -207,7 +207,7 @@ const TeamGroup = ({ players, maxSlots, label, borderClass }: {
       <div className="text-center">
         <p className="text-[10px] font-bold text-foreground truncate w-20">{label}</p>
         {avgRating > 0 && (
-          <span className="bg-secondary/20 text-secondary text-[9px] font-black px-1.5 rounded">
+          <span className="bg-secondary/20 text-secondary text-[11px] font-black px-1.5 rounded">
             {avgRating.toFixed(1)}
           </span>
         )}
@@ -305,16 +305,16 @@ const MatchCard = ({
         {(courtBookingStatus === "booked" || courtBookingStatus === "not_booked") && (
           <span className="inline-flex items-center gap-1.5 mt-1.5">
             {courtBookingStatus === "booked" ? (
-              <span className="inline-flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-green-500 border border-green-500/40 rounded-full px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-green-500 border border-green-500/40 rounded-full px-2 py-0.5">
                 ✓ Court booked
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5">
+              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5">
                 ⚠ Court not booked yet
               </span>
             )}
             {externalProvider && (
-              <span className="text-[9px] font-bold text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
+              <span className="text-[11px] font-bold text-muted-foreground border border-border rounded-full px-2 py-0.5 capitalize">
                 {externalProvider}
               </span>
             )}
@@ -354,11 +354,11 @@ const MatchCard = ({
       {STAKES_ENABLED && matchFormat !== "social" && hasBothTeams && (
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Team A Odds</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Team A Odds</span>
             <span className="text-sm font-display font-black text-foreground">x{odds.a.toFixed(1)}</span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Team B Odds</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">Team B Odds</span>
             <span className="text-sm font-display font-black text-foreground">x{odds.b.toFixed(1)}</span>
           </div>
         </div>
@@ -384,7 +384,7 @@ const MatchCard = ({
               {totalPointsStaked > 0 ? `${totalPointsStaked.toLocaleString()} POT` : "0 POT"}
             </span>
           </div>
-          <span className="text-[9px] text-muted-foreground font-semibold flex items-center gap-1">
+          <span className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
             <Trophy className="w-2.5 h-2.5" /> Pot bonus · players only
           </span>
         </div>

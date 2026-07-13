@@ -525,7 +525,7 @@ const TournamentCard = ({
                           {formatPrice(gross, currencyCode)}
                         </span>
                         <span>{formatPrice(discounted, currencyCode)}</span>
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-primary/80">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
                           members
                         </span>
                       </>

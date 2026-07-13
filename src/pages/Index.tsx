@@ -216,7 +216,7 @@ const Dashboard = () => {
           <div className="font-display text-[26px] font-black italic text-primary leading-tight">
             {userPoints.toLocaleString()}
           </div>
-          <div className="text-[9px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
+          <div className="text-[10px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
             XP
           </div>
         </div>
@@ -225,7 +225,7 @@ const Dashboard = () => {
           <div className="font-display text-[20px] font-black italic leading-tight">
             {level ? `Lvl ${level.toFixed(1)}` : "—"}
           </div>
-          <div className="text-[9px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
+          <div className="text-[10px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
             Level
           </div>
         </div>
@@ -234,7 +234,7 @@ const Dashboard = () => {
           <div className="font-display text-[20px] font-black italic leading-tight">
             {globalRank != null ? `#${globalRank}` : "—"}
           </div>
-          <div className="text-[9px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
+          <div className="text-[10px] font-black tracking-[0.12em] text-muted-foreground uppercase mt-0.5">
             Rank
           </div>
         </div>

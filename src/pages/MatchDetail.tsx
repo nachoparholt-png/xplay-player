@@ -859,12 +859,16 @@ const MatchDetail = () => {
 
   const isPreGame = !isAfterGame && !["cancelled", "completed"].includes(match.status);
 
-  const teamALevel = confirmedPlayers
-    .filter(p => p.team === "A" && p.profiles?.padel_level)
-    .reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0);
-  const teamBLevel = confirmedPlayers
-    .filter(p => p.team === "B" && p.profiles?.padel_level)
-    .reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0);
+  // Average (not summed) team level — summed values read as the wrong scale
+  // next to per-player levels (~3.2 each showing "Team A Lvl: 6.5")
+  const teamARated = confirmedPlayers.filter(p => p.team === "A" && p.profiles?.padel_level);
+  const teamBRated = confirmedPlayers.filter(p => p.team === "B" && p.profiles?.padel_level);
+  const teamALevel = teamARated.length
+    ? teamARated.reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0) / teamARated.length
+    : 0;
+  const teamBLevel = teamBRated.length
+    ? teamBRated.reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0) / teamBRated.length
+    : 0;
   const totalLevel = teamALevel + teamBLevel || 1;
 
   const matchIdShort = match.id.slice(-3).toUpperCase();
@@ -908,8 +912,8 @@ const MatchDetail = () => {
         <div className="w-9 h-9 rounded-full bg-muted/50 border border-dashed border-muted-foreground/30 flex items-center justify-center group-hover:border-primary/50 transition-colors">
           <User className="w-4 h-4 text-muted-foreground/50" />
         </div>
-        <span className="text-sm italic text-muted-foreground/60 flex-1">Waiting...</span>
-        <span className="text-xs text-muted-foreground/40">N/A</span>
+        <span className="text-sm text-muted-foreground/60 flex-1">Open spot</span>
+        <span className="text-xs text-primary/60 font-medium">Tap to fill</span>
       </button>
     );
   };
@@ -1024,10 +1028,8 @@ const MatchDetail = () => {
             <Clock className="w-4 h-4 text-primary" />
             <span>{(() => { const d = match.duration_mins ?? 90; return d < 60 ? `${d} min` : `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}` : ""}`; })()}</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
-            <MapPin className="w-4 h-4 text-primary" />
-            <span>{match.club.split(" ").slice(-1)[0]}</span>
-          </div>
+          {/* Club-name-fragment pill removed — it duplicated the heading with a
+              meaningless last word ("Club"); re-add if a real city/area field lands */}
           {match.price_per_player != null && match.price_per_player > 0 && (
             <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
               <Coins className="w-4 h-4 text-primary" />
@@ -1427,7 +1429,7 @@ const MatchDetail = () => {
       {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && userLevelFits && user && (
         <div
           className="fixed left-0 right-0 px-4 z-40 space-y-2"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 108px)" }}
+          style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}
         >
           {/* Private match joining warning */}
           {match.visibility === "private" && isInsidePrivateCancelWindow && (

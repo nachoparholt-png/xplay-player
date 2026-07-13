@@ -417,7 +417,7 @@ const ClubDetail = () => {
           ) : (
             <button
               onClick={() => setTab("memberships")}
-              className="text-[9px] font-bold uppercase tracking-wider bg-primary/20 text-primary px-3 py-1.5 rounded-full border border-primary/30 active:scale-95 transition-transform"
+              className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary px-3 py-1.5 rounded-full border border-primary/30 active:scale-95 transition-transform"
             >
               {memberTierName?.toUpperCase() || myMembership.role?.replace("_", " ").toUpperCase() || "MEMBER"} ✓
             </button>

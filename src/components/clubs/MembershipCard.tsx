@@ -72,7 +72,7 @@ const MembershipCard = ({
         </div>
         {isCurrentPlan && (
           <span
-            className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
+            className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full"
             style={{ backgroundColor: `color-mix(in srgb, ${tier.accent} 20%, transparent)`, color: tier.accent }}
           >
             Current

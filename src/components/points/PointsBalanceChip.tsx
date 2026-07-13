@@ -55,7 +55,7 @@ const PointsBalanceChip = ({ compact = false }: PointsBalanceChipProps) => {
       )}
       <span className="tabular-nums">{balance.toLocaleString()}</span>
       {!compact && (
-        <span className="text-[9px] font-semibold opacity-70 uppercase tracking-wider">pts</span>
+        <span className="text-[10px] font-semibold opacity-70 uppercase tracking-wider">pts</span>
       )}
     </button>
   );

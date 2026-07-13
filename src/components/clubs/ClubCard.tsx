@@ -46,7 +46,7 @@ const ClubCard = ({
           <div className="flex items-center gap-2">
             <h3 className="font-display font-bold text-sm text-foreground truncate">{name}</h3>
             {hasMembership && (
-              <span className="text-[8px] font-bold uppercase tracking-wider bg-primary/20 text-primary px-2 py-0.5 rounded-full flex-shrink-0 border border-primary/30">
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary px-2 py-0.5 rounded-full flex-shrink-0 border border-primary/30">
                 Pro Member
               </span>
             )}
@@ -60,7 +60,7 @@ const ClubCard = ({
             {courtTypes.map((type) => (
               <span
                 key={type}
-                className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-md border border-border/30"
+                className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-md border border-border/30"
               >
                 {type}
               </span>
@@ -68,7 +68,7 @@ const ClubCard = ({
 
             {/* Distance badge — only shown when Near Me filter is active */}
             {distanceMi != null && (
-              <span className="text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 flex items-center gap-0.5 ml-auto">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20 flex items-center gap-0.5 ml-auto">
                 <Navigation className="w-2.5 h-2.5" />
                 {formatMiles(distanceMi)}
               </span>

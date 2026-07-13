@@ -100,7 +100,7 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-sm truncate">{club.club_name}</p>
                       {club.source === "directory" && (
-                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
                           External booking
                         </span>
                       )}

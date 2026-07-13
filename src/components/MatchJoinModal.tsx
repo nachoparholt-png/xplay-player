@@ -470,7 +470,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
                     <div className="font-display text-[32px] font-black italic text-foreground leading-[0.95]">
                       {match.match_time.slice(0, 5)}
                     </div>
-                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                       {timeUntilMatch}
                     </div>
                   </div>
@@ -480,7 +480,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
                     <div className="font-display text-[18px] font-black italic text-amber-400">
                       {emptySlots} spot{emptySlots !== 1 ? "s" : ""}
                     </div>
-                    <div className="text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
+                    <div className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground mt-0.5">
                       left · 200 XP
                     </div>
                   </div>
@@ -518,7 +518,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
 
               {/* COURT VISUAL */}
               <div className="px-5 py-4">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-center text-muted-foreground mb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-center text-muted-foreground mb-2">
                   {isAlreadyJoined ? "You're already in" : "Tap an empty spot"}
                 </p>
 

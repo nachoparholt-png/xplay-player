@@ -404,7 +404,7 @@ const ChatThread = () => {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">{msg.message_text}</p>
-                      <p className={`text-[9px] mt-0.5 ${
+                      <p className={`text-[11px] mt-0.5 ${
                         isOwn ? "text-primary-foreground/60" : "text-muted-foreground"
                       }`}>
                         {formatMessageTime(msg.created_at)}

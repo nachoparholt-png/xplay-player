@@ -266,7 +266,7 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
                           className="flex-shrink-0 flex flex-col items-center rounded-xl px-3 py-2 bg-muted/20 border border-border/20 opacity-40 min-w-[60px]"
                         >
                           <span className="text-xs font-bold text-muted-foreground">{time}</span>
-                          <span className="text-[9px] text-muted-foreground">—</span>
+                          <span className="text-[11px] text-muted-foreground">—</span>
                         </button>
                       );
                     }
@@ -314,8 +314,8 @@ const CourtAvailabilityGrid = ({ clubId, courts, membershipDiscount = 0, memberT
                         )}
                       >
                         <span className="text-xs font-bold">{time}</span>
-                        <span className="text-[8px] text-inherit opacity-70">{durationMins} min</span>
-                        <span className="text-[9px] font-semibold uppercase tracking-wide">
+                        <span className="text-[10px] text-inherit opacity-70">{durationMins} min</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide">
                           {isBooking ? "..." : label}
                         </span>
                         {pw && (

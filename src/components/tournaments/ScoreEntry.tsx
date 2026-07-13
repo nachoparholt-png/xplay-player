@@ -361,7 +361,7 @@ const ScoreEntry = ({
                         {s.teamA}-{s.teamB}
                       </p>
                       {s.winner && (
-                        <p className="text-[9px] text-primary font-medium">
+                        <p className="text-[11px] text-primary font-medium">
                           {s.winner === "a" ? "A" : "B"}
                         </p>
                       )}

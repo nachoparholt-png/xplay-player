@@ -57,7 +57,7 @@ const GroupTable = ({ groupId, standings, advanceCount }: GroupTableProps) => {
                 <TableCell className="text-sm font-medium truncate max-w-[120px]">
                   {t.teamName}
                   {i < advanceCount && (
-                    <span className="ml-1 text-[9px] text-primary">▲</span>
+                    <span className="ml-1 text-[11px] text-primary">▲</span>
                   )}
                 </TableCell>
                 <TableCell className="text-center text-xs">{t.played}</TableCell>

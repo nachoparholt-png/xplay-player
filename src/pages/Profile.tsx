@@ -10,7 +10,7 @@
  */
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Settings, LogOut, Share2, BarChart3, CreditCard, Bell, Check, X, Download } from "lucide-react";
+import { ChevronRight, Settings, LogOut, Share2, BarChart3, CreditCard, Bell, Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -268,15 +268,15 @@ const Profile = () => {
         {/* stat strip */}
         <div className="flex mt-4 pt-4 border-t border-border/40 relative">
           <div className="flex-1">
-            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Level</div>
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Level</div>
             <div className="font-mono text-[26px] font-bold text-primary leading-tight">{level}</div>
           </div>
           <div className="flex-1 border-l border-border/40 pl-3.5">
-            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Win rate</div>
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Win rate</div>
             <div className="font-mono text-[26px] font-bold leading-tight">{winRate}</div>
           </div>
           <div className="flex-1 border-l border-border/40 pl-3.5">
-            <div className="text-[9.5px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Form</div>
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">Form</div>
             <div className="mt-1.5"><FormDots results={formResults} /></div>
           </div>
         </div>
@@ -400,7 +400,7 @@ const Profile = () => {
                 <div className={`font-mono text-xs font-bold ${m.result === "win" ? "text-primary" : "text-[#FF6B35]"}`}>
                   {m.ratingChange}
                 </div>
-                <div className="text-[9px] text-muted-foreground font-bold uppercase">rating</div>
+                <div className="text-[10px] text-muted-foreground font-bold uppercase">rating</div>
               </div>
             </div>
           ))
@@ -523,7 +523,7 @@ const Profile = () => {
                       { l: "Streak", v: streak > 0 ? `${streak}W` : "—", c: "text-amber-400" },
                     ].map((s) => (
                       <div key={s.l} className="flex-1 bg-white/[0.06] border border-white/10 rounded-[14px] px-3 py-2.5">
-                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-white/50">{s.l}</div>
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-white/50">{s.l}</div>
                         <div className={`font-mono text-2xl font-bold leading-tight ${s.c}`}>{s.v}</div>
                       </div>
                     ))}
@@ -543,13 +543,8 @@ const Profile = () => {
                 >
                   Share
                 </button>
-                <button
-                  onClick={handleNativeShare}
-                  className="w-[52px] rounded-[13px] bg-muted flex items-center justify-center active:scale-95 transition-transform"
-                  aria-label="More share options"
-                >
-                  <Download className="w-5 h-5 text-foreground" />
-                </button>
+                {/* Download-icon button removed — it only re-triggered the
+                    share sheet; re-add when card image export is implemented */}
               </div>
             </motion.div>
           </>

@@ -133,7 +133,7 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
                       {format(new Date(s.starts_at), "HH:mm")}
                     </span>
                     {s.price_cents != null && (
-                      <span className="block text-[9px] text-muted-foreground">
+                      <span className="block text-[11px] text-muted-foreground">
                         £{(s.price_cents / 100).toFixed(0)}
                       </span>
                     )}

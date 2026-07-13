@@ -59,22 +59,22 @@ const TournamentMatchCard = ({
         </span>
         <div className="flex items-center gap-1.5">
           {estimatedTime && status === "pending" && (
-            <Badge variant="outline" className="text-[9px] gap-0.5">
+            <Badge variant="outline" className="text-[11px] gap-0.5">
               <Clock className="w-2.5 h-2.5" />
               {estimatedTime}
             </Badge>
           )}
           {isUserMatch && (
-            <Badge variant="outline" className="text-[9px] border-primary/40 text-primary">
+            <Badge variant="outline" className="text-[11px] border-primary/40 text-primary">
               You
             </Badge>
           )}
           {displayCourt && (
-            <Badge variant="outline" className="text-[9px]">
+            <Badge variant="outline" className="text-[11px]">
               {displayCourt}
             </Badge>
           )}
-          <Badge variant="outline" className={`text-[9px] ${statusStyles[status] || ""}`}>
+          <Badge variant="outline" className={`text-[11px] ${statusStyles[status] || ""}`}>
             {status.replace("_", " ")}
           </Badge>
         </div>
@@ -114,7 +114,7 @@ const TournamentMatchCard = ({
         </div>
       )}
       {isWalkover && (
-        <Badge variant="outline" className="text-[9px] bg-muted/50 text-muted-foreground w-fit">
+        <Badge variant="outline" className="text-[11px] bg-muted/50 text-muted-foreground w-fit">
           W/O
         </Badge>
       )}

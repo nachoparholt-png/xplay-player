@@ -117,15 +117,15 @@ const OpenMatchesView = ({ clubId, clubName }: OpenMatchesViewProps) => {
                         <span className="text-sm font-display font-bold text-foreground">{match.format}</span>
                       </div>
                       {isJoined ? (
-                        <span className="text-[9px] font-bold uppercase bg-primary/15 text-primary px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold uppercase bg-primary/15 text-primary px-2 py-0.5 rounded-full">
                           Joined
                         </span>
                       ) : spots > 0 ? (
-                        <span className="text-[9px] font-bold uppercase bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-400 px-2 py-0.5 rounded-full">
                           {spots} spot{spots > 1 ? "s" : ""} left
                         </span>
                       ) : (
-                        <span className="text-[9px] font-bold uppercase bg-destructive/15 text-destructive px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-bold uppercase bg-destructive/15 text-destructive px-2 py-0.5 rounded-full">
                           Full
                         </span>
                       )}
@@ -143,13 +143,13 @@ const OpenMatchesView = ({ clubId, clubName }: OpenMatchesViewProps) => {
                         {matchPlayers.slice(0, 4).map((p: any, i: number) => (
                           <div
                             key={p.user_id}
-                            className="w-6 h-6 rounded-full bg-primary/20 border-2 border-card flex items-center justify-center text-[8px] font-bold text-primary"
+                            className="w-6 h-6 rounded-full bg-primary/20 border-2 border-card flex items-center justify-center text-[10px] font-bold text-primary"
                           >
                             P{i + 1}
                           </div>
                         ))}
                         {matchPlayers.length > 4 && (
-                          <div className="w-6 h-6 rounded-full bg-muted border-2 border-card flex items-center justify-center text-[8px] font-bold text-muted-foreground">
+                          <div className="w-6 h-6 rounded-full bg-muted border-2 border-card flex items-center justify-center text-[10px] font-bold text-muted-foreground">
                             +{matchPlayers.length - 4}
                           </div>
                         )}

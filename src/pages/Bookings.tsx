@@ -219,7 +219,7 @@ const Bookings = () => {
             <div className="font-display text-[18px] font-black italic leading-[0.95]">
               {t.count}
             </div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.1em] opacity-70">
+            <div className="text-[10px] font-bold uppercase tracking-[0.1em] opacity-70">
               {t.label}
             </div>
           </button>

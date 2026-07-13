@@ -82,17 +82,17 @@ const CourtListAccordion = ({ courts, slots, selectedTime, bookingSlot, onBook }
                       </span>
                       <div className="flex gap-1.5 mt-0.5">
                         {court.court_type && (
-                          <span className="text-[9px] uppercase bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md font-semibold">
+                          <span className="text-[10px] uppercase bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md font-semibold">
                             {court.court_type}
                           </span>
                         )}
                         {court.surface && (
-                          <span className="text-[9px] uppercase bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md font-semibold">
+                          <span className="text-[10px] uppercase bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md font-semibold">
                             {court.surface}
                           </span>
                         )}
                         {durationLabel && (
-                          <span className="text-[9px] uppercase bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-semibold">
+                          <span className="text-[10px] uppercase bg-primary/10 text-primary px-1.5 py-0.5 rounded-md font-semibold">
                             {durationLabel}
                           </span>
                         )}
