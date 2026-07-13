@@ -40,7 +40,10 @@ function addMins(hhmm: string, mins: number): string {
 }
 
 export default function TournamentFixtureView({
+  formatType,
   tournamentType,
+  playerCount,
+  bracketConfig,
   filledPlayers = [],
   canvasState,
   startTime = "10:00",
@@ -52,56 +55,121 @@ export default function TournamentFixtureView({
   const teamSize = tournamentType === "pairs" ? 2 : 1;
 
   const groups = useMemo(() => {
-    if (!canvasState?.phases?.length) return [];
-    const groupPhases = canvasState.phases
-      .filter(p => p.phaseType === "round_robin")
-      .sort((a, b) => (a.positionX - b.positionX) || (a.positionY - b.positionY));
+    // ── Path 1: visual-builder canvas (wizard preview) ─────────────────────
+    if (canvasState?.phases?.length) {
+      const groupPhases = canvasState.phases
+        .filter(p => p.phaseType === "round_robin")
+        .sort((a, b) => (a.positionX - b.positionX) || (a.positionY - b.positionY));
 
-    let teamOffset = 0;
-    return groupPhases.map((phase, gIdx) => {
-      const pal = GROUP_PALETTE[gIdx % GROUP_PALETTE.length];
-      const letter = String.fromCharCode(65 + gIdx);
-      const groupTeamCount = (phase.config?.teams as number) || 4;
+      let teamOffset = 0;
+      return groupPhases.map((phase, gIdx) => {
+        const pal = GROUP_PALETTE[gIdx % GROUP_PALETTE.length];
+        const letter = String.fromCharCode(65 + gIdx);
+        const groupTeamCount = (phase.config?.teams as number) || 4;
 
-      const teams = Array.from({ length: groupTeamCount }, (_, tIdx) => {
-        const globalTeamIdx = teamOffset + tIdx;
-        const players = Array.from({ length: teamSize }, (_, p) => {
-          const pIdx = globalTeamIdx * teamSize + p;
-          return pIdx < filledPlayers.length ? filledPlayers[pIdx] : null;
+        const teams = Array.from({ length: groupTeamCount }, (_, tIdx) => {
+          const globalTeamIdx = teamOffset + tIdx;
+          const players = Array.from({ length: teamSize }, (_, p) => {
+            const pIdx = globalTeamIdx * teamSize + p;
+            return pIdx < filledPlayers.length ? filledPlayers[pIdx] : null;
+          });
+          return { id: `${letter}${tIdx + 1}`, seed: tIdx + 1, players };
         });
-        return { id: `${letter}${tIdx + 1}`, seed: tIdx + 1, players };
+
+        teamOffset += groupTeamCount;
+
+        return {
+          letter,
+          label: phase.label || `Group ${letter}`,
+          courtNumber: gIdx + 1,
+          pal,
+          teams,
+          matches: getRRMatchOrder(groupTeamCount),
+        };
       });
+    }
 
-      teamOffset += groupTeamCount;
+    // ── Path 2: bracketConfig fallback (saved "groups" tournaments) ────────
+    // TournamentDetail passes no canvasState, so before this fallback existed
+    // the Fixture View always showed "No group phases configured yet" even for
+    // a fully configured Groups tournament. Mirrors the team distribution used
+    // by TournamentStructurePreview (team i → group i % groupCount) so both
+    // views place players in the same slots.
+    if (formatType === "groups") {
+      const teamCount = tournamentType === "pairs" ? Math.floor(playerCount / 2) : playerCount;
+      const groupCount =
+        bracketConfig?.group_count ||
+        Math.max(1, Math.floor(teamCount / (bracketConfig?.teams_per_group || 4)));
 
-      return {
-        letter,
-        label: phase.label || `Group ${letter}`,
-        courtNumber: gIdx + 1,
-        pal,
-        teams,
-        matches: getRRMatchOrder(groupTeamCount),
-      };
-    });
-  }, [canvasState, filledPlayers, teamSize]);
+      return Array.from({ length: groupCount }, (_, gIdx) => {
+        const pal = GROUP_PALETTE[gIdx % GROUP_PALETTE.length];
+        const letter = String.fromCharCode(65 + gIdx);
+
+        // Teams whose global index i satisfies i % groupCount === gIdx
+        const globalIdxs: number[] = [];
+        for (let i = gIdx; i < teamCount; i += groupCount) globalIdxs.push(i);
+
+        const teams = globalIdxs.map((globalTeamIdx, tIdx) => {
+          const players = Array.from({ length: teamSize }, (_, p) => {
+            const pIdx = globalTeamIdx * teamSize + p;
+            return pIdx < filledPlayers.length ? filledPlayers[pIdx] : null;
+          });
+          return { id: `${letter}${tIdx + 1}`, seed: tIdx + 1, players };
+        });
+
+        return {
+          letter,
+          label: `Group ${letter}`,
+          courtNumber: gIdx + 1,
+          pal,
+          teams,
+          matches: getRRMatchOrder(teams.length),
+        };
+      });
+    }
+
+    return [];
+  }, [canvasState, filledPlayers, teamSize, formatType, tournamentType, playerCount, bracketConfig]);
 
   const knockoutPhases = useMemo(() => {
-    if (!canvasState?.phases?.length) return [];
-    return canvasState.phases
-      .filter(p => p.phaseType !== "round_robin")
-      .sort((a, b) => a.positionX - b.positionX);
-  }, [canvasState]);
+    if (canvasState?.phases?.length) {
+      return canvasState.phases
+        .filter(p => p.phaseType !== "round_robin")
+        .sort((a, b) => a.positionX - b.positionX);
+    }
+    // Legacy fallback: derive pseudo knockout phases from bracketConfig
+    const ks = bracketConfig?.knockout_structure;
+    if (!ks || ks === "groups_only") return [];
+    const labels =
+      ks === "groups_final" ? ["Final"]
+      : ks === "groups_semis_final" ? ["Semi-Finals", "Final"]
+      : ["Quarter-Finals", "Semi-Finals", "Final"];
+    return labels.map((label, i) => ({ id: `legacy_ko_${i}`, label }));
+  }, [canvasState, bracketConfig]);
 
   const maxMatchCount = Math.max(...groups.map(g => g.matches.length), 0);
   const finalsTime = addMins(startTime, maxMatchCount * slotMins + changeoverMins);
 
   if (!groups.length) {
+    // Context-aware empty state: for round-robin-style formats the schedule is
+    // generated at launch (there are no pre-drawn groups), so don't tell the
+    // user to "set up groups" — that step doesn't exist for their format.
+    const isRoundRobinStyle = formatType === "americano" || formatType === "king_of_court";
     return (
       <div className="rounded-xl border border-border/40 bg-muted/20 p-8 text-center">
         <Grid3x3 className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
         <p className="text-sm text-muted-foreground">
-          No group phases configured yet.<br />
-          Set up groups in the Format step.
+          {isRoundRobinStyle ? (
+            <>
+              {formatType === "americano" ? "Americano" : "King of the Court"} pairings are drawn automatically at launch.<br />
+              The full schedule appears on the live screen once the tournament starts.
+            </>
+          ) : (
+            <>
+              No fixtures to show yet.<br />
+              They'll appear here once the tournament format is configured.
+            </>
+          )}
         </p>
       </div>
     );

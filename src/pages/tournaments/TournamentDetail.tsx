@@ -671,20 +671,29 @@ const TournamentDetail = () => {
         )}
       </div>
 
-      {/* Sticky CTA Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background to-transparent">
-        <div className="flex flex-col gap-2">
+      {/* Sticky CTA Footer — sits ABOVE the AppLayout bottom nav (which is
+          fixed bottom-0 z-50, ~98px tall + safe-area). The old version used a
+          transparent gradient anchored at bottom-0, so (a) the nav covered the
+          last button(s) and (b) the "Need at least 2 players" hint rendered
+          semi-transparently on top of page content and was unreadable.
+          Fix: solid blurred panel, z-40 (below nav/modals), and a bottom
+          padding that reserves exactly the nav's height + safe-area. */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border/[0.08] px-4 pt-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 106px)" }}
+      >
+        <div className="flex flex-col gap-2 max-w-4xl mx-auto">
           {tournament.status === "draft" && isCreator && (
             <>
               {playingCount < 2 && (
-                <p className="text-xs text-center text-muted-foreground pb-1">
-                  Need at least 2 players to launch ({playingCount}/{tournament.player_count} joined)
+                <p className="text-[11px] text-center text-muted-foreground">
+                  Need at least 2 players to launch · {playingCount}/{tournament.player_count} joined
                 </p>
               )}
               <button
                 onClick={handleLaunch}
-                disabled={launching}
-                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-50 transition-all"
+                disabled={launching || playingCount < 2}
+                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-40 disabled:shadow-none transition-all"
               >
                 <span>Launch tournament</span>
                 <span>🏆</span>
@@ -736,21 +745,51 @@ const TournamentDetail = () => {
                 </button>
               )}
               {isCreator && (
-                <button
-                  onClick={() => setInviteOpen(true)}
-                  className="w-full h-[54px] rounded-[16px] border border-primary/30 text-primary font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
-                >
-                  <Send className="w-4 h-4" />
-                  Invite Players
-                </button>
+                // Invite + Delete share one compact row so the creator's footer
+                // stack stays short (Launch is the only full-height primary CTA).
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setInviteOpen(true)}
+                    className="flex-1 h-[48px] rounded-[14px] border border-primary/30 text-primary font-display text-[13px] font-black italic uppercase tracking-[0.04em] hover:bg-primary/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    Invite Players
+                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        aria-label="Delete tournament"
+                        className="w-[48px] h-[48px] shrink-0 rounded-[14px] border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete tournament?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete "{tournament.name}" and all associated data. This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               )}
             </>
           )}
 
-          {isCreator && (
+          {/* Standalone Delete — only for creators of finished/cancelled
+              tournaments (draft/active creators get it inline next to Invite). */}
+          {isCreator && tournament.status !== "draft" && tournament.status !== "active" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all flex items-center justify-center gap-2">
+                <button className="w-full h-[48px] rounded-[14px] border border-destructive/30 text-destructive font-display text-[13px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all flex items-center justify-center gap-2">
                   <Trash2 className="w-4 h-4" />
                   Delete
                 </button>

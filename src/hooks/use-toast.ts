@@ -3,7 +3,15 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+// How long a dismissed (open=false) toast stays mounted before being removed
+// from the DOM — only needs to outlast the exit animation.
+// (Was 1000000ms, which combined with no auto-dismiss timer meant every toast
+// sat on screen until the user tapped it away.)
+const TOAST_REMOVE_DELAY = 1000;
+// Toasts dismiss themselves after this many ms so the user never has to tap
+// twice for every action. Destructive (error) toasts get longer to be read.
+const TOAST_AUTO_DISMISS_MS = 3500;
+const TOAST_AUTO_DISMISS_DESTRUCTIVE_MS = 6000;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -134,7 +142,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -155,6 +163,17 @@ function toast({ ...props }: Toast) {
       },
     },
   });
+
+  // Auto-dismiss so users don't have to tap every toast away manually.
+  // Callers can override with `duration` (ms), or pass duration: Infinity
+  // for a persistent toast (e.g. one with an action button).
+  const autoMs =
+    duration ?? (props.variant === "destructive"
+      ? TOAST_AUTO_DISMISS_DESTRUCTIVE_MS
+      : TOAST_AUTO_DISMISS_MS);
+  if (Number.isFinite(autoMs)) {
+    setTimeout(dismiss, autoMs);
+  }
 
   return {
     id: id,
