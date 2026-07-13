@@ -8,14 +8,20 @@
  * Cache-aside: if the stored slots are stale (> 30 min) or absent, triggers an
  * on-demand collect for this club, then refetches. Fails soft to a quiet
  * "availability unavailable" state — never blocks match creation.
+ *
+ * Selectable mode (match creation): pass `onSelectSlot` and the time chips
+ * become tappable — tapping one prefills the match date & time in the parent
+ * form. The slot is still NOT a reservation; booking happens on the club's
+ * own system via the deep link.
  */
 import { useState, useEffect, useCallback } from "react";
 import { ExternalLink, Clock, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { AVAILABILITY_ENABLED } from "@/lib/featureFlags";
 
-interface Slot {
+export interface ExternalSlot {
   id: string;
   starts_at: string;
   duration_mins: number;
@@ -25,10 +31,19 @@ interface Slot {
   fetched_at: string;
 }
 
+interface ExternalAvailabilityProps {
+  clubId: string;
+  clubName?: string;
+  /** When provided, slot chips become tappable and call back to prefill the form. */
+  onSelectSlot?: (slot: ExternalSlot) => void;
+  /** Currently selected date+time in the parent form — highlights the matching chip. */
+  selected?: { date: string; time: string } | null;
+}
+
 const STALE_MS = 30 * 60 * 1000;
 
-const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?: string }) => {
-  const [slots, setSlots] = useState<Slot[]>([]);
+const ExternalAvailability = ({ clubId, clubName, onSelectSlot, selected }: ExternalAvailabilityProps) => {
+  const [slots, setSlots] = useState<ExternalSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -41,7 +56,7 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
       .lte("starts_at", new Date(Date.now() + 48 * 3600 * 1000).toISOString())
       .order("starts_at")
       .limit(60);
-    return (data as Slot[]) || [];
+    return (data as ExternalSlot[]) || [];
   }, [clubId]);
 
   useEffect(() => {
@@ -83,7 +98,7 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
   if (!AVAILABILITY_ENABLED) return null;
 
   // Group by day, dedupe by start time (multiple courts, same slot)
-  const byDay = new Map<string, Map<string, Slot>>();
+  const byDay = new Map<string, Map<string, ExternalSlot>>();
   for (const s of slots) {
     const day = s.starts_at.slice(0, 10);
     const time = format(new Date(s.starts_at), "HH:mm");
@@ -92,6 +107,11 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
     if (!dayMap.has(time)) dayMap.set(time, s);
   }
   const bookingUrl = slots.find((s) => s.booking_url)?.booking_url;
+
+  const isSelected = (s: ExternalSlot) =>
+    !!selected &&
+    s.starts_at.slice(0, 10) === selected.date &&
+    format(new Date(s.starts_at), "HH:mm") === selected.time;
 
   return (
     <div className="rounded-xl border border-border/40 bg-card p-3.5 space-y-3">
@@ -118,27 +138,61 @@ const ExternalAvailability = ({ clubId, clubName }: { clubId: string; clubName?:
         </p>
       ) : (
         <>
+          {onSelectSlot && (
+            <p className="text-[11px] text-muted-foreground">
+              Tap a time to use it for your match.
+            </p>
+          )}
           {[...byDay.entries()].slice(0, 2).map(([day, times]) => (
             <div key={day}>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
                 {format(new Date(day + "T00:00:00"), "EEE d MMM")}
               </p>
               <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {[...times.values()].slice(0, 12).map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex-shrink-0 rounded-lg bg-muted px-2.5 py-1.5 text-center"
-                  >
-                    <span className="block font-mono text-xs font-bold">
-                      {format(new Date(s.starts_at), "HH:mm")}
-                    </span>
-                    {s.price_cents != null && (
-                      <span className="block text-[11px] text-muted-foreground">
-                        £{(s.price_cents / 100).toFixed(0)}
+                {[...times.values()].slice(0, 12).map((s) =>
+                  onSelectSlot ? (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => onSelectSlot(s)}
+                      className={cn(
+                        "flex-shrink-0 rounded-lg px-2.5 py-1.5 text-center border transition-colors",
+                        isSelected(s)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
+                      )}
+                    >
+                      <span className={cn(
+                        "block font-mono text-xs font-bold",
+                        !isSelected(s) && "text-emerald-400"
+                      )}>
+                        {format(new Date(s.starts_at), "HH:mm")}
                       </span>
-                    )}
-                  </div>
-                ))}
+                      {s.price_cents != null && (
+                        <span className={cn(
+                          "block text-[11px]",
+                          isSelected(s) ? "text-primary-foreground/70" : "text-muted-foreground"
+                        )}>
+                          £{(s.price_cents / 100).toFixed(0)}
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <div
+                      key={s.id}
+                      className="flex-shrink-0 rounded-lg bg-muted px-2.5 py-1.5 text-center"
+                    >
+                      <span className="block font-mono text-xs font-bold">
+                        {format(new Date(s.starts_at), "HH:mm")}
+                      </span>
+                      {s.price_cents != null && (
+                        <span className="block text-[11px] text-muted-foreground">
+                          £{(s.price_cents / 100).toFixed(0)}
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           ))}

@@ -17,9 +17,11 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (club: Club) => void;
+  /** Optional escape hatch: "Can't find your club?" → free venue search (Google Places). */
+  onOther?: () => void;
 }
 
-const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
+const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,12 +50,17 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
     return matchSearch;
   });
 
+  const handleOther = () => {
+    onOpenChange(false);
+    onOther?.();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg h-[75vh] flex flex-col p-0 gap-0">
         <DialogHeader className="p-4 pb-3 border-b border-border/30">
           <DialogTitle className="font-display flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" /> Select Club
+            <Building2 className="w-5 h-5 text-primary" /> Select Venue
           </DialogTitle>
         </DialogHeader>
 
@@ -99,6 +106,11 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-sm truncate">{club.club_name}</p>
+                      {club.source === "xplay_partner" && (
+                        <span className="text-[10px] font-black uppercase tracking-wider text-primary-foreground bg-primary rounded-full px-1.5 py-px flex-shrink-0">
+                          XPLAY
+                        </span>
+                      )}
                       {club.source === "directory" && (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
                           External booking
@@ -113,6 +125,25 @@ const ClubPicker = ({ open, onOpenChange, onSelect }: Props) => {
                 </motion.button>
               ))}
             </AnimatePresence>
+          )}
+
+          {/* Escape hatch — venue not in the directory */}
+          {!loading && onOther && (
+            <button
+              onClick={handleOther}
+              className="w-full text-left p-3 rounded-xl border border-dashed border-border/60 hover:border-primary/40 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">Can't find your club?</p>
+                <span className="text-xs text-muted-foreground">
+                  Search any venue or address
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+            </button>
           )}
         </div>
       </DialogContent>

@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { format, addDays, startOfDay, isSameDay } from "date-fns";
-import { ClipboardPaste, ChevronRight, CheckCircle2, Lock, ShieldCheck } from "lucide-react";
+import { ClipboardPaste, ChevronRight, CheckCircle2, Lock, ShieldCheck, Check, ArrowLeft } from "lucide-react";
 import { Stripe, PaymentSheetEventsEnum } from "@capacitor-community/stripe";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import ClubPicker from "@/components/ClubPicker";
 import PlacesVenueInput from "@/components/PlacesVenueInput";
+import ExternalAvailability, { type ExternalSlot } from "@/components/ExternalAvailability";
 import { type PlaceResult } from "@/hooks/useGooglePlaces";
 import { useMatchChat } from "@/hooks/useMatchChat";
 import { parsePlaytomicClipboard, findBestClubMatch } from "@/lib/parsePlaytomic";
@@ -25,6 +26,7 @@ type ClubSelection = {
   club_name: string;
   location: string;
   city: string | null;
+  source?: string; // 'xplay_partner' | 'directory' | 'demo'
 };
 
 interface CreateMatchModalProps {
@@ -33,7 +35,7 @@ interface CreateMatchModalProps {
   onCreated?: (matchId: string) => void;
 }
 
-// Fallback time slots used only for "other" venue mode
+// Fallback time slots used when the venue has no XPLAY-managed slots
 const TIME_SLOTS = Array.from({ length: 36 }, (_, i) => {
   const hour = Math.floor(i / 2) + 6;
   const min = i % 2 === 0 ? "00" : "30";
@@ -53,12 +55,13 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [selectedClub, setSelectedClub] = useState<ClubSelection | null>(null);
   const [notes, setNotes] = useState("");
 
-  // Venue mode
-  const [venueMode, setVenueMode] = useState<"xplay" | "other">("xplay");
+  // Venue: one unified club list (partner + directory clubs from our DB),
+  // with a "can't find your club?" escape hatch to free venue search.
+  const [venueKind, setVenueKind] = useState<"club" | "custom">("club");
   const [customVenue, setCustomVenue] = useState<PlaceResult | null>(null);
   const [customCourt, setCustomCourt] = useState("");
 
-  // XPLAY club courts (real DB courts)
+  // XPLAY club courts (real DB courts — partner/demo clubs only)
   const [courts, setCourts] = useState<any[]>([]);
   const [courtsLoading, setCourtsLoading] = useState(false);
   const [selectedCourtObj, setSelectedCourtObj] = useState<any | null>(null);
@@ -74,11 +77,16 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
 
-  // Free-text court fallback (used when XPLAY club has no courts in DB, or "other" mode)
+  // Free-text court fallback (used for directory clubs, or XPLAY clubs with no DB courts)
   const [courtFallback, setCourtFallback] = useState("");
 
   // Manual court fee for private matches without a pre-priced slot (total cost in £)
   const [courtFeeInput, setCourtFeeInput] = useState("");
+
+  // External-court matches (directory clubs + custom venues): the court is NOT
+  // booked through XPLAY — the organizer attests they've booked it on the
+  // club's own system. See XPLAY_Club_Data_Availability_Design.md.
+  const [courtBookedExternally, setCourtBookedExternally] = useState(false);
 
   // Auto-calculated level range
   const playerLevel = profile?.padel_level ?? 3.0;
@@ -86,9 +94,18 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const [levelMin, setLevelMin] = useState(Math.max(0.5, playerLevel - 1.0));
   const [showLevelEditor, setShowLevelEditor] = useState(false);
 
-  // ─── Fetch courts when XPLAY club is selected ───────────────────────────────
+  // ─── Venue tier ──────────────────────────────────────────────────────────────
+  // Native = XPLAY-managed club (partner/demo): real courts, held reservations,
+  //          payment through XPLAY.
+  // External = directory club or custom venue: we show aggregated availability
+  //            but the court is booked on the club's own system.
+  const isDirectoryClub = venueKind === "club" && selectedClub?.source === "directory";
+  const isNativeClub = venueKind === "club" && !!selectedClub && !isDirectoryClub;
+  const isExternalCourt = venueKind === "custom" || isDirectoryClub;
+
+  // ─── Fetch courts when a native (XPLAY-managed) club is selected ────────────
   useEffect(() => {
-    if (venueMode !== "xplay" || !selectedClub) {
+    if (!isNativeClub || !selectedClub) {
       setCourts([]);
       setSelectedCourtObj(null);
       return;
@@ -104,11 +121,11 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
         setCourts(data || []);
         setCourtsLoading(false);
       });
-  }, [selectedClub, venueMode]);
+  }, [selectedClub, isNativeClub]);
 
   // ─── Fetch available slots when court + date both selected ──────────────────
   useEffect(() => {
-    if (venueMode !== "xplay" || !selectedCourtObj || !matchDate) {
+    if (!isNativeClub || !selectedCourtObj || !matchDate) {
       setAvailableSlots([]);
       return;
     }
@@ -138,7 +155,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
           if (!stillAvailable) setMatchTime("");
         }
       });
-  }, [selectedCourtObj, matchDate, venueMode]);
+  }, [selectedCourtObj, matchDate, isNativeClub]);
 
   // ─── Reset state when modal opens/closes ────────────────────────────────────
   useEffect(() => {
@@ -154,7 +171,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       setCourtFallback("");
       setCustomVenue(null);
       setCustomCourt("");
-      setVenueMode("xplay");
+      setVenueKind("club");
+      setCourtBookedExternally(false);
       setMatchDate(undefined);
       setMatchTime("");
       setMatchFormat("competitive");
@@ -180,12 +198,15 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       if (parsed.clubName) {
         const { data: clubs } = await supabase
           .from("clubs")
-          .select("id, club_name, location, city")
+          .select("id, club_name, location, city, source")
           .eq("club_status", "active");
 
         if (clubs) {
           const match = findBestClubMatch(clubs, parsed.clubName);
-          if (match) setSelectedClub(match);
+          if (match) {
+            setVenueKind("club");
+            setSelectedClub(match);
+          }
         }
       }
 
@@ -214,27 +235,38 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     }
   };
 
+  // ─── External availability slot tapped → prefill date & time ────────────────
+  const handleExternalSlotSelect = (slot: ExternalSlot) => {
+    const d = new Date(slot.starts_at);
+    setMatchDate(startOfDay(d));
+    setMatchTime(format(d, "HH:mm"));
+    if (slot.duration_mins) setDurationMins(slot.duration_mins);
+    setErrors((prev) => ({ ...prev, date: undefined, time: undefined }));
+  };
+
   // ─── Create match (with optional Stripe payment for private matches) ─────────
   const handleCreate = async () => {
     if (!user) return;
     const newErrors: typeof errors = {};
-    if (venueMode === "xplay" && !selectedClub) newErrors.club = true;
-    if (venueMode === "other" && !customVenue?.name) newErrors.club = true;
+    if (venueKind === "club" && !selectedClub) newErrors.club = true;
+    if (venueKind === "custom" && !customVenue?.name) newErrors.club = true;
     if (!matchDate) newErrors.date = true;
     if (!matchTime) newErrors.time = true;
-    if (venueMode === "xplay" && courts.length > 0 && !selectedCourtObj) newErrors.court = true;
+    if (isNativeClub && courts.length > 0 && !selectedCourtObj) newErrors.court = true;
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
     setErrors({});
 
-    const clubName = venueMode === "xplay" ? selectedClub!.club_name : customVenue!.name;
+    const clubName = venueKind === "club" ? selectedClub!.club_name : customVenue!.name;
     let courtValue: string | null = null;
-    if (venueMode === "xplay") {
+    if (isNativeClub) {
       courtValue = selectedCourtObj
         ? (selectedCourtObj.nickname || selectedCourtObj.name)
         : (courtFallback || null);
+    } else if (isDirectoryClub) {
+      courtValue = courtFallback || null;
     } else {
       courtValue = customCourt || null;
     }
@@ -332,6 +364,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       price_per_player: 0,
       visibility,
       notes: notes || null,
+      // External-court matches carry the organizer's booking attestation;
+      // NULL means the court is managed/booked natively through XPLAY.
+      court_booking_status: isExternalCourt ? (courtBookedExternally ? "booked" : "not_booked") : null,
       // XPLAY slot → club-defined length; otherwise the organizer's pick
       duration_mins: selectedSlot
         ? Math.max(15, Math.round((new Date(selectedSlot.ends_at).getTime() - new Date(selectedSlot.starts_at).getTime()) / 60000))
@@ -415,7 +450,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     (slotHasPrice || manualFeeAmount > 0);
 
   // Whether we're in "smart slot" mode
-  const useSmartSlots = venueMode === "xplay" && courts.length > 0;
+  const useSmartSlots = isNativeClub && courts.length > 0;
   const nextSevenDays = Array.from({ length: 7 }, (_, i) => addDays(startOfDay(new Date()), i));
 
   return (
@@ -478,39 +513,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               <div className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
                 Venue
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {(["xplay", "other"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      setVenueMode(mode);
-                      setSelectedClub(null);
-                      setSelectedCourtObj(null);
-                      setCourts([]);
-                      setAvailableSlots([]);
-                      setCourtFallback("");
-                      setCustomVenue(null);
-                      setCustomCourt("");
-                      setMatchTime("");
-                      setErrors(prev => ({ ...prev, club: undefined, court: undefined, time: undefined }));
-                      if (mode === "xplay") setClubPickerOpen(true);
-                    }}
-                    className={cn(
-                      "h-10 rounded-xl text-sm font-medium transition-colors border",
-                      venueMode === mode
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted border-border/50 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {mode === "xplay" ? "XPLAY Club" : "Other Venue"}
-                  </button>
-                ))}
-              </div>
 
-              {venueMode === "xplay" ? (
+              {venueKind === "club" ? (
                 <>
-                  {/* Club selector */}
+                  {/* Unified club selector — every club in our directory */}
                   <button
                     type="button"
                     onClick={() => setClubPickerOpen(true)}
@@ -527,19 +533,31 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                           {selectedClub.club_name.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <span className="text-sm font-medium block truncate">{selectedClub.club_name}</span>
+                          <span className="text-sm font-medium flex items-center gap-1.5 min-w-0">
+                            <span className="truncate">{selectedClub.club_name}</span>
+                            {selectedClub.source === "xplay_partner" && (
+                              <span className="text-[9px] font-black uppercase tracking-wider text-primary-foreground bg-primary rounded-full px-1.5 py-px flex-shrink-0">
+                                XPLAY
+                              </span>
+                            )}
+                            {isDirectoryClub && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
+                                External booking
+                              </span>
+                            )}
+                          </span>
                           <span className="text-[10px] text-muted-foreground">{selectedClub.location || selectedClub.city || "—"}</span>
                         </div>
                       </div>
                     ) : (
-                      <span className="text-muted-foreground text-sm">Select a club...</span>
+                      <span className="text-muted-foreground text-sm">Select a venue...</span>
                     )}
                     <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   </button>
-                  {errors.club && <p className="text-[11px] text-destructive px-1">Please select a club</p>}
+                  {errors.club && <p className="text-[11px] text-destructive px-1">Please select a venue</p>}
 
-                  {/* Court picker — real courts from DB */}
-                  {selectedClub && (
+                  {/* ── Native club: real courts from DB ── */}
+                  {isNativeClub && (
                     <div className="space-y-1.5 pt-1">
                       <label className={cn(
                         "text-xs uppercase tracking-wider font-medium",
@@ -598,9 +616,35 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                       {errors.court && <p className="text-[11px] text-destructive px-1">Please select a court</p>}
                     </div>
                   )}
+
+                  {/* ── Directory club: aggregated availability (tap to prefill) ── */}
+                  {isDirectoryClub && selectedClub && (
+                    <div className="space-y-2 pt-1">
+                      <ExternalAvailability
+                        clubId={selectedClub.id}
+                        onSelectSlot={handleExternalSlotSelect}
+                        selected={matchDate && matchTime
+                          ? { date: format(matchDate, "yyyy-MM-dd"), time: matchTime }
+                          : null}
+                      />
+                      <div>
+                        <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">
+                          Court (optional)
+                        </label>
+                        <Input
+                          value={courtFallback}
+                          onChange={(e) => setCourtFallback(e.target.value)}
+                          placeholder="e.g. Court 3, Padel 2..."
+                          className="h-11 rounded-xl bg-muted border-border/30"
+                          style={{ fontSize: "16px" }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
+                  {/* Custom venue — free search via Google Places */}
                   <PlacesVenueInput
                     value={customVenue}
                     onChange={(place) => {
@@ -610,6 +654,19 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     hasError={errors.club}
                   />
                   {errors.club && <p className="text-[11px] text-destructive px-1">Please enter a venue</p>}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVenueKind("club");
+                      setCustomVenue(null);
+                      setCustomCourt("");
+                      setClubPickerOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline px-1"
+                  >
+                    <ArrowLeft className="w-3 h-3" /> Choose from club list instead
+                  </button>
 
                   <div>
                     <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">
@@ -624,6 +681,35 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     />
                   </div>
                 </>
+              )}
+
+              {/* ── External court: booking attestation ── */}
+              {isExternalCourt && (venueKind === "custom" ? !!customVenue : true) && (
+                <button
+                  type="button"
+                  onClick={() => setCourtBookedExternally(!courtBookedExternally)}
+                  className={cn(
+                    "w-full flex items-start gap-2.5 p-3.5 rounded-xl border text-left transition-colors",
+                    courtBookedExternally
+                      ? "bg-primary/10 border-primary/30"
+                      : "bg-amber-400/5 border-amber-400/25"
+                  )}
+                >
+                  <span className={cn(
+                    "w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 transition-colors",
+                    courtBookedExternally ? "bg-primary" : "border border-border bg-background"
+                  )}>
+                    {courtBookedExternally && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
+                  </span>
+                  <span className="text-xs leading-relaxed">
+                    <span className="font-semibold block">I've booked the court</span>
+                    <span className="text-muted-foreground">
+                      This club isn't managed on XPLAY, so this match won't hold a reservation —
+                      book the court on the club's own system, then confirm here. Players will
+                      see whether the court is secured.
+                    </span>
+                  </span>
+                </button>
               )}
             </div>
 
@@ -749,7 +835,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                   </div>
                 )
               ) : (
-                /* Generic time grid — for "other" venue or XPLAY clubs without DB courts */
+                /* Generic time grid — for directory clubs, custom venues, or XPLAY clubs without DB courts */
                 <div className="bg-muted/40 border border-border/30 rounded-xl p-2 max-h-32 overflow-y-auto">
                   <div className="grid grid-cols-4 gap-2">
                     {TIME_SLOTS.map((t) => (
@@ -979,11 +1065,26 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
         open={clubPickerOpen}
         onOpenChange={setClubPickerOpen}
         onSelect={(club) => {
+          setVenueKind("club");
           setSelectedClub(club);
           setSelectedCourtObj(null);
           setAvailableSlots([]);
           setMatchTime("");
           setCourtFallback("");
+          setCustomVenue(null);
+          setCustomCourt("");
+          setCourtBookedExternally(false);
+          setErrors(prev => ({ ...prev, club: undefined, court: undefined, time: undefined }));
+        }}
+        onOther={() => {
+          setVenueKind("custom");
+          setSelectedClub(null);
+          setSelectedCourtObj(null);
+          setCourts([]);
+          setAvailableSlots([]);
+          setCourtFallback("");
+          setCourtBookedExternally(false);
+          setMatchTime("");
           setErrors(prev => ({ ...prev, club: undefined, court: undefined, time: undefined }));
         }}
       />
