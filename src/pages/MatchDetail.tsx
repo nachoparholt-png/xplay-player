@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, Calendar, DollarSign, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Zap, Globe, Lock, Share2, MapPin, User, ShieldCheck, Coins } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Zap, Globe, Lock, Share2, MapPin, User, Users, ShieldCheck, Coins } from "lucide-react";
 import SlotActionModal from "@/components/SlotActionModal";
 import InvitePlayerModal from "@/components/InvitePlayerModal";
 import { Button } from "@/components/ui/button";
@@ -773,6 +773,7 @@ const MatchDetail = () => {
         <div className="flex items-center px-4 py-4">
           <button
             onClick={() => navigate("/matches")}
+            aria-label="Back to matches"
             className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -839,7 +840,7 @@ const MatchDetail = () => {
           <div className="w-full max-w-sm space-y-2">
             <Button
               onClick={() => navigate("/matches")}
-              className="w-full h-13 rounded-2xl font-bold text-sm gap-2"
+              className="w-full h-12 rounded-2xl font-bold text-sm gap-2"
             >
               Find Another Match
             </Button>
@@ -917,11 +918,11 @@ const MatchDetail = () => {
     <div className="pb-24">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-4">
-        <button onClick={() => navigate("/matches")} className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
+        <button onClick={() => navigate("/matches")} aria-label="Back to matches" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="font-display font-bold text-lg">Match Detail</h1>
-        <button onClick={handleShare} className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
+        <button onClick={handleShare} aria-label="Share match" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
           <Share2 className="w-5 h-5" />
         </button>
       </div>
@@ -1029,8 +1030,8 @@ const MatchDetail = () => {
           </div>
           {match.price_per_player != null && match.price_per_player > 0 && (
             <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
-              <DollarSign className="w-4 h-4 text-primary" />
-              <span>€{Number(match.price_per_player).toFixed(2)}</span>
+              <Coins className="w-4 h-4 text-primary" />
+              <span>£{Number(match.price_per_player).toFixed(2)}</span>
             </div>
           )}
         </div>
@@ -1420,9 +1421,14 @@ const MatchDetail = () => {
         )}
       </div>
 
-      {/* Join Match FAB */}
+      {/* Join Match FAB — bottom offset clears the AppLayout bottom nav
+          (fixed bottom-0 z-50, ~98px + safe-area tall). Was `bottom-20` (80px),
+          which left the CTA mostly hidden underneath the nav on notched iPhones. */}
       {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && userLevelFits && user && (
-        <div className="fixed bottom-20 left-0 right-0 px-4 z-40 space-y-2">
+        <div
+          className="fixed left-0 right-0 px-4 z-40 space-y-2"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 108px)" }}
+        >
           {/* Private match joining warning */}
           {match.visibility === "private" && isInsidePrivateCancelWindow && (
             <div className="rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-2 flex items-start gap-2">
@@ -1438,7 +1444,7 @@ const MatchDetail = () => {
             className="w-full h-14 rounded-2xl font-bold text-base gap-2 shadow-[0_0_30px_hsl(var(--primary)/0.3)]"
             size="lg"
           >
-            <MessageSquare className="w-5 h-5" />
+            <Users className="w-5 h-5" />
             {isFull ? "Join Waitlist" : "Join Match"}
           </Button>
         </div>

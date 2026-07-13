@@ -196,7 +196,8 @@ const PointsStore = () => {
                     size="sm"
                     className="flex-1 gap-1.5"
                     onClick={() => {
-                      const baseUrl = "https://racketeer-rewards.lovable.app";
+                      // Production domain (was a leftover Lovable staging URL)
+                      const baseUrl = "https://xplay-player.vercel.app";
                       const link = `${baseUrl}/auth?ref=${profile.referral_code}`;
                       navigator.clipboard.writeText(link);
                       setCopied(true);

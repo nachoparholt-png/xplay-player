@@ -415,12 +415,6 @@ const Matches = () => {
   const pendingIds = new Set(pendingMatches.map((m) => m.id));
   const displayedMatches = matches.filter((m) => !pendingIds.has(m.id));
 
-  // Helper to calculate distance display
-  const getDistanceText = (match: EnrichedMatch): string => {
-    // Placeholder - actual distance would need geo calculation
-    return "5.2km away";
-  };
-
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <div className="px-4 py-5 space-y-6">
@@ -537,30 +531,9 @@ const Matches = () => {
               ))}
             </div>
 
-            {/* FILTER ROW */}
-            <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-              <button
-                className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap"
-              >
-                Tonight
-              </button>
-              <button
-                className="px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:bg-muted/30"
-              >
-                My Level
-              </button>
-              <button
-                className="px-3 py-1.5 rounded-full border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:bg-muted/30"
-              >
-                ≤ 5km
-              </button>
-              <div className="flex-1" />
-              <button
-                className="px-3 py-1.5 text-muted-foreground text-[10px] font-black uppercase tracking-[0.08em] whitespace-nowrap hover:text-foreground"
-              >
-                Filters ↓
-              </button>
-            </div>
+            {/* FILTER ROW removed for launch — the chips (Tonight / My Level /
+                ≤ 5km / Filters) had no handlers, so they were dead controls that
+                looked active. Re-add once real filtering is wired up. */}
 
             {/* LOADING STATE */}
             {loading && (
@@ -714,7 +687,10 @@ const Matches = () => {
                           {match.match_time?.slice(0, 5) ?? "TBD"}
                         </div>
                         <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-0.5">
-                          {getDistanceText(match)} · 60 min
+                          {/* Real match date (was a hardcoded "5.2km away · 60 min" placeholder) */}
+                          {match.match_date
+                            ? format(new Date(match.match_date + "T00:00:00"), "EEE d MMM")
+                            : "Date TBD"}
                         </div>
                       </div>
 

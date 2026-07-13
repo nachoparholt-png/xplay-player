@@ -122,6 +122,8 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
         team_b_set_1: sets[0].b,
         team_b_set_2: sets[1].b,
         team_b_set_3: sets[2].b ?? null,
+        // Was collected in the UI but never sent — silently discarded
+        comment: comment.trim() || null,
       },
     });
 

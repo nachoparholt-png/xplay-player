@@ -295,7 +295,7 @@ const Profile = () => {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="rounded-[18px] px-4.5 p-4 flex items-center justify-between bg-gradient-to-br from-[#FFBF00] to-[#E6A500] text-[#1A2833]"
+        className="rounded-[18px] px-4 p-4 flex items-center justify-between bg-gradient-to-br from-[#FFBF00] to-[#E6A500] text-[#1A2833]"
       >
         <div>
           <div className="font-display text-[10px] font-extrabold uppercase tracking-[0.16em] opacity-70">

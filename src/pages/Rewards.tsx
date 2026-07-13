@@ -43,7 +43,7 @@ import RewardCatalogCard from "@/components/rewards/RewardCatalogCard";
 import XplayProPaywall from "@/components/points/XplayProPaywall";
 import { useXplayPro } from "@/hooks/useXplayPro";
 import { Sparkles } from "lucide-react";
-import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
+import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED, XPLAY_PRO_ENABLED } from "@/lib/featureFlags";
 
 const Rewards = () => {
   const { profile, refreshProfile } = useAuth();
@@ -448,8 +448,9 @@ const Rewards = () => {
         </div>
       )}
 
-      {/* ── XPLAY Pro upsell banner ── */}
-      {!proState.active && (
+      {/* ── XPLAY Pro upsell banner — gated behind XPLAY_PRO_ENABLED so we
+          don't advertise a tier that can't be purchased yet ── */}
+      {XPLAY_PRO_ENABLED && !proState.active && (
         <button
           onClick={() => setProPaywallOpen(true)}
           className="w-full text-left bg-gradient-to-br from-primary/15 via-primary/10 to-secondary/10 border border-primary/30 rounded-2xl p-4 flex items-center gap-3 hover:from-primary/20 hover:via-primary/15 transition-colors active:scale-[0.99]"

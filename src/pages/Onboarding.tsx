@@ -280,10 +280,14 @@ function QuizStep({
   questionIndex,
   onAnswer,
   selectedAnswer,
+  onBack,
+  onSkip,
 }: {
   questionIndex: number;
   onAnswer: (value: number) => void;
   selectedAnswer: number | null;
+  onBack: () => void;
+  onSkip: () => void;
 }) {
   const q = QUESTIONS[questionIndex];
   const letters = ["A", "B", "C", "D", "E"];
@@ -347,10 +351,16 @@ function QuizStep({
 
       {/* BOTTOM NAV */}
       <div className="flex items-center gap-4 mt-8 justify-between">
-        <button className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform">
+        <button
+          onClick={onBack}
+          className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform"
+        >
           ← Back
         </button>
-        <button className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform">
+        <button
+          onClick={onSkip}
+          className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform"
+        >
           Skip for now
         </button>
       </div>
@@ -737,7 +747,7 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
       >
         <h2 className="font-display text-[28px] font-black italic uppercase leading-[0.95]">Welcome Bonus!</h2>
         <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
-          100 XPLAY Points have been added to your account. Play matches, refer friends and complete tournaments to earn more.
+          50 XPLAY Points have been added to your account. Play matches, refer friends and complete tournaments to earn more.
         </p>
         <p className="text-[11px] text-muted-foreground/60">
           100 XPLAY Points = £1 of catalogue value · Points have no cash value.
@@ -949,6 +959,10 @@ const Onboarding = () => {
             questionIndex={quizIndex}
             selectedAnswer={answers[QUESTIONS[quizIndex].id] ?? null}
             onAnswer={(v) => handleQuizAnswer(quizIndex, v)}
+            onBack={() =>
+              quizIndex === 0 ? setStep("welcome") : setStep(`quiz-${quizIndex - 1}` as Step)
+            }
+            onSkip={() => setStep("external-platform")}
           />
         )}
         {step === "external-platform" && (

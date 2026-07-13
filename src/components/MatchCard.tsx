@@ -349,8 +349,9 @@ const MatchCard = ({
         />
       </div>
 
-      {/* Odds Row — only when both teams have rated players */}
-      {matchFormat !== "social" && hasBothTeams && (
+      {/* Odds Row — gated behind STAKES_ENABLED: betting multipliers must not
+          render while wagering is disabled (no gambling licence yet) */}
+      {STAKES_ENABLED && matchFormat !== "social" && hasBothTeams && (
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex flex-col">
             <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-tighter">Team A Odds</span>
@@ -363,8 +364,8 @@ const MatchCard = ({
         </div>
       )}
 
-      {/* "Waiting for opponents" hint */}
-      {matchFormat !== "social" && !hasBothTeams && (
+      {/* "Waiting for opponents" hint — tied to the odds row, so same gate */}
+      {STAKES_ENABLED && matchFormat !== "social" && !hasBothTeams && (
         <p className="text-[10px] text-muted-foreground italic text-center mb-2">
           Factor updates as players join
         </p>

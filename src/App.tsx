@@ -18,7 +18,7 @@ import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
 import AdminRoute from "./components/AdminRoute";
 import { Stripe } from "@capacitor-community/stripe";
-import { STAKES_ENABLED } from "@/lib/featureFlags";
+import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
 
 // ── Chunk-load resilience ───────────────────────────────────────────────────
 // After a Vercel redeploy the old chunk URLs are gone. This wrapper catches
@@ -177,7 +177,12 @@ const AppRoutes = () => {
           {STAKES_ENABLED && (
             <Route path="/stakes" element={<ProtectedRoute><AppLayout><ActiveStakes /></AppLayout></ProtectedRoute>} />
           )}
-          <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
+          {/* Points-for-cash store — must stay off until POINTS_PURCHASE_ENABLED
+              flips (e-money bright line + Apple 3.1.1 requires IAP for digital
+              currency; Shopify web checkout would be rejected) */}
+          {POINTS_PURCHASE_ENABLED && (
+            <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
+          )}
           {/* Programme Rules — public like /terms + /privacy (linked from landing + legal pages) */}
           <Route path="/programme-rules" element={<ProgrammeRules />} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
