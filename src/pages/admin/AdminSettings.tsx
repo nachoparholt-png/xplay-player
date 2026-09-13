@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Settings, Save, Clock, Bell, Users, Shield, RotateCcw, MessageSquare, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -386,7 +387,8 @@ const AdminSettings = () => {
         </div>
       </motion.div>
 
-      {/* Tournament Time Estimates */}
+      {/* Tournament Time Estimates — beta lane only */}
+      {TOURNAMENTS_ENABLED && (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -424,6 +426,7 @@ const AdminSettings = () => {
           ))}
         </div>
       </motion.div>
+      )}
 
       {/* Save button */}
       <Button onClick={handleSave} disabled={saving} className="gap-2 w-full h-12 rounded-xl font-semibold">

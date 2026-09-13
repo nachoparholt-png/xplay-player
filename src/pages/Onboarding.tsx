@@ -747,7 +747,7 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
       >
         <h2 className="font-display text-[28px] font-black italic uppercase leading-[0.95]">Welcome Bonus!</h2>
         <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
-          50 XPLAY Points have been added to your account. Play matches, refer friends and complete tournaments to earn more.
+          50 XPLAY Points have been added to your account. Play matches, refer friends and keep your streak going to earn more.
         </p>
         <p className="text-[11px] text-muted-foreground/60">
           100 XPLAY Points = £1 of catalogue value · Points have no cash value.

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Gift, Trophy, Calendar, Flame, UserPlus, Award, ChevronDown, ChevronUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
 interface EarnMethod {
   icon: typeof Gift;
@@ -29,7 +30,7 @@ const EarnPointsSection = ({ title, settings: _settings }: EarnPointsSectionProp
     { icon: UserPlus, title: "Refer a friend who plays", points: "+500", highlight: true },
     { icon: Trophy, title: "Play a match", points: "+100" },
     { icon: Flame, title: "Weekly play streak", points: "+100" },
-    { icon: Trophy, title: "Play a tournament", points: "+100" },
+    ...(TOURNAMENTS_ENABLED ? [{ icon: Trophy, title: "Play a tournament", points: "+100" } as EarnMethod] : []),
     { icon: Gift, title: "Complete your profile", points: "+100" },
     { icon: Award, title: "Win bonus", points: "+25" },
     { icon: Calendar, title: "Daily check-in", points: "+5" },

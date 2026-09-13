@@ -71,3 +71,16 @@ export const AVAILABILITY_ENABLED = true;
  * multiplier; they do not buy points. Default OFF and likely to stay OFF.
  */
 export const POINTS_PURCHASE_ENABLED = false;
+
+/**
+ * ─── TOURNAMENTS_ENABLED ─────────────────────────────────────────────────────
+ * Tournament generation / live mode is OUT of the App Store MVP (decision
+ * 13 Sep 2026) and continues in the beta lane. Driven by the environment so
+ * the same code ships both ways:
+ *   .env          (prod / main)      → unset  → false → tab, routes, banner,
+ *                                       admin section and earn-row hidden;
+ *                                       /tournaments/* redirects to /matches
+ *   .env.staging  (beta / develop)   → "true" → everything visible
+ * Mirror: xplay-club-vercel/src/lib/featureFlags.ts
+ */
+export const TOURNAMENTS_ENABLED = import.meta.env.VITE_TOURNAMENTS_ENABLED === "true";

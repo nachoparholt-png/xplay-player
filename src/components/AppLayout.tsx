@@ -13,18 +13,28 @@ import {
   IconRewards,
   IconProfile,
 } from "@/components/icons/XPlayIcons";
+import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
-const navItems = [
-  { path: "/matches", icon: IconMatches, label: "Matches" },
-  { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
-  { path: "/rewards", icon: IconRewards, label: "Rewards" },
-  { path: "/profile", icon: IconProfile, label: "Profile" },
-];
+// Mobile tab bar (4 slots). MVP: Tourneys is out, so Messages takes its slot.
+// Beta (TOURNAMENTS_ENABLED): Tourneys is back and Messages lives in the header bell/sidebar.
+const navItems = TOURNAMENTS_ENABLED
+  ? [
+      { path: "/matches", icon: IconMatches, label: "Matches" },
+      { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
+      { path: "/rewards", icon: IconRewards, label: "Rewards" },
+      { path: "/profile", icon: IconProfile, label: "Profile" },
+    ]
+  : [
+      { path: "/matches", icon: IconMatches, label: "Matches" },
+      { path: "/messages", icon: MessageSquare, label: "Messages" },
+      { path: "/rewards", icon: IconRewards, label: "Rewards" },
+      { path: "/profile", icon: IconProfile, label: "Profile" },
+    ];
 
 // Full list including Messages — used for desktop sidebar only
 const sidebarItems = [
   { path: "/matches", icon: IconMatches, label: "Matches" },
-  { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
+  ...(TOURNAMENTS_ENABLED ? [{ path: "/tournaments", icon: IconTournaments, label: "Tourneys" }] : []),
   { path: "/rewards", icon: IconRewards, label: "Rewards" },
   { path: "/messages", icon: MessageSquare, label: "Messages" },
   { path: "/profile", icon: IconProfile, label: "Profile" },
@@ -97,6 +107,8 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </button>
           <div className="flex items-center gap-1.5">
             <PointsBalanceChip compact />
+            {/* Header Messages shortcut only when Messages isn't already a tab (beta lane) */}
+            {TOURNAMENTS_ENABLED && (
             <button
               onClick={() => navigate("/messages")}
               className={`p-2 rounded-xl transition-colors active:scale-95 ${
@@ -108,6 +120,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             >
               <MessageSquare className="w-5 h-5" />
             </button>
+            )}
             <NotificationBell />
           </div>
         </div>

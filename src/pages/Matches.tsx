@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import ClubsExplorer from "@/components/clubs/ClubsExplorer";
 import CourtFinder from "@/components/courts/CourtFinder";
 import LiveTournamentBanner from "@/components/tournaments/live/LiveTournamentBanner";
+import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
 type MatchRow = {
   id: string;
@@ -433,7 +434,7 @@ const Matches = () => {
       <div className="px-4 py-5 space-y-6">
 
         {/* P1 — LIVE tournament banner (auto-hidden when no live tournament for the user) */}
-        <LiveTournamentBanner />
+        {TOURNAMENTS_ENABLED && <LiveTournamentBanner />}
 
         {/* TOP-LEVEL TOGGLE: Matches | Clubs */}
         <div className="flex gap-4 border-b border-border/20">

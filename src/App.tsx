@@ -18,7 +18,7 @@ import OfflineBanner from "./components/OfflineBanner";
 import AdminLayout from "./components/AdminLayout";
 import AdminRoute from "./components/AdminRoute";
 import { Stripe } from "@capacitor-community/stripe";
-import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED } from "@/lib/featureFlags";
+import { STAKES_ENABLED, POINTS_PURCHASE_ENABLED, TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
 // ── Chunk-load resilience ───────────────────────────────────────────────────
 // After a Vercel redeploy the old chunk URLs are gone. This wrapper catches
@@ -188,10 +188,18 @@ const AppRoutes = () => {
           <Route path="/matches/create" element={<ProtectedRoute><AppLayout><CreateMatch /></AppLayout></ProtectedRoute>} />
           <Route path="/matches/:id" element={<ProtectedRoute><AppLayout><MatchDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/matches/:id/stats" element={<ProtectedRoute><PostMatchStats /></ProtectedRoute>} />
-          <Route path="/tournaments" element={<ProtectedRoute><AppLayout><TournamentsList /></AppLayout></ProtectedRoute>} />
-          <Route path="/tournaments/new" element={<ProtectedRoute><AppLayout><TournamentWizard /></AppLayout></ProtectedRoute>} />
-          <Route path="/tournaments/:id" element={<ProtectedRoute><AppLayout><TournamentDetail /></AppLayout></ProtectedRoute>} />
-          <Route path="/tournaments/:id/live" element={<ProtectedRoute><AppLayout><TournamentLive /></AppLayout></ProtectedRoute>} />
+          {/* Tournaments — beta lane only (TOURNAMENTS_ENABLED). In the MVP any
+              stray deep link (notification, email, push) lands on /matches. */}
+          {TOURNAMENTS_ENABLED ? (
+            <>
+              <Route path="/tournaments" element={<ProtectedRoute><AppLayout><TournamentsList /></AppLayout></ProtectedRoute>} />
+              <Route path="/tournaments/new" element={<ProtectedRoute><AppLayout><TournamentWizard /></AppLayout></ProtectedRoute>} />
+              <Route path="/tournaments/:id" element={<ProtectedRoute><AppLayout><TournamentDetail /></AppLayout></ProtectedRoute>} />
+              <Route path="/tournaments/:id/live" element={<ProtectedRoute><AppLayout><TournamentLive /></AppLayout></ProtectedRoute>} />
+            </>
+          ) : (
+            <Route path="/tournaments/*" element={<Navigate to="/matches" replace />} />
+          )}
           <Route path="/messages" element={<ProtectedRoute><AppLayout><Messages /></AppLayout></ProtectedRoute>} />
           <Route path="/messages/:conversationId" element={<ProtectedRoute><AppLayout><ChatThread /></AppLayout></ProtectedRoute>} />
           <Route path="/rewards" element={<ProtectedRoute><AppLayout><Rewards /></AppLayout></ProtectedRoute>} />
@@ -228,8 +236,10 @@ const AppRoutes = () => {
             <Route path="/admin/betting" element={<AdminRoute><AdminLayout><AdminBettingSettings /></AdminLayout></AdminRoute>} />
           )}
           <Route path="/admin/products" element={<AdminRoute><AdminLayout><AdminProducts /></AdminLayout></AdminRoute>} />
-          <Route path="/admin/tournament-categories" element={<AdminRoute><AdminLayout><AdminTournamentCategories /></AdminLayout></AdminRoute>} />
-          {STAKES_ENABLED && (
+          {TOURNAMENTS_ENABLED && (
+            <Route path="/admin/tournament-categories" element={<AdminRoute><AdminLayout><AdminTournamentCategories /></AdminLayout></AdminRoute>} />
+          )}
+          {TOURNAMENTS_ENABLED && STAKES_ENABLED && (
             <Route path="/tournaments/:id/bets" element={<AdminRoute><AdminLayout><TournamentBetConfig /></AdminLayout></AdminRoute>} />
           )}
           <Route path="*" element={<NotFound />} />
