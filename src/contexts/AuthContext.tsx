@@ -12,6 +12,8 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  /** true once the first profile fetch for the current session has completed (even if it returned nothing) */
+  profileLoaded: boolean;
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   user: null,
   profile: null,
+  profileLoaded: false,
   loading: true,
   refreshProfile: async () => {},
   signOut: async () => {},
@@ -32,15 +35,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    setProfile(data);
+    // Own row via SECURITY DEFINER RPC: date_of_birth / push_token /
+    // stripe_customer_id are not selectable on the table by clients (WS5).
+    // (types.ts predates this RPC — cast until the generated types are refreshed)
+    const { data } = await (supabase as any).rpc("get_my_profile").maybeSingle();
+    setProfile((data as Profile | null) ?? null);
+    setProfileLoaded(true);
   };
 
   const refreshProfile = async () => {
@@ -80,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         } else {
           setProfile(null);
+          setProfileLoaded(false);
         }
         // Only set loading false after we've handled at least the initial event
         if (event === 'INITIAL_SESSION' || !initialSessionHandled) {
@@ -163,7 +168,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, profileLoaded, loading, refreshProfile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

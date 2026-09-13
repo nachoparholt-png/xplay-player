@@ -131,25 +131,11 @@ const ProfileSettings = () => {
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
-      // ── +20 XP: profile completion bonus (once only) ───────────────
-      const isComplete =
-        !!form.display_name.trim() &&
-        !!form.avatar_url &&
-        !!form.padel_level;
-      const alreadyGranted = (profile as any)?.profile_completed_bonus_granted === true;
-
-      if (isComplete && !alreadyGranted) {
-        await supabase.rpc("increment_points", { p_user_id: user.id, p_amount: 20 });
-        await supabase
-          .from("profiles")
-          .update({ profile_completed_bonus_granted: true })
-          .eq("user_id", user.id);
-      }
-      // ────────────────────────────────────────────────────────────────
-
+      // (The onboarding completion bonus is granted server-side; there is no
+      //  separate profile-edit bonus — WS5 removed the phantom +20 XP.)
       await refreshProfile();
       toast({
-        title: isComplete && !alreadyGranted ? "Profile updated! +20 XP 🎉" : "Profile updated!",
+        title: "Profile updated!",
       });
       navigate("/profile");
     }

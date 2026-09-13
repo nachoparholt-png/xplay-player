@@ -372,12 +372,7 @@ const MatchDetail = () => {
       toast({ title: "You joined the match! 🎾" });
       // Auto-add to match chat
       addPlayerToMatchChat(match.id, user.id);
-      const newCount = confirmedPlayers.length + 1;
-      if (newCount >= match.max_players) {
-        await supabase.from("matches").update({ status: "full" }).eq("id", match.id);
-      } else if (newCount >= match.max_players - 1) {
-        await supabase.from("matches").update({ status: "almost_full" }).eq("id", match.id);
-      }
+      // matches.status / spots_left are derived server-side (trg_update_match_spots)
       // Recalculate betting odds
       if (match.format !== "social") {
         await supabase.functions.invoke("update-match-factor", { body: { match_id: match.id } });
@@ -538,12 +533,6 @@ const MatchDetail = () => {
       if (status === "confirmed") {
         addPlayerToMatchChat(match.id, user.id);
       }
-      const newCount = confirmedPlayers.length + (status === "confirmed" ? 1 : 0);
-      if (newCount >= match.max_players) {
-        await supabase.from("matches").update({ status: "full" }).eq("id", match.id);
-      } else if (newCount >= match.max_players - 1) {
-        await supabase.from("matches").update({ status: "almost_full" }).eq("id", match.id);
-      }
       if (status === "confirmed" && match.format !== "social") {
         await supabase.functions.invoke("update-match-factor", { body: { match_id: match.id } });
       }
@@ -582,7 +571,7 @@ const MatchDetail = () => {
           _link: `/matches/${match.id}`,
         });
       }
-      await supabase.from("matches").update({ status: "open" }).eq("id", match.id);
+      // matches.status / spots_left are derived server-side after the delete
       // Recalculate betting odds
       if (match.format !== "social") {
         await supabase.functions.invoke("update-match-factor", { body: { match_id: match.id } });
@@ -708,23 +697,15 @@ const MatchDetail = () => {
   const handleApproveRequest = async (request: typeof joinRequests[0]) => {
     if (!user || !match) return;
     setProcessingRequest(request.id);
-    await supabase.from("match_join_approvals").insert({ request_id: request.id, approver_id: user.id });
-    const newApprovals = [...request.approvals, user.id];
-    const allApproved = confirmedPlayers.every((p) => newApprovals.includes(p.user_id));
-    if (allApproved) {
-      const teamACnt = confirmedPlayers.filter((p) => p.team === "A").length;
-      const teamBCnt = confirmedPlayers.filter((p) => p.team === "B").length;
-      const team = teamACnt <= teamBCnt ? "A" : "B";
-      await supabase.from("match_players").insert({ match_id: match.id, user_id: request.user_id, status: "confirmed", team });
-      await supabase.from("match_join_requests").update({ status: "approved" }).eq("id", request.id);
-      await supabase.rpc("create_notification_for_user", {
-        _user_id: request.user_id, _type: "match_update", _title: "Request approved! 🎾",
-        _body: `All players approved your request. You're now in the match at ${match.club}!`,
-        _link: `/matches/${match.id}`,
-      });
+    // Server-side: records the approval, checks every confirmed player has
+    // approved, seats the player on the smaller team and notifies them.
+    const { data, error } = await (supabase as any).rpc("approve_join_request", { _request_id: request.id });
+    if (error) {
+      toast({ title: "Could not approve", description: error.message, variant: "destructive" });
+    } else if ((data as any)?.approved) {
       toast({ title: "Request approved", description: `${request.display_name || "Player"} has been added.` });
     } else {
-      toast({ title: "Approval recorded", description: `Waiting for ${confirmedPlayers.length - newApprovals.length} more player(s).` });
+      toast({ title: "Approval recorded", description: `Waiting for ${(data as any)?.pending ?? "more"} more player(s).` });
     }
     fetchMatch(); fetchJoinRequests(); setProcessingRequest(null);
   };

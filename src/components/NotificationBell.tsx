@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
 type Notification = {
   id: string;
@@ -43,6 +44,14 @@ const typeIcon = (type: string) => {
   }
 };
 
+// MVP: tournament notifications are hidden (the feature lives in the beta lane);
+// club-targeted rows never belong in the players bell.
+const isVisibleNotification = (n: { type?: string | null; link?: string | null; target_app?: string | null }) => {
+  if (n.target_app && !["player", "all"].includes(n.target_app)) return false;
+  if (!TOURNAMENTS_ENABLED && ((n.type ?? "").startsWith("tournament") || (n.link ?? "").startsWith("/tournaments"))) return false;
+  return true;
+};
+
 const NotificationBell = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -63,8 +72,9 @@ const NotificationBell = () => {
       .limit(20);
 
     if (data) {
-      setNotifications(data as Notification[]);
-      setUnreadCount(data.filter((n: any) => !n.read).length);
+      const visible = (data as Notification[]).filter((n: any) => isVisibleNotification(n));
+      setNotifications(visible);
+      setUnreadCount(visible.filter((n: any) => !n.read).length);
     }
   };
 
@@ -84,6 +94,7 @@ const NotificationBell = () => {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
+          if (!isVisibleNotification(newNotif as any)) return;
           setNotifications((prev) => [newNotif, ...prev]);
           setUnreadCount((prev) => prev + 1);
         }

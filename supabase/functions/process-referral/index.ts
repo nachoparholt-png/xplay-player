@@ -1,3 +1,11 @@
+// process-referral
+//
+// Records the referral link between a newly signed-up user and the inviter
+// whose code they used. It does NOT grant any points: the reward (500 pts to
+// the inviter) is paid server-side by the DB trigger
+// `trg_award_referral_on_first_match` when the referee plays their first match,
+// and only while `referrals.reward_granted_at IS NULL`. So this function must
+// leave the row `pending` with `reward_granted_at = NULL`.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -6,7 +14,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const REFERRAL_REWARD_PTS = 50;
+const REFERRAL_REWARD_PTS = 500; // informational only — paid by DB trigger on first match
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -82,72 +90,56 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if already rewarded
-    const { data: existing } = await admin
+    // Duplicate checks: the invited user may only ever be referred once
+    // (by anyone), and the same pair must not be recorded twice.
+    const { data: anyExisting } = await admin
       .from("referrals")
-      .select("id, referral_status")
-      .eq("inviter_user_id", inviterProfile.user_id)
+      .select("id, inviter_user_id, referral_status")
       .eq("invited_user_id", userId)
+      .limit(1)
       .maybeSingle();
 
-    if (existing?.referral_status === "completed") {
-      return new Response(JSON.stringify({ ok: true, message: "Already processed" }), {
+    if (anyExisting) {
+      // Same inviter -> idempotent; different inviter -> already referred by someone else.
+      const msg = anyExisting.inviter_user_id === inviterProfile.user_id
+        ? "Already processed"
+        : "User already referred";
+      return new Response(JSON.stringify({ ok: true, message: msg }), {
         headers: corsHeaders,
       });
     }
 
-    // Upsert referral to completed
-    if (existing) {
-      await admin
-        .from("referrals")
-        .update({ referral_status: "completed", reward_granted_at: new Date().toISOString() })
-        .eq("id", existing.id);
-    } else {
-      await admin.from("referrals").insert({
-        inviter_user_id: inviterProfile.user_id,
-        invited_user_id: userId,
-        referral_code,
-        referral_status: "completed",
-        reward_granted_at: new Date().toISOString(),
-      });
+    // Record the referral link only. Reward is granted later by the DB trigger.
+    const { error: insertErr } = await admin.from("referrals").insert({
+      inviter_user_id: inviterProfile.user_id,
+      invited_user_id: userId,
+      referral_code,
+      referral_status: "pending",
+      reward_granted_at: null,
+    });
+
+    if (insertErr) {
+      // Unique-violation race (double invoke) is fine — treat as processed.
+      if (insertErr.code === "23505") {
+        return new Response(JSON.stringify({ ok: true, message: "Already processed" }), {
+          headers: corsHeaders,
+        });
+      }
+      throw insertErr;
     }
 
-    // Credit inviter points
-    await admin.rpc("increment_points", {
-      p_user_id: inviterProfile.user_id,
-      p_amount: REFERRAL_REWARD_PTS,
-    });
-
-    // Get inviter balance for transaction log
-    const { data: inviterBal } = await admin
-      .from("profiles")
-      .select("padel_park_points")
-      .eq("user_id", inviterProfile.user_id)
-      .single();
-
-    const balAfter = inviterBal?.padel_park_points ?? 0;
-
-    await admin.from("points_transactions").insert({
-      user_id: inviterProfile.user_id,
-      amount: REFERRAL_REWARD_PTS,
-      balance_before: balAfter - REFERRAL_REWARD_PTS,
-      balance_after: balAfter,
-      transaction_type: "bonus",
-      reason: `Referral bonus: invited user joined via code ${referral_code}`,
-    });
-
-    // Notify the inviter
+    // Tell the inviter someone joined with their code (no points yet).
     await admin.rpc("create_notification_for_user", {
       _user_id: inviterProfile.user_id,
       _type: "referral",
-      _title: "🎉 Referral Reward!",
-      _body: "A friend joined XPLAY using your referral link — you've earned 50 XPLAY points! Keep sharing to earn more.",
+      _title: "👋 A friend joined with your code",
+      _body: `Someone joined XPLAY using your referral code — you'll get ${REFERRAL_REWARD_PTS} XPLAY points when they play their first match.`,
       _link: "/points-store",
     });
 
     return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
       status: 500,
       headers: corsHeaders,
     });

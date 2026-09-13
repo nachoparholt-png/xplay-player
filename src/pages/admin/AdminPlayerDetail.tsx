@@ -88,7 +88,7 @@ const AdminPlayerDetail = () => {
     setLoading(true);
 
     const [{ data: profileData }, { data: txData }, { data: noteData }, { data: stakeData }] = await Promise.all([
-      supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+      (supabase as any).rpc("admin_get_profile", { _user_id: userId }).maybeSingle(),
       supabase.from("points_transactions").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(50),
       supabase.from("admin_notes").select("*").eq("target_user_id", userId).order("created_at", { ascending: false }),
       // match_stakes is locked while STAKES_ENABLED=false — skip the query

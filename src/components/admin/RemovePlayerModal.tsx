@@ -35,8 +35,7 @@ const RemovePlayerModal = ({ open, onOpenChange, matchId, playerId, playerName, 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      // Update match status back to open
-      await supabase.from("matches").update({ status: "open" }).eq("id", matchId);
+      // matches.status / spots_left are derived server-side after the delete
 
       // Send notification to removed player
       await supabase.rpc("create_notification_for_user", {

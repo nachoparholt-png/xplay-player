@@ -114,11 +114,14 @@ const PageLoader = () => (
 );
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, profileLoaded, loading } = useAuth();
   const location = useLocation();
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   if (!session) return <Navigate to="/auth" replace />;
-  if (profile && !profile.onboarding_completed && location.pathname !== "/onboarding") {
+  // The profile is fetched right after the session event — wait for that first
+  // fetch instead of rendering /matches for a user who still has to onboard.
+  if (!profileLoaded) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  if ((!profile || !profile.onboarding_completed || !profile.terms_accepted_at) && location.pathname !== "/onboarding") {
     return <Navigate to="/onboarding" replace />;
   }
   return <>{children}</>;

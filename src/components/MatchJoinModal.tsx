@@ -201,13 +201,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     const doJoin = async () => {
       const { error } = await supabase.from("match_players").insert({ match_id: matchId, user_id: user.id });
       if (error) throw new Error(error.message);
-
-      const filledCount = filledNow + 1;
-      if (filledCount >= maxPlayers) {
-        await supabase.from("matches").update({ status: "full" }).eq("id", matchId);
-      } else if (filledCount >= maxPlayers - 1) {
-        await supabase.from("matches").update({ status: "almost_full" }).eq("id", matchId);
-      }
+      // matches.status / spots_left are derived server-side (trg_update_match_spots)
     };
 
     // ── Offline path: queue the operation ──────────────────────────
@@ -233,20 +227,11 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     setJoining(true);
     try {
       await doJoin();
-
-      // ── +30 XP: first match bonus (once only) ─────────────────────
-      const alreadyGranted = (profile as any)?.first_match_bonus_granted === true;
-      if (!alreadyGranted) {
-        await supabase.rpc("increment_points", { p_user_id: user.id, p_amount: 30 });
-        await supabase
-          .from("profiles")
-          .update({ first_match_bonus_granted: true })
-          .eq("user_id", user.id);
-      }
-      // ───────────────────────────────────────────────────────────────
+      // Match points (play_match, win bonus) are granted server-side when the
+      // score is confirmed — no client-side bonus.
 
       toast({
-        title: !alreadyGranted ? "You're in! +30 XP 🎾" : "You're in! 🎾",
+        title: "You're in! 🎾",
         description: "Match added to My Matches",
       });
       onOpenChange(false);
@@ -304,12 +289,6 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      const newCount = confirmedCount + 1;
-      if (newCount >= (match.max_players ?? 4)) {
-        await supabase.from("matches").update({ status: "full" }).eq("id", match.id);
-      } else if (newCount >= (match.max_players ?? 4) - 1) {
-        await supabase.from("matches").update({ status: "almost_full" }).eq("id", match.id);
-      }
       toast({ title: "Spot claimed! 🎾", description: "You're now confirmed in this match." });
       onOpenChange(false);
       navigate("/matches");

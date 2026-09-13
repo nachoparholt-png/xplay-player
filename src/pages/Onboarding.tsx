@@ -729,14 +729,14 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
         </div>
       </motion.div>
 
-      {/* Floating +50 XP label */}
+      {/* Floating +100 XP label */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.35 }}
         className="bg-primary/10 border border-primary/30 rounded-2xl px-6 py-2 mb-6"
       >
-        <span className="font-display text-4xl font-black text-primary tracking-tight">+50 XP</span>
+        <span className="font-display text-4xl font-black text-primary tracking-tight">+100 XP</span>
       </motion.div>
 
       <motion.div
@@ -747,7 +747,7 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
       >
         <h2 className="font-display text-[28px] font-black italic uppercase leading-[0.95]">Welcome Bonus!</h2>
         <p className="text-[12px] text-muted-foreground leading-[1.6] max-w-xs">
-          50 XPLAY Points have been added to your account. Play matches, refer friends and keep your streak going to earn more.
+          100 XPLAY Points have been added to your account. Play matches, refer friends and keep your streak going to earn more.
         </p>
         <p className="text-[11px] text-muted-foreground/60">
           100 XPLAY Points = £1 of catalogue value · Points have no cash value.
@@ -919,8 +919,8 @@ const Onboarding = () => {
 
       if (error) throw error;
 
-      // Grant 50 XP welcome bonus — uses SECURITY DEFINER RPC that bypasses RLS
-      await supabase.rpc("increment_points", { p_user_id: user.id, p_amount: 50 });
+      // Welcome bonus (100 pts, rule complete_profile) is granted server-side by
+      // trigger award_profile_completion when onboarding_completed flips to true.
 
       await refreshProfile();
       // Show celebration screen before navigating

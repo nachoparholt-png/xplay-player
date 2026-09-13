@@ -126,8 +126,7 @@ const CancelRegistrationModal = ({
       });
     }
 
-    // Update match status back to open
-    await supabase.from("matches").update({ status: "open" }).eq("id", matchId);
+    // matches.status / spots_left are derived server-side after the delete
 
     // Remove from match chat with system message
     await removePlayerFromMatchChat(matchId, user.id, "cancelled");

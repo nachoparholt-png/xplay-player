@@ -45,7 +45,7 @@ export function useDailyCheckIn(): void {
     firedRef.current = true;
 
     supabase
-      .rpc("award_points", { _user_id: userId, _action_type: "daily_check_in" })
+      .rpc("daily_check_in" as any)
       .then(({ error }) => {
         if (error) {
           // Don't show user error — non-critical. Log for debugging.
