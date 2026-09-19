@@ -138,7 +138,10 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, profile, loading } = useAuth();
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
   if (!session) return <Navigate to="/auth" replace />;
-  if (profile && profile.onboarding_completed) return <Navigate to="/matches" replace />;
+  // Must mirror ProtectedRoute: an onboarded profile WITHOUT accepted terms (accounts
+  // created before the age/terms gate) has to stay here to accept them — bouncing it
+  // to /matches made the two guards redirect to each other forever.
+  if (profile && profile.onboarding_completed && profile.terms_accepted_at) return <Navigate to="/matches" replace />;
   return <>{children}</>;
 };
 

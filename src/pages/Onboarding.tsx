@@ -831,6 +831,12 @@ const Onboarding = () => {
         })
         .eq("user_id", user.id);
       if (error) throw error;
+      if (profile?.onboarding_completed) {
+        // Existing account that only needed the age/terms gate — skip the quiz.
+        await refreshProfile();
+        navigate("/matches", { replace: true });
+        return;
+      }
       setStep("welcome");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
