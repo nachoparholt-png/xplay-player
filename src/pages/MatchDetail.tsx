@@ -873,8 +873,12 @@ const MatchDetail = () => {
           onClick={() => setViewPlayerId(player.user_id)}
           className="flex items-center gap-3 py-2.5 w-full text-left hover:bg-muted/30 rounded-lg transition-colors cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary">
-            {player.profiles?.display_name?.[0]?.toUpperCase() || "?"}
+          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary overflow-hidden shrink-0">
+            {player.profiles?.avatar_url ? (
+              <img src={player.profiles.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              player.profiles?.display_name?.[0]?.toUpperCase() || "?"
+            )}
           </div>
           <span className="text-sm font-medium flex-1 truncate">{player.profiles?.display_name || "Player"}</span>
           <span className="text-xs font-semibold text-primary">
@@ -884,17 +888,27 @@ const MatchDetail = () => {
       );
     }
 
+    // Already in this team → the only useful action on an empty slot is inviting someone.
+    const inviteOnly = isJoined && currentPlayerEntry?.team === team;
     return (
       <button
-        onClick={() => isPreGame && user && setSlotAction({ team, slotIndex: index })}
-        className="flex items-center gap-3 py-2.5 w-full text-left group"
+        onClick={() => {
+          if (!isPreGame || !user) return;
+          if (inviteOnly) {
+            setInviteTarget({ team, slotIndex: index });
+            setShowInviteModal(true);
+          } else {
+            setSlotAction({ team, slotIndex: index });
+          }
+        }}
+        className="flex items-center gap-2.5 py-2.5 w-full min-h-[44px] text-left group"
         disabled={!isPreGame || !user}
       >
         <div className="w-9 h-9 rounded-full bg-muted/50 border border-dashed border-muted-foreground/30 flex items-center justify-center group-hover:border-primary/50 transition-colors">
           <User className="w-4 h-4 text-muted-foreground/50" />
         </div>
-        <span className="text-sm text-muted-foreground/60 flex-1">Open spot</span>
-        <span className="text-xs text-primary/60 font-medium">Tap to fill</span>
+        <span className="text-sm text-muted-foreground flex-1 whitespace-nowrap">Open</span>
+        <span className="text-xs text-primary font-semibold whitespace-nowrap">{inviteOnly ? "Invite" : isJoined ? "Switch" : "Join"}</span>
       </button>
     );
   };
@@ -1073,16 +1087,19 @@ const MatchDetail = () => {
           {/* Skill delta bar */}
           <div className="px-4 py-3 bg-surface-container/50 border-t border-border/30">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-              <span>Team A Lvl: {teamALevel.toFixed(1)}</span>
-              <span className="text-primary/70">Skill Delta</span>
-              <span>Team B Lvl: {teamBLevel.toFixed(1)}</span>
+              <span>Team A avg {teamALevel > 0 ? teamALevel.toFixed(1) : "—"}</span>
+              <span className="text-primary/80">Level balance</span>
+              <span>Team B avg {teamBLevel > 0 ? teamBLevel.toFixed(1) : "—"}</span>
             </div>
+            {/* The balance bar only means something once both teams have a player. */}
+            {teamALevel > 0 && teamBLevel > 0 && (
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full transition-all duration-500"
                 style={{ width: `${(teamALevel / totalLevel) * 100}%` }}
               />
             </div>
+            )}
           </div>
         </motion.div>
 

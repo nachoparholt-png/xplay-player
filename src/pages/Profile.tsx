@@ -248,7 +248,7 @@ const Profile = () => {
             </Avatar>
           </div>
           <div className="flex-1 min-w-0 pr-16">
-            <h2 className="font-display text-[24px] font-black italic uppercase leading-none truncate">
+            <h2 className="font-display text-[22px] font-black italic uppercase leading-[1.05] line-clamp-2 break-words">
               {profile?.display_name || "Player"}
             </h2>
             <p className="text-xs text-muted-foreground mt-1 truncate">
@@ -419,7 +419,7 @@ const Profile = () => {
           {
             icon: <BarChart3 className="w-[18px] h-[18px] text-primary" />,
             title: "My matches",
-            sub: `${totalMatches} matches · ${wins} W · ${totalMatches - wins} L`,
+            sub: totalMatches > 0 ? `${totalMatches} played · ${wins} W · ${totalMatches - wins} L` : "Upcoming and played matches",
             to: "/matches",
           },
           {
@@ -429,9 +429,9 @@ const Profile = () => {
             to: "/bookings",
           },
           {
-            icon: <Bell className="w-[18px] h-[18px] text-primary" />,
+            icon: <Settings className="w-[18px] h-[18px] text-primary" />,
             title: "Settings",
-            sub: "Account, notifications & privacy",
+            sub: "Edit profile, legal & delete account",
             to: "/profile/settings",
           },
         ].map((r) => (

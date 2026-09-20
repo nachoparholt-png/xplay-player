@@ -148,6 +148,25 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Pages that render outside AppLayout. html/body/#root are height:100% + overflow:hidden
+// (no rubber-band on the shell), so a page with no scroll container of its own cannot
+// scroll at all — Terms and Privacy were cut off after the first screen. This gives every
+// standalone page one scroll area that also clears the notch and the home indicator.
+const StandalonePage = ({ children }: { children: React.ReactNode }) => (
+  <div
+    className="h-full flex flex-col bg-background"
+    style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+  >
+    {/* The insets sit outside the scroll area so sticky headers stop below the notch. */}
+    <div
+      className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+      style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+    >
+      {children}
+    </div>
+  </div>
+);
+
 const RouteErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   const { pathname } = useLocation();
   return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
@@ -184,14 +203,14 @@ const AppRoutes = () => {
       <RecoveryRedirect />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+          <Route path="/auth" element={<AuthRoute><StandalonePage><Auth /></StandalonePage></AuthRoute>} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           {/* Set-new-password after a recovery link (self-guards on session) */}
-          <Route path="/auth/reset" element={<ResetPassword />} />
+          <Route path="/auth/reset" element={<StandalonePage><ResetPassword /></StandalonePage>} />
           {/* Legal pages — public, reachable signed-out (App Store requirement) */}
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
+          <Route path="/terms" element={<StandalonePage><Terms /></StandalonePage>} />
+          <Route path="/privacy" element={<StandalonePage><Privacy /></StandalonePage>} />
+          <Route path="/onboarding" element={<OnboardingRoute><StandalonePage><Onboarding /></StandalonePage></OnboardingRoute>} />
           <Route path="/" element={<Navigate to="/matches" replace />} />
           <Route path="/matches" element={<ProtectedRoute><AppLayout><Matches /></AppLayout></ProtectedRoute>} />
           <Route path="/matches/create" element={<ProtectedRoute><AppLayout><CreateMatch /></AppLayout></ProtectedRoute>} />
@@ -226,7 +245,7 @@ const AppRoutes = () => {
             <Route path="/points-store" element={<ProtectedRoute><AppLayout><PointsStore /></AppLayout></ProtectedRoute>} />
           )}
           {/* Programme Rules — public like /terms + /privacy (linked from landing + legal pages) */}
-          <Route path="/programme-rules" element={<ProgrammeRules />} />
+          <Route path="/programme-rules" element={<StandalonePage><ProgrammeRules /></StandalonePage>} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><AppLayout><Bookings /></AppLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />
@@ -251,7 +270,7 @@ const AppRoutes = () => {
           {TOURNAMENTS_ENABLED && STAKES_ENABLED && (
             <Route path="/tournaments/:id/bets" element={<AdminRoute><AdminLayout><TournamentBetConfig /></AdminLayout></AdminRoute>} />
           )}
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={<StandalonePage><NotFound /></StandalonePage>} />
         </Routes>
       </Suspense>
     </RouteErrorBoundary>

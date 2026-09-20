@@ -95,7 +95,7 @@ const ClubMarketTab = ({ clubId, clubName, membershipDiscount = 0 }: ClubMarketT
 
     try {
       if (payMode === "xp") {
-        if (effectiveXp === null) throw new Error("This product is not redeemable with XP");
+        if (effectiveXp === null) throw new Error("This product can't be redeemed with XPLAY Points");
         if (userXp < effectiveXp * quantity) throw new Error(`Not enough XP. You need ${effectiveXp * quantity} XP.`);
 
         // Deduct XP
@@ -366,7 +366,7 @@ const ClubMarketTab = ({ clubId, clubName, membershipDiscount = 0 }: ClubMarketT
                 {payMode === "xp" && discountedXp(selected) !== null && userXp < discountedXp(selected)! * quantity ? (
                   <div className="text-center space-y-2">
                     <p className="text-xs text-destructive font-semibold">
-                      Not enough XP — you need {discountedXp(selected)! * quantity - userXp} more
+                      Not enough XPLAY Points — you need {discountedXp(selected)! * quantity - userXp} more
                     </p>
                     <Button
                       variant="outline"
@@ -409,7 +409,7 @@ const ClubMarketTab = ({ clubId, clubName, membershipDiscount = 0 }: ClubMarketT
               <p className="font-display font-black text-xl">Order placed!</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {payMode === "xp"
-                  ? "Your XP have been deducted. Collect at the club."
+                  ? "Your XPLAY Points have been deducted. Collect at the club."
                   : "The club will confirm and prepare your order."}
               </p>
             </div>

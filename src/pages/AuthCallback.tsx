@@ -18,7 +18,18 @@ const AuthCallback = () => {
         localStorage.getItem("xplay_recovery_pending") === "1";
 
       if (!code) {
-        // No code in URL — nothing to exchange, go back to login
+        // The provider sent the player back without a code: they cancelled, or the
+        // provider refused. Say so instead of silently dropping them on the login form.
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const providerError =
+          params.get("error_description") || hash.get("error_description") || params.get("error") || hash.get("error");
+        if (providerError) {
+          const cancelled = /access_denied|cancel/i.test(providerError);
+          setErrorMsg(cancelled ? "Sign-in was cancelled" : `Sign-in didn't complete (${providerError.replace(/\+/g, " ")})`);
+          setTimeout(() => navigate("/auth", { replace: true }), 3000);
+          return;
+        }
+        // No code and no error — nothing to exchange, go back to login
         navigate("/auth", { replace: true });
         return;
       }
@@ -69,7 +80,7 @@ const AuthCallback = () => {
             <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 14, margin: 0 }}>Signing you in…</p>
           </>
         ) : (
-          <p style={{ color: "#f87171", fontSize: 14, margin: 0 }}>{errorMsg} — redirecting…</p>
+          <p style={{ color: "#fca5a5", fontSize: 15, margin: 0, textAlign: "center", padding: "0 24px" }}>{errorMsg}. Taking you back to sign in…</p>
         )}
       </div>
       <style>{`@keyframes xplay-spin { to { transform: rotate(360deg); } }`}</style>

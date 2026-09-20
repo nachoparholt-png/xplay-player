@@ -19,6 +19,7 @@ const ProductDetail = () => {
   const { profile, refreshProfile } = useAuth();
   const { addItem, isLoading: cartLoading } = useCartStore();
   const [selectedVariantIdx, setSelectedVariantIdx] = useState(0);
+  const [descOpen, setDescOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
@@ -69,7 +70,7 @@ const ProductDetail = () => {
   const selectedVariant = variants[selectedVariantIdx]?.node;
   const images = node.images.edges;
   const userPoints = profile?.padel_park_points ?? 0;
-  // ✅ Option 2: XP price from Shopify metafield → local DB → formula
+  // XP price: local DB (what the server charges) → Shopify metafield → formula
   const pointPrice = resolveXpPrice(product, localProduct?.point_price);
   // ✅ Option 2: stock status from Shopify (availableForSale), not local DB
   const outOfStock = !shopifyInStock(product);
@@ -157,7 +158,7 @@ const ProductDetail = () => {
             </div>
           )}
           <p className="text-muted-foreground">
-            {selectedVariant ? formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode) : ""}
+            {selectedVariant ? `${pointPrice > 0 ? "or " : ""}${formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}` : ""}
           </p>
         </div>
         {outOfStock && <Badge variant="destructive">Out of Stock</Badge>}
@@ -180,22 +181,37 @@ const ProductDetail = () => {
           </div>
         )}
 
-        <p className="text-sm text-muted-foreground leading-relaxed">{node.description}</p>
-      </div>
-
-      <div className="space-y-3 pb-6">
-        {pointPrice > 0 && (
-          <Button className="w-full" size="lg" disabled={outOfStock} onClick={() => setRedeemOpen(true)}>
-            <Zap className="w-4 h-4 mr-2" />
-            Redeem with Points
+        {/* Buttons come before the long description so they are on the first screen. */}
+        <div className="space-y-3 pt-1">
+          {pointPrice > 0 && (
+            <Button className="w-full h-12 rounded-xl" size="lg" disabled={outOfStock} onClick={() => setRedeemOpen(true)}>
+              <Zap className="w-4 h-4 mr-2" />
+              Redeem with XPLAY Points
+            </Button>
+          )}
+          <Button variant="outline" className="w-full h-12 rounded-xl" size="lg" onClick={handleAddToCart} disabled={cartLoading || outOfStock}>
+            {cartLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShoppingCart className="w-4 h-4 mr-2" />}
+            Add to cart (pay by card)
           </Button>
-        )}
+        </div>
 
-        <Button variant="outline" className="w-full" size="lg" onClick={handleAddToCart} disabled={cartLoading || outOfStock}>
-          {cartLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShoppingCart className="w-4 h-4 mr-2" />}
-          Add to Cart (Pay with Card)
-        </Button>
+        {node.description && (
+          <div className="pb-6">
+            <h2 className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground mb-2">About this product</h2>
+            <p className={`text-sm text-foreground/80 leading-relaxed ${descOpen ? "" : "line-clamp-5"}`}>{node.description}</p>
+            {node.description.length > 260 && (
+              <button
+                type="button"
+                onClick={() => setDescOpen(!descOpen)}
+                className="mt-1 min-h-[44px] text-sm font-semibold text-primary"
+              >
+                {descOpen ? "Show less" : "Read more"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
 
       <MarketplaceRedeemModal
         open={redeemOpen}

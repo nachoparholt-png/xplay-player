@@ -181,7 +181,7 @@ const NotificationBell = () => {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="relative p-2 rounded-xl hover:bg-muted transition-colors"
+        className="relative w-11 h-11 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
       >
         <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
@@ -198,13 +198,15 @@ const NotificationBell = () => {
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            {/* Phone: dimmed backdrop + bottom sheet. Desktop (lg): the old anchored dropdown. */}
+            <div className="fixed inset-0 z-[60] bg-black/60 lg:bg-transparent" onClick={() => setOpen(false)} />
 
             <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className="absolute right-0 lg:right-auto lg:left-0 top-12 w-80 max-h-[70vh] bg-card border border-border/50 rounded-2xl shadow-2xl shadow-black/30 z-50 overflow-hidden"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              className="fixed inset-x-0 bottom-0 z-[61] max-h-[80dvh] rounded-t-3xl lg:absolute lg:inset-x-auto lg:bottom-auto lg:left-0 lg:top-12 lg:w-80 lg:max-h-[70vh] lg:rounded-2xl bg-card border border-border/50 shadow-2xl shadow-black/30 overflow-y-auto"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
             >
               <div className="flex items-center justify-between p-4 border-b border-border/50">
                 <h3 className="font-display font-bold text-sm">Notifications</h3>

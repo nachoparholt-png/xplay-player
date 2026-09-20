@@ -57,7 +57,8 @@ const ClubCard = ({
           </p>
 
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            {courtTypes.map((type) => (
+            {/* every club on XPLAY is a padel club — only show the tag when it says something else */}
+            {courtTypes.filter((t) => t.toLowerCase() !== "padel").map((type) => (
               <span
                 key={type}
                 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-md border border-border/30"

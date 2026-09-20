@@ -1,3 +1,4 @@
+import { poundsToXp } from "@/lib/pointsCopy";
 import { toast } from "sonner";
 
 /** Maps ISO 4217 currency codes to their display symbols. */
@@ -88,13 +89,18 @@ export interface ShopifyProduct {
 
 /**
  * Reads the XP price for a product.
- * Priority: Shopify metafield custom.xplay_points_price → local DB point_price → formula fallback.
+ * Priority: local DB point_price → Shopify metafield custom.xplay_points_price → formula fallback.
+ * The DB value comes first because it is the number the server actually charges
+ * (redeem-product / create-payment-intent read products.point_price) — the screen
+ * must never show a different price from the one deducted.
  */
 export function resolveXpPrice(
   product: ShopifyProduct,
   localPointPrice?: number | null,
 ): number {
-  // 1. Shopify metafield (source of truth in Option 2)
+  // 1. Local DB — what the redemption functions charge
+  if (localPointPrice != null && localPointPrice > 0) return localPointPrice;
+  // 2. Shopify metafield
   const mf = product.node.metafields?.find(
     (m) => m && m.namespace === "custom" && m.key === "xplay_points_price",
   );
@@ -102,10 +108,8 @@ export function resolveXpPrice(
     const parsed = parseInt(mf.value, 10);
     if (!isNaN(parsed) && parsed > 0) return parsed;
   }
-  // 2. Local DB (still works as fallback while migrating)
-  if (localPointPrice != null && localPointPrice > 0) return localPointPrice;
-  // 3. Formula: £1 → 10 XP
-  return Math.round(parseFloat(product.node.priceRange.minVariantPrice.amount) * 10);
+  // 3. Formula: £1 → 100 XP
+  return poundsToXp(parseFloat(product.node.priceRange.minVariantPrice.amount));
 }
 
 /**

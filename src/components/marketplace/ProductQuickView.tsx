@@ -279,8 +279,8 @@ export default function ProductQuickView({
                     >
                       <span>
                         {canAffordWithPoints
-                          ? "Redeem with XP"
-                          : `Buy · Mix XP + €`}
+                          ? "Redeem with XPLAY Points"
+                          : "Buy · points + card"}
                       </span>
                       {redeeming ? (
                         <Loader2 className="w-4 h-4 animate-spin" />

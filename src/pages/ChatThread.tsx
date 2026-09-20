@@ -26,6 +26,8 @@ type ConversationInfo = {
   other_user_name: string | null;
   other_user_avatar: string | null;
   participant_count: number;
+  /** "Tue 22 Sep · 18:00" for match chats, so two matches at one venue can be told apart. */
+  match_when: string | null;
 };
 
 const formatMessageTime = (dateStr: string) => format(new Date(dateStr), "HH:mm");
@@ -89,6 +91,20 @@ const ChatThread = () => {
       }
     }
 
+    let matchWhen: string | null = null;
+    if (conv.type === "match" && conv.match_id) {
+      const { data: m } = await supabase
+        .from("matches")
+        .select("match_date, match_time")
+        .eq("id", conv.match_id)
+        .maybeSingle();
+      if (m?.match_date) {
+        const d = new Date(`${m.match_date}T12:00:00`);
+        const day = isNaN(d.getTime()) ? m.match_date : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+        matchWhen = `${day}${m.match_time ? ` · ${String(m.match_time).slice(0, 5)}` : ""}`;
+      }
+    }
+
     setConvInfo({
       id: conv.id,
       type: conv.type,
@@ -97,6 +113,7 @@ const ChatThread = () => {
       other_user_name: otherUserName,
       other_user_avatar: otherUserAvatar,
       participant_count: participants?.length || 0,
+      match_when: matchWhen,
     });
 
     setLoading(false);
@@ -276,7 +293,7 @@ const ChatThread = () => {
     : convInfo?.title || "Match Chat";
 
   const headerSubtitle = convInfo?.type === "match"
-    ? `${convInfo.participant_count} player${convInfo.participant_count !== 1 ? "s" : ""}`
+    ? `${convInfo.match_when ? `${convInfo.match_when} · ` : ""}${convInfo.participant_count} player${convInfo.participant_count !== 1 ? "s" : ""}`
     : undefined;
 
   // Check if this is a solo match chat (only system messages, 1 participant)
@@ -303,10 +320,14 @@ const ChatThread = () => {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-48px)] lg:h-screen">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b border-border/50 bg-card/95 backdrop-blur-sm flex items-center gap-3">
-        <button onClick={() => navigate("/messages")} className="p-2 rounded-xl hover:bg-muted transition-colors">
+        <button
+          onClick={() => ((window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate("/messages"))}
+          aria-label="Back"
+          className="w-11 h-11 -ml-2 flex items-center justify-center rounded-xl hover:bg-muted transition-colors"
+        >
           <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </button>
 
@@ -335,9 +356,9 @@ const ChatThread = () => {
         {convInfo.match_id && (
           <button
             onClick={() => navigate(`/matches/${convInfo.match_id}`)}
-            className="text-xs text-primary font-semibold hover:underline"
+            className="min-h-[44px] px-1 text-xs text-primary font-semibold hover:underline whitespace-nowrap"
           >
-            View Match
+            View match
           </button>
         )}
       </div>

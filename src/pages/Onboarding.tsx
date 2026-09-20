@@ -51,10 +51,11 @@ const QUESTIONS = [
   },
 ];
 
-function mapExternalToXPlayLevel(externalLevel: number): number {
-  // External platforms typically use a 0–10 scale; XPLAY uses 0.5–7.0
-  const clamped = Math.max(0, Math.min(10, externalLevel));
-  const mapped = (clamped / 10) * 7;
+function mapExternalToXPlayLevel(externalLevel: number, scaleMax: number = 10): number {
+  // XPLAY uses 0.5–7.0. Playtomic is also 0–7 (so it maps 1:1); other apps are usually 0–10.
+  // Treating a Playtomic 3.5 as "3.5 out of 10" used to drop players a full level.
+  const clamped = Math.max(0, Math.min(scaleMax, externalLevel));
+  const mapped = (clamped / scaleMax) * 7;
   return Math.max(0.5, Math.min(7.0, Math.round(mapped * 2) / 2));
 }
 
@@ -423,13 +424,13 @@ function QuizStep({
       <div className="flex items-center gap-4 mt-8 justify-between">
         <button
           onClick={onBack}
-          className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform"
+          className="min-h-[44px] pr-4 text-[14px] text-muted-foreground font-semibold active:scale-95 transition-transform"
         >
           ← Back
         </button>
         <button
           onClick={onSkip}
-          className="text-[11px] text-muted-foreground/45 font-semibold active:scale-95 transition-transform"
+          className="min-h-[44px] pl-4 text-[14px] text-muted-foreground font-semibold active:scale-95 transition-transform"
         >
           Skip for now
         </button>
@@ -472,7 +473,7 @@ function LevelStep({
 
       <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
         {levelSource === "external"
-          ? "Based on your ranking on other platforms, we suggest starting at:"
+          ? "We converted your level from the other app onto XPLAY's 0.5–7 scale. We suggest starting at:"
           : "Based on your answers, we recommend starting at:"}
       </p>
 
@@ -514,7 +515,7 @@ function LevelStep({
       </div>
 
       <p className="text-xs text-muted-foreground/60 text-center mb-8 max-w-xs">
-        You can always update your level later as you play more matches.
+        After this your level moves on its own as you play rated matches.
       </p>
 
       <Button onClick={onAccept} className="w-full max-w-xs h-12 rounded-xl font-bold text-base gap-2">
@@ -654,9 +655,10 @@ function IntroStep({ onFinish }: { onFinish: () => void }) {
 function ExternalPlatformStep({
   onNext,
 }: {
-  onNext: (used: boolean, level: number | null, matches: number | null) => void;
+  onNext: (used: boolean, level: number | null, matches: number | null, scaleMax: number) => void;
 }) {
   const [usesOtherPlatform, setUsesOtherPlatform] = useState<boolean | null>(null);
+  const [scaleMax, setScaleMax] = useState<7 | 10>(7);
   const [platformLevel, setPlatformLevel] = useState("");
   const [platformMatches, setPlatformMatches] = useState("");
 
@@ -667,11 +669,11 @@ function ExternalPlatformStep({
   const handleContinue = () => {
     if (!canContinue) return;
     if (!usesOtherPlatform) {
-      onNext(false, null, null);
+      onNext(false, null, null, scaleMax);
     } else {
       const level = parseFloat(platformLevel);
       const matches = parseInt(platformMatches, 10);
-      onNext(true, isNaN(level) ? null : level, isNaN(matches) ? null : matches);
+      onNext(true, isNaN(level) ? null : level, isNaN(matches) ? null : matches, scaleMax);
     }
   };
 
@@ -688,11 +690,11 @@ function ExternalPlatformStep({
       </div>
 
       <h2 className="font-display text-[28px] font-black italic uppercase text-foreground mb-3 text-center leading-[0.95]">
-        Other Platforms?
+        Played elsewhere?
       </h2>
 
-      <p className="text-[12px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
-        Do you already have a ranking on another padel platform?
+      <p className="text-[14px] text-muted-foreground text-center mb-8 max-w-xs leading-[1.5]">
+        Do you already have a level on Playtomic or another padel app?
       </p>
 
       {/* Yes / No toggle */}
@@ -726,15 +728,35 @@ function ExternalPlatformStep({
             className="w-full max-w-xs space-y-4 mb-6 overflow-hidden"
           >
             <div>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
+                Which app?
+              </span>
+              <div className="flex gap-2">
+                {([[7, "Playtomic (0–7)"], [10, "Other (0–10)"]] as [7 | 10, string][]).map(([max, label]) => (
+                  <button
+                    key={max}
+                    type="button"
+                    onClick={() => setScaleMax(max)}
+                    className={`flex-1 h-11 rounded-xl border text-[13px] font-bold transition-colors ${
+                      scaleMax === max ? "bg-primary/15 text-primary border-primary/40" : "bg-card/40 text-muted-foreground border-border/20"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block">
-                Your level on that platform
+                Your level there
               </label>
               <input
                 type="number"
                 step="0.1"
                 min="0"
-                max="10"
-                placeholder="e.g. 6.5"
+                max={scaleMax}
+                inputMode="decimal"
+                placeholder={scaleMax === 7 ? "e.g. 3.5" : "e.g. 6.5"}
                 value={platformLevel}
                 onChange={(e) => setPlatformLevel(e.target.value)}
                 className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[16px] font-bold placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50"
@@ -747,6 +769,7 @@ function ExternalPlatformStep({
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 placeholder="e.g. 47"
                 value={platformMatches}
                 onChange={(e) => setPlatformMatches(e.target.value)}
@@ -846,6 +869,14 @@ function WelcomeBonusStep({ onContinue }: { onContinue: () => void }) {
 /* ── Main Onboarding Page ── */
 
 type Step = "age-terms" | "welcome" | "quiz-0" | "quiz-1" | "quiz-2" | "external-platform" | "level" | "court-side" | "intro" | "bonus";
+
+/** Steps after the quiz had no way back. */
+const LATER_STEP_BACK: Partial<Record<Step, Step>> = {
+  "external-platform": "quiz-2",
+  level: "external-platform",
+  "court-side": "level",
+  intro: "court-side",
+};
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -963,14 +994,15 @@ const Onboarding = () => {
   const handleExternalPlatform = (
     used: boolean,
     level: number | null,
-    matches: number | null
+    matches: number | null,
+    scaleMax: number = 10
   ) => {
     setExternalPlatformUsed(used);
     setExternalPlatformLevel(level);
     setExternalPlatformMatches(matches);
 
     if (used && level !== null) {
-      const xplayLevel = mapExternalToXPlayLevel(level);
+      const xplayLevel = mapExternalToXPlayLevel(level, scaleMax);
       setRecommendedLevel(xplayLevel);
       setSelectedLevel(xplayLevel);
       setLevelSource("external");
@@ -1045,7 +1077,17 @@ const Onboarding = () => {
   const quizIndex = getQuizIndex();
 
   return (
-    <div className="min-h-screen bg-background overflow-y-auto">
+    <div className="min-h-full bg-background relative">
+      {!underageBlocked && LATER_STEP_BACK[step] && (
+        <button
+          type="button"
+          onClick={() => setStep(LATER_STEP_BACK[step]!)}
+          aria-label="Back"
+          className="absolute top-2 left-2 z-10 w-11 h-11 flex items-center justify-center rounded-xl text-muted-foreground active:scale-95 transition-transform"
+        >
+          <ChevronRight className="w-5 h-5 rotate-180" />
+        </button>
+      )}
       <AnimatePresence mode="wait">
         {underageBlocked && (
           <UnderageBlock key="underage-block" onSignOut={handleUnderageSignOut} onDeleteAccount={handleUnderageDelete} />

@@ -130,7 +130,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           className={`flex-1 overflow-y-scroll overflow-x-hidden ${location.pathname.startsWith('/messages/') ? '' : 'pb-36'}`}
           style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         >
-          <div className="max-w-4xl mx-auto">{children}</div>
+          <div className={`max-w-4xl mx-auto ${location.pathname.startsWith("/messages/") ? "h-full" : ""}`}>{children}</div>
         </div>
       </main>
 

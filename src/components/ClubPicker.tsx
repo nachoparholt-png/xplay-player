@@ -57,7 +57,7 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg h-[75vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-lg h-[75vh] flex flex-col p-0 gap-0" onOpenAutoFocus={(e) => e.preventDefault() /* don't raise the phone keyboard over the list on open */}>
         <DialogHeader className="p-4 pb-3 border-b border-border/30">
           <DialogTitle className="font-display flex items-center gap-2">
             <Building2 className="w-5 h-5 text-primary" /> Select Venue
@@ -111,14 +111,10 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
                           XPLAY
                         </span>
                       )}
-                      {club.source === "directory" && (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
-                          External booking
-                        </span>
-                      )}
                     </div>
                     <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3 h-3" /> {club.location || club.city || "—"}
+                      <MapPin className="w-3 h-3 shrink-0" /> {club.location || club.city || "—"}
+                      {club.source === "directory" && <span className="text-muted-foreground"> · book on club's site</span>}
                     </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />

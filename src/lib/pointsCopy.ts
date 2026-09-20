@@ -21,5 +21,14 @@ export const POINTS = {
   weeklyStreak: 100,
 } as const;
 
+/**
+ * The one exchange rate: 100 XPLAY Points = £1 (Programme Rules, Terms, Rewards page).
+ * Everything that turns money into points or back goes through these helpers.
+ * Server twin: supabase/functions/create-payment-intent (XP_PER_POUND).
+ */
+export const XP_PER_POUND = 100;
+export const poundsToXp = (pounds: number): number => Math.round(pounds * XP_PER_POUND);
+export const xpToPence = (xp: number): number => Math.round((xp * 100) / XP_PER_POUND);
+
 /** Starter missions shown in the tour checklist and on a new player's profile. */
 export const STARTER_MISSIONS_TOTAL = POINTS.welcomeBonus + POINTS.playMatch + POINTS.referral;

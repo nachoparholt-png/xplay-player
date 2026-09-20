@@ -35,7 +35,7 @@ export const TOUR_STOPS: TourStop[] = [
     step: 1,
     route: "/matches",
     title: "Jump Into a Match",
-    body: "Open matches are waiting for players like you. Tap any card to see the court, the level and the players. Then claim your spot.",
+    body: "Switch to Open to see matches looking for players. Tap one to see the court, the level and who's in, then claim your spot.",
     icon: "🎾",
   },
   {
@@ -48,8 +48,8 @@ export const TOUR_STOPS: TourStop[] = [
   {
     step: 3,
     route: "/rewards",
-    title: "XP Means Real Rewards",
-    body: "Every match earns you XP. Rack it up and trade it for gear, discounts and exclusive perks from top brands.",
+    title: "Points Mean Real Rewards",
+    body: "Every match earns XPLAY Points. Trade them for gear, discounts and perks — 100 XP is worth £1 of catalogue value.",
     icon: "🎁",
   },
   {

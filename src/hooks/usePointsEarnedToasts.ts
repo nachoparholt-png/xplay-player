@@ -69,7 +69,7 @@ export function usePointsEarnedToasts(): void {
           const reason = row.reason ?? row.transaction_type ?? "";
           const label = FRIENDLY_LABEL[reason] ?? "Points earned";
 
-          toast.success(`+${amt.toLocaleString()} XPLAY Points`, {
+          toast.success(`+${amt.toLocaleString()} XP`, {
             description: label,
             duration: 4000,
           });

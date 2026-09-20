@@ -44,6 +44,12 @@ const sideBadge = (side: string | null) => {
   return null;
 };
 
+/** "2026-09-22" → "Tue 22 Sep" (same format as the match screens). */
+const prettyDate = (iso: string): string => {
+  const d = new Date(`${iso}T12:00:00`);
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+};
+
 const InvitePlayerModal = ({
   open, onOpenChange, matchId, matchClub, matchDate, matchTime, team, slotIndex, existingPlayerIds,
 }: InvitePlayerModalProps) => {
@@ -87,6 +93,7 @@ const InvitePlayerModal = ({
       const { data } = await supabase
         .from("profiles")
         .select("user_id, display_name, avatar_url, padel_level, preferred_side")
+        .eq("onboarding_completed", true) // half-registered accounts can't accept an invite yet
         .not("user_id", "in", `(${excludeIds.join(",")})`)
         .order("display_name", { ascending: true })
         .limit(100);
@@ -94,13 +101,21 @@ const InvitePlayerModal = ({
       setPlayers(
         (data || []).map((p) => ({ ...p, playedTogether: counts.get(p.user_id) || 0 }))
       );
+
+      // 3. people who already hold a pending invite to this match show as "Invited"
+      const { data: pending } = await supabase
+        .from("match_invitations")
+        .select("invited_user_id")
+        .eq("match_id", matchId)
+        .eq("status", "pending");
+      setSent(new Set((pending || []).map((r) => r.invited_user_id as string)));
       setLoading(false);
     };
     fetchPlayers();
-    setSent(new Set());
     setSearch("");
     setSide("all");
-  }, [open, user, existingPlayerIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.id, matchId, existingPlayerIds.join(",")]);
 
   /* filter + rank: usual players first (by shared matches), then alphabetical */
   const { usual, others } = useMemo(() => {
@@ -155,7 +170,7 @@ const InvitePlayerModal = ({
       _user_id: targetUserId,
       _type: "invite",
       _title: "Match Invitation",
-      _body: `${inviterName} invited you to join a match at ${matchClub} on ${matchDate} at ${matchTime.slice(0, 5)}.`,
+      _body: `${inviterName} invited you to join a match at ${matchClub} on ${prettyDate(matchDate)} at ${matchTime.slice(0, 5)}.`,
       _link: `/matches/${matchId}`,
     });
 
@@ -194,7 +209,7 @@ const InvitePlayerModal = ({
       {sent.has(p.user_id) ? (
         <div className="flex items-center gap-1 text-primary text-xs font-medium">
           <Check className="w-3.5 h-3.5" />
-          Sent
+          Invited
         </div>
       ) : (
         <Button
@@ -202,7 +217,7 @@ const InvitePlayerModal = ({
           variant="outline"
           onClick={() => handleInvite(p.user_id)}
           disabled={sending === p.user_id}
-          className="h-8 rounded-lg text-xs font-semibold gap-1.5"
+          className="h-10 rounded-lg text-xs font-semibold gap-1.5"
         >
           {sending === p.user_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
           Invite
@@ -213,14 +228,14 @@ const InvitePlayerModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0">
+      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault() /* don't raise the phone keyboard over the list on open */}>
         <DialogHeader className="p-5 pb-0">
           <DialogTitle className="font-display text-lg flex items-center gap-2">
             <Send className="w-4 h-4 text-primary" />
-            Invite a Player
+            Invite a player
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            {matchClub} • {matchDate} • {matchTime.slice(0, 5)} • {team === "A" ? "Team A" : "Team B"}
+            {matchClub} • {prettyDate(matchDate)} • {matchTime.slice(0, 5)} • {team === "A" ? "Team A" : "Team B"}
           </p>
         </DialogHeader>
 

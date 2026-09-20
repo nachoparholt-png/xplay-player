@@ -1,3 +1,4 @@
+import { xpToPence } from "@/lib/pointsCopy";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -27,16 +28,19 @@ const MarketplaceRedeemModal = ({
   const maxSlider = Math.min(userPoints, pointPrice);
   const hasUsableXP = maxSlider > 0;
   const [pointsToUse, setPointsToUse] = useState(maxSlider);
-  const [address, setAddress] = useState({ line1: "", city: "", postcode: "" });
+  const [address, setAddress] = useState({ name: "", line1: "", city: "", postcode: "" });
+  // Marketplace items are physical goods shipped from Shopify — no address, no delivery.
+  const addressComplete =
+    address.name.trim().length > 1 && address.line1.trim().length > 3 && address.city.trim().length > 1 && address.postcode.trim().length >= 5;
 
   const remainingPoints = pointPrice - pointsToUse;
-  // 10 XP = £1 → 1 XP = £0.10 → remaining in pence = remainingPoints * 10
-  const cardChargePence = remainingPoints * 10;
+  // 100 XP = £1 → 1 XP = 1p (see lib/pointsCopy)
+  const cardChargePence = xpToPence(remainingPoints);
   const cardCharge = (cardChargePence / 100).toFixed(2);
   const isFullPoints = pointsToUse >= pointPrice;
   const balanceAfter = userPoints - pointsToUse;
   // Full card charge when user has 0 XP
-  const fullCardCharge = (pointPrice * 10 / 100).toFixed(2);
+  const fullCardCharge = (xpToPence(pointPrice) / 100).toFixed(2);
 
   const handleConfirm = () => {
     if (!hasUsableXP) {
@@ -68,7 +72,7 @@ const MarketplaceRedeemModal = ({
           <DialogDescription>
             {hasUsableXP
               ? <>Choose how to pay for <strong>{productTitle}</strong>.</>
-              : <>You don't have enough XP yet. Pay the full amount by card.</>
+              : <>You don't have XPLAY Points to use yet. Pay the full amount by card.</>
             }
           </DialogDescription>
         </DialogHeader>
@@ -92,7 +96,7 @@ const MarketplaceRedeemModal = ({
                 className="text-xs h-7"
                 onClick={() => setPointsToUse(0)}
               >
-                No XP (Card Only)
+                Pay by card only
               </Button>
               <Button
                 type="button"
@@ -101,7 +105,7 @@ const MarketplaceRedeemModal = ({
                 className="text-xs h-7"
                 onClick={() => setPointsToUse(maxSlider)}
               >
-                Use All XP
+                Use all my points
               </Button>
             </div>
           </div>
@@ -146,7 +150,7 @@ const MarketplaceRedeemModal = ({
                 <span className="font-bold">£{fullCardCharge}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 text-sm">
-                <span className="text-muted-foreground">Your XP balance</span>
+                <span className="text-muted-foreground">Your points balance</span>
                 <span className="font-bold text-primary">{userPoints.toLocaleString()} XP</span>
               </div>
             </>
@@ -155,8 +159,16 @@ const MarketplaceRedeemModal = ({
 
         {/* Shipping address */}
         <div className="space-y-3">
-          <Label className="text-xs text-muted-foreground">Shipping Address (optional)</Label>
+          <Label className="text-sm font-medium">Delivery address</Label>
           <Input
+            placeholder="Full name"
+            autoComplete="name"
+            value={address.name}
+            onChange={(e) => setAddress({ ...address, name: e.target.value })}
+            style={{ fontSize: "16px" }}
+          />
+          <Input
+            autoComplete="address-line1"
             placeholder="Address line 1"
             value={address.line1}
             onChange={(e) => setAddress({ ...address, line1: e.target.value })}
@@ -165,17 +177,22 @@ const MarketplaceRedeemModal = ({
           <div className="flex gap-2">
             <Input
               placeholder="City"
+              autoComplete="address-level2"
               value={address.city}
               onChange={(e) => setAddress({ ...address, city: e.target.value })}
               style={{ fontSize: "16px" }}
             />
             <Input
               placeholder="Postcode"
+              autoComplete="postal-code"
               value={address.postcode}
               onChange={(e) => setAddress({ ...address, postcode: e.target.value })}
               style={{ fontSize: "16px" }}
             />
           </div>
+          {!addressComplete && (
+            <p className="text-xs text-muted-foreground">We need your name and full address to send this to you.</p>
+          )}
         </div>
 
         {(!hasUsableXP || !isFullPoints) && (
@@ -186,7 +203,7 @@ const MarketplaceRedeemModal = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
-          <Button onClick={handleConfirm} disabled={isLoading}>
+          <Button onClick={handleConfirm} disabled={isLoading || !addressComplete}>
             {isLoading
               ? "Processing..."
               : !hasUsableXP

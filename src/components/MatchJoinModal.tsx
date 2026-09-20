@@ -372,7 +372,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
       {/* Overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/40"
+          className="fixed inset-0 z-[60] bg-black/60"
           onClick={() => onOpenChange(false)}
           style={{ animation: "fadeIn 0.2s ease-out" }}
         />
@@ -380,10 +380,10 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
 
       {/* Bottom Sheet */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-[28px] border-t border-border/[0.08]"
+        className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-[28px] border-t border-border/[0.08]"
         style={{
           animation: "slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-          maxHeight: "85vh",
+          maxHeight: "85dvh",
           display: "flex",
           flexDirection: "column",
         }}
@@ -556,7 +556,7 @@ const MatchJoinModal = ({ matchId, open, onOpenChange }: MatchJoinModalProps) =>
 
         {/* FOOTER: Actions */}
         {!loading && match && (
-          <div className="px-5 pb-5 pt-3 border-t border-border/[0.08] space-y-3">
+          <div className="px-5 pt-3 border-t border-border/[0.08] space-y-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}>
             {/* PRIMARY CTA - One button that adapts */}
             <button
               onClick={() => {

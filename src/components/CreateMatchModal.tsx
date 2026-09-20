@@ -42,6 +42,13 @@ const TIME_SLOTS = Array.from({ length: 36 }, (_, i) => {
   return `${hour.toString().padStart(2, "0")}:${min}`;
 });
 
+type DayPart = "morning" | "afternoon" | "evening";
+const DAY_PARTS: Record<DayPart, { label: string; from: string; to: string }> = {
+  morning: { label: "Morning", from: "06:00", to: "12:00" },
+  afternoon: { label: "Afternoon", from: "12:00", to: "17:00" },
+  evening: { label: "Evening", from: "17:00", to: "24:00" },
+};
+
 const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalProps) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -73,6 +80,13 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   // Shared form state
   const [matchDate, setMatchDate] = useState<Date | undefined>();
   const [matchTime, setMatchTime] = useState("");
+  const [dayPart, setDayPart] = useState<DayPart>("evening"); // most padel is played after work
+  // A time that arrives from elsewhere (Playtomic paste, Court Finder) must be visible in the grid.
+  useEffect(() => {
+    if (!matchTime) return;
+    const part = (Object.keys(DAY_PARTS) as DayPart[]).find((k) => matchTime >= DAY_PARTS[k].from && matchTime < DAY_PARTS[k].to);
+    if (part) setDayPart(part);
+  }, [matchTime]);
   const [durationMins, setDurationMins] = useState(90); // for venues without XPLAY slots
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
@@ -482,7 +496,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               NEW MATCH
             </div>
             <div className="font-display text-[clamp(28px,8vw,36px)] font-black italic uppercase leading-[0.92] break-words">
-              Who's in?
+              Set up your match
             </div>
             <div className="text-xs text-muted-foreground">
               We'll post it and invite players in your level range.
@@ -540,13 +554,11 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                                 XPLAY
                               </span>
                             )}
-                            {isDirectoryClub && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-px flex-shrink-0">
-                                External booking
-                              </span>
-                            )}
                           </span>
-                          <span className="text-[10px] text-muted-foreground">{selectedClub.location || selectedClub.city || "—"}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {selectedClub.location || selectedClub.city || "—"}
+                            {isDirectoryClub && " · book on club's site"}
+                          </span>
                         </div>
                       </div>
                     ) : (
@@ -836,9 +848,25 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                 )
               ) : (
                 /* Generic time grid — for directory clubs, custom venues, or XPLAY clubs without DB courts */
-                <div className="bg-muted/40 border border-border/30 rounded-xl p-2 max-h-32 overflow-y-auto">
+                <div className="bg-muted/40 border border-border/30 rounded-xl p-2 space-y-2">
+                  {/* Part-of-day switch instead of a scroll box inside a scrolling sheet */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(Object.keys(DAY_PARTS) as DayPart[]).map((part) => (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() => setDayPart(part)}
+                        className={cn(
+                          "h-10 rounded-lg text-xs font-bold uppercase tracking-wide transition-colors",
+                          dayPart === part ? "bg-primary/20 text-primary border border-primary/40" : "text-muted-foreground border border-transparent"
+                        )}
+                      >
+                        {DAY_PARTS[part].label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="grid grid-cols-4 gap-2">
-                    {TIME_SLOTS.map((t) => (
+                    {TIME_SLOTS.filter((t) => t >= DAY_PARTS[dayPart].from && t < DAY_PARTS[dayPart].to).map((t) => (
                       <button
                         key={t}
                         onClick={() => {
@@ -846,7 +874,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                           setErrors(prev => ({ ...prev, time: undefined }));
                         }}
                         className={cn(
-                          "py-2 rounded-lg text-xs font-semibold transition-colors",
+                          "h-11 rounded-lg text-sm font-semibold transition-colors",
                           matchTime === t
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted border border-border/30 text-muted-foreground hover:text-foreground"

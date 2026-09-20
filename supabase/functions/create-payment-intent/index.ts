@@ -53,11 +53,17 @@ serve(async (req) => {
     // Use client-provided points_to_use, clamped to valid range
     const pointsToUse = Math.max(0, Math.min(points_to_use ?? Math.min(userPoints, pointPrice), userPoints, pointPrice));
     const shortfallPts = pointPrice - pointsToUse;
-    // 10 PP = £1 → 1 PP = 10 pence → shortfall in pence = shortfallPts * 10
-    const chargeAmountCents = shortfallPts * 10;
+    // 100 XPLAY Points = £1 → 1 point = 1 penny. App twin: src/lib/pointsCopy.ts (XP_PER_POUND).
+    // redeem-product and stripe-webhook already record cash paid as (point_price - points) pence.
+    const XP_PER_POUND = 100;
+    const chargeAmountCents = Math.round((shortfallPts * 100) / XP_PER_POUND);
 
     if (chargeAmountCents <= 0) {
       throw new Error("No card payment needed — use full points redemption instead");
+    }
+    // Stripe refuses GBP charges under 30p.
+    if (chargeAmountCents < 30) {
+      throw new Error("Card top-ups start at £0.30 — use fewer points so the card part is at least 30p, or pay fully with points");
     }
 
     // Initialize Stripe
@@ -84,7 +90,7 @@ serve(async (req) => {
             currency: "gbp",
             product_data: {
               name: product.title,
-              description: `${pointsToUse} PP applied, paying remainder`,
+              description: `${pointsToUse} XP applied, paying remainder`,
             },
             unit_amount: chargeAmountCents,
           },

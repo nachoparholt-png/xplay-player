@@ -1,3 +1,4 @@
+import { poundsToXp } from "@/lib/pointsCopy";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Zap, Loader2, Award, CreditCard, Users, Copy, Share2, Check, X } from "lucide-react";
@@ -242,9 +243,9 @@ const PointsStore = () => {
             const xpValue = parseXpFromTitle(product.node.title);
             const badge = getBadge(i, products.length);
 
-            // Calculate bonus: price in £ × 10 = base points, anything above is bonus
+            // Calculate bonus: price in £ × 100 = base points, anything above is bonus
             const priceNum = price ? parseFloat(price.amount) : 0;
-            const impliedBase = Math.round(priceNum * 10);
+            const impliedBase = poundsToXp(priceNum);
             const bonus = xpValue && xpValue > impliedBase ? xpValue - impliedBase : null;
 
             return (

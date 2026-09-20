@@ -1,3 +1,4 @@
+import { poundsToXp } from "@/lib/pointsCopy";
 import { useEffect, useState, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
@@ -88,7 +89,7 @@ const TAB_EMPTY_STATES: Record<Tab, { icon: React.ReactNode; title: string; subt
   my_matches: {
     icon: <Search className="w-10 h-10 text-muted-foreground/50" />,
     title: "You haven't joined any matches yet",
-    subtitle: "Browse open matches and join one, or create your own match.",
+    subtitle: "Join an open match, or tap Create to post your own.",
   },
 };
 
@@ -421,7 +422,7 @@ const Matches = () => {
   }, [fetchMatches, fetchPendingMatches]);
 
   const tabs: { key: Tab; label: string; icon?: React.ReactNode }[] = [
-    { key: "my_matches", label: "My Matches" },
+    { key: "my_matches", label: "My matches" },
     { key: "open", label: "Open" },
   ];
 
@@ -479,12 +480,10 @@ const Matches = () => {
             {/* HEADER */}
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-[10px] font-black tracking-[0.14em] text-muted-foreground uppercase mb-2">
+                <div className="text-[11px] font-black tracking-[0.14em] text-muted-foreground uppercase">
                   {format(new Date(), "EEEE · d MMMM").toUpperCase()}
                 </div>
-                <h1 className="font-display text-[26px] font-black italic uppercase text-foreground leading-tight">
-                  Matches
-                </h1>
+                <h1 className="sr-only">Matches</h1>
               </div>
 
             </div>
@@ -519,7 +518,7 @@ const Matches = () => {
                     <span className="text-[10px] font-black uppercase tracking-wider text-primary-foreground/60">View →</span>
                   </div>
                   <div className="font-display text-[26px] font-black italic uppercase text-primary-foreground leading-tight">
-                    {nextMatch.match_time?.slice(0, 5) ?? "TBD"} · COURT {nextMatch.court || "?"}
+                    {nextMatch.match_time?.slice(0, 5) ?? "TBD"}{nextMatch.court ? ` · COURT ${nextMatch.court}` : ""}
                   </div>
                   <div className="text-[11px] font-semibold text-primary-foreground/75">
                     {nextMatch.club} · {nextMatch.format} · {nextMatch.playerCount} confirmed
@@ -529,15 +528,17 @@ const Matches = () => {
             })()}
 
             {/* TABS (my_matches | open) */}
-            <div className="flex gap-6 border-b border-border/20">
+            <div className="flex gap-2" role="tablist">
               {tabs.map((t) => (
                 <button
                   key={t.key}
+                  role="tab"
+                  aria-selected={tab === t.key}
                   onClick={() => setTab(t.key)}
-                  className={`pb-3 font-display text-sm font-black uppercase tracking-[0.1em] transition-colors ${
+                  className={`h-10 px-4 rounded-full text-[13px] font-bold transition-colors ${
                     tab === t.key
-                      ? "border-b-2 border-primary text-foreground"
-                      : "border-b-2 border-transparent text-muted-foreground"
+                      ? "bg-primary/15 text-primary border border-primary/40"
+                      : "bg-card text-muted-foreground border border-border/40"
                   }`}
                 >
                   {t.label}
@@ -689,10 +690,10 @@ const Matches = () => {
                         <p className="text-sm text-muted-foreground mt-1">{emptyState.subtitle}</p>
                       </div>
                       <button
-                        onClick={() => setShowCreateMatch(true)}
-                        className="px-6 py-3 rounded-full bg-primary text-primary-foreground font-display font-black text-xs uppercase tracking-widest mt-2 active:scale-95 transition-transform"
+                        onClick={() => setTab("open")}
+                        className="px-6 h-12 rounded-full bg-primary text-primary-foreground font-display font-black text-xs uppercase tracking-widest mt-2 active:scale-95 transition-transform"
                       >
-                        Create a match
+                        Browse open matches
                       </button>
                     </motion.div>
                   )}
@@ -725,18 +726,15 @@ const Matches = () => {
                         </div>
                       </div>
 
-                      {/* AVAILABILITY DOTS (4 dots) */}
-                      <div className="flex gap-1.5">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={cn(
-                              "w-2 h-2 rounded-full",
-                              i < match.spotsLeft ? "bg-primary" : "bg-muted"
-                            )}
-                          />
-                        ))}
-                      </div>
+                      {/* SPOTS LEFT — same labelled pill on every card */}
+                      <span
+                        className={cn(
+                          "text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap",
+                          match.spotsLeft <= 1 ? "text-amber-300 bg-amber-400/15" : "text-primary bg-primary/15"
+                        )}
+                      >
+                        {match.spotsLeft} spot{match.spotsLeft === 1 ? "" : "s"} left
+                      </span>
                     </div>
 
                     {/* BOTTOM ROW: Club + Details */}
@@ -745,24 +743,16 @@ const Matches = () => {
                         {match.club}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                        <span>{match.format}</span>
-                        <span>Level {match.level_min}-{match.level_max}</span>
+                        <span className="capitalize">{match.format}</span>
+                        <span>Level {match.level_min}–{match.level_max}</span>
                         {(match.price_per_player ?? 0) > 0 && (
                           <span className="text-amber-400 font-semibold">
-                            {Math.ceil((match.price_per_player ?? 0) * 10)} XP
+                            {poundsToXp(match.price_per_player ?? 0).toLocaleString()} XP
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* SPOTS LEFT BADGE */}
-                    {match.spotsLeft <= 2 && (
-                      <div className="absolute top-4 right-4">
-                        <span className="text-[11px] font-bold text-amber-400 bg-amber-400/10 px-2 py-1 rounded-full">
-                          {match.spotsLeft} SPOT{match.spotsLeft === 1 ? "" : "S"}
-                        </span>
-                      </div>
-                    )}
                   </motion.button>
                 ))}
               </div>
@@ -848,8 +838,8 @@ const Matches = () => {
                 }
               }}
               onCreated={(matchId) => {
-                setHighlightMatchId(matchId);
-                setTimeout(() => setHighlightMatchId(null), 3500);
+                // Land on the new match: that is where the organiser invites players and books the court.
+                navigate(`/matches/${matchId}`);
               }}
             />
             <MatchJoinModal

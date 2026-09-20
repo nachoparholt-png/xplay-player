@@ -1,9 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronRight, Zap, Check } from "lucide-react";
+import { X, ChevronRight, Zap, Check, Sparkles, Users, Trophy, Gift, UserPlus, User, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTour, REGULAR_STOPS } from "@/contexts/TourContext";
 import { useAuth } from "@/contexts/AuthContext";
+import xplayLogo from "@/assets/xplay-logo-full.png";
 import { POINTS, STARTER_MISSIONS_TOTAL } from "@/lib/pointsCopy";
+
+// Line icons per tour stop (the app uses line icons everywhere else; emoji looked foreign).
+const STOP_ICONS = [Sparkles, Users, Trophy, Gift, UserPlus, User];
 
 // ── Checklist definition ─────────────────────────────────────────────────────
 
@@ -43,17 +47,12 @@ const AppTour = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex flex-col"
-          style={{ backgroundColor: "#0A0A0A" }}
+          className="fixed inset-0 z-[100] flex flex-col overflow-y-auto"
+          style={{ backgroundColor: "hsl(var(--background))", paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           {/* Top bar — XPLAY wordmark */}
-          <div className="flex items-center justify-between px-5 pt-14 pb-2">
-            <span
-              className="text-white font-black text-xl tracking-widest uppercase"
-              style={{ fontFamily: "system-ui, sans-serif", letterSpacing: "0.15em" }}
-            >
-              XPLAY
-            </span>
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <img src={xplayLogo} alt="XPLAY" className="h-8 w-auto object-contain" />
           </div>
 
           {/* Content */}
@@ -70,17 +69,17 @@ const AppTour = () => {
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 16, delay: 0.15 }}
-                  className="text-6xl"
+                  className="w-20 h-20 rounded-3xl bg-primary/15 flex items-center justify-center mx-auto"
                 >
-                  🏆
+                  <Trophy className="w-10 h-10 text-primary" />
                 </motion.div>
                 <h2
                   className="font-black uppercase leading-none"
-                  style={{ fontSize: 32, color: "#C8F135", letterSpacing: "-0.02em" }}
+                  style={{ fontSize: 32, color: "hsl(var(--primary))", letterSpacing: "-0.02em" }}
                 >
                   YOUR FIRST WEEK
                 </h2>
-                <p className="text-sm" style={{ color: "#888" }}>
+                <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
                   Three ways to earn your first XPLAY Points
                 </p>
               </div>
@@ -99,30 +98,30 @@ const AppTour = () => {
                       transition={{ delay: 0.2 + idx * 0.07 }}
                       className="flex items-center justify-between rounded-2xl border px-4 py-3.5"
                       style={{
-                        backgroundColor: done ? "rgba(200,241,53,0.08)" : "rgba(255,255,255,0.05)",
-                        borderColor: done ? "rgba(200,241,53,0.35)" : "rgba(255,255,255,0.08)",
+                        backgroundColor: done ? "hsl(var(--primary) / 0.08)" : "rgba(255,255,255,0.05)",
+                        borderColor: done ? "hsl(var(--primary) / 0.35)" : "rgba(255,255,255,0.08)",
                       }}
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{
-                            backgroundColor: done ? "#C8F135" : "transparent",
+                            backgroundColor: done ? "hsl(var(--primary))" : "transparent",
                             border: done ? "none" : "2px solid rgba(255,255,255,0.2)",
                           }}
                         >
-                          {done && <Check className="w-4 h-4" style={{ color: "#0A0A0A" }} />}
+                          {done && <Check className="w-4 h-4" style={{ color: "hsl(var(--primary-foreground))" }} />}
                         </div>
                         <span
                           className="text-sm font-semibold"
-                          style={{ color: done ? "#C8F135" : "#fff" }}
+                          style={{ color: done ? "hsl(var(--primary))" : "hsl(var(--foreground))" }}
                         >
                           {item.label}
                         </span>
                       </div>
                       <div
                         className="flex items-center gap-1 text-xs font-black rounded-full px-2.5 py-1"
-                        style={{ backgroundColor: "rgba(200,241,53,0.15)", color: "#C8F135" }}
+                        style={{ backgroundColor: "hsl(var(--primary) / 0.15)", color: "hsl(var(--primary))" }}
                       >
                         <Zap className="w-3 h-3" />
                         +{item.xp} XP
@@ -138,17 +137,17 @@ const AppTour = () => {
                 style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider" style={{ color: "#888" }}>
+                  <p className="text-xs font-black uppercase tracking-wider" style={{ color: "hsl(var(--muted-foreground))" }}>
                     All three add up to
                   </p>
-                  <p className="text-[10px]" style={{ color: "#555" }}>
+                  <p className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>
                     Paid as each one is completed
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 font-black" style={{ color: "#C8F135" }}>
+                <div className="flex items-center gap-1.5 font-black" style={{ color: "hsl(var(--primary))" }}>
                   <Zap className="w-4 h-4" />
                   <span className="text-lg">+{STARTER_MISSIONS_TOTAL} XP</span>
-                  <span className="text-xs" style={{ color: "#888" }}>total</span>
+                  <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>total</span>
                 </div>
               </div>
 
@@ -158,8 +157,8 @@ const AppTour = () => {
                 className="w-full h-13 rounded-2xl font-black uppercase tracking-wider text-sm flex items-center justify-center gap-2"
                 style={{
                   height: 52,
-                  backgroundColor: "#C8F135",
-                  color: "#0A0A0A",
+                  backgroundColor: "hsl(var(--primary))",
+                  color: "hsl(var(--primary-foreground))",
                   fontSize: 14,
                   letterSpacing: "0.08em",
                 }}
@@ -187,7 +186,7 @@ const AppTour = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6 text-center"
-          style={{ backgroundColor: "#0A0A0A" }}
+          style={{ backgroundColor: "hsl(var(--background))", paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         >
           {/* Glow radial behind rocket */}
           <div
@@ -199,7 +198,7 @@ const AppTour = () => {
               width: 280,
               height: 280,
               borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(200,241,53,0.18) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(var(--primary) / 0.18) 0%, transparent 70%)",
               pointerEvents: "none",
             }}
           />
@@ -209,9 +208,9 @@ const AppTour = () => {
             initial={{ scale: 0, rotate: -30, y: 40 }}
             animate={{ scale: 1, rotate: 0, y: 0 }}
             transition={{ type: "spring", stiffness: 240, damping: 14, delay: 0.1 }}
-            className="text-8xl mb-6 relative z-10"
+            className="w-24 h-24 rounded-3xl bg-primary/15 flex items-center justify-center mb-6 relative z-10"
           >
-            🚀
+            <Rocket className="w-12 h-12 text-primary" />
           </motion.div>
 
           <motion.div
@@ -222,11 +221,11 @@ const AppTour = () => {
           >
             <h2
               className="font-black uppercase leading-none"
-              style={{ fontSize: 42, color: "#fff", letterSpacing: "-0.03em" }}
+              style={{ fontSize: 42, color: "hsl(var(--foreground))", letterSpacing: "-0.03em" }}
             >
               YOU'RE<br />READY.
             </h2>
-            <p className="text-sm leading-relaxed" style={{ color: "#888" }}>
+            <p className="text-sm leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
               Your {POINTS.welcomeBonus} XP welcome bonus is already in your account. Now go play.
             </p>
 
@@ -237,14 +236,14 @@ const AppTour = () => {
               transition={{ delay: 0.55, type: "spring", stiffness: 300, damping: 18 }}
               className="inline-flex items-center gap-2 rounded-full px-6 py-3 mx-auto"
               style={{
-                backgroundColor: "rgba(200,241,53,0.12)",
-                border: "1px solid rgba(200,241,53,0.35)",
+                backgroundColor: "hsl(var(--primary) / 0.12)",
+                border: "1px solid hsl(var(--primary) / 0.35)",
               }}
             >
-              <Zap className="w-5 h-5" style={{ color: "#C8F135" }} />
+              <Zap className="w-5 h-5" style={{ color: "hsl(var(--primary))" }} />
               <span
                 className="font-black"
-                style={{ fontSize: 28, color: "#C8F135", lineHeight: 1 }}
+                style={{ fontSize: 28, color: "hsl(var(--primary))", lineHeight: 1 }}
               >
                 {POINTS.welcomeBonus} XP
               </span>
@@ -260,8 +259,8 @@ const AppTour = () => {
               style={{
                 marginTop: 12,
                 height: 56,
-                backgroundColor: "#C8F135",
-                color: "#0A0A0A",
+                backgroundColor: "hsl(var(--primary))",
+                color: "hsl(var(--primary-foreground))",
                 fontSize: 15,
                 letterSpacing: "0.1em",
               }}
@@ -318,7 +317,12 @@ const AppTour = () => {
 
         {/* Stop content */}
         <div className="flex items-start gap-3 mb-5">
-          <div className="text-2xl flex-shrink-0 mt-0.5">{currentStop.icon}</div>
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+            {(() => {
+              const Icon = STOP_ICONS[currentStop.step] ?? Sparkles;
+              return <Icon className="w-5 h-5 text-primary" />;
+            })()}
+          </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-display font-black text-base uppercase tracking-tight leading-tight mb-1.5">
               {currentStop.title}
@@ -343,7 +347,7 @@ const AppTour = () => {
             size="sm"
             className="h-9 px-5 font-display font-black uppercase tracking-wider text-xs gap-1.5"
           >
-            {isLastRegularStop ? "Almost done" : "Next"}
+            Next
             <ChevronRight className="w-3.5 h-3.5" />
           </Button>
         </div>
