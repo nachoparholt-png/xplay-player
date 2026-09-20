@@ -104,7 +104,7 @@ const ClubsMarketSection = () => {
           value={filter}
           onChange={e => setFilter(e.target.value)}
           placeholder="Search clubs..."
-          className="w-full h-10 rounded-xl bg-muted border border-border/30 px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
+          className="w-full h-11 rounded-xl bg-muted border border-border/30 px-4 text-base md:text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
           style={{ fontSize: "16px" }}
         />
       </div>

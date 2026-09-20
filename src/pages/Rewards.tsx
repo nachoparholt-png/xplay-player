@@ -384,7 +384,7 @@ const Rewards = () => {
                       <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
                         {product.node.description}
                       </p>
-                      {costNum && (
+                      {costNum != null && costNum > 0 && (
                         <div className="flex items-baseline gap-1.5">
                           <span className="inline-flex items-center gap-1">
                             <Zap className="w-3 h-3 text-primary" />

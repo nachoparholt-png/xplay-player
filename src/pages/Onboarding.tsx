@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 // Single source of truth for the ToS version — stamped onto profiles at acceptance.
 import { TERMS_VERSION } from "@/pages/Terms";
 
+const SUPPORT_EMAIL = "hello@joinxplay.com";
+
 /* ── Quiz Data ── */
 
 const QUESTIONS = [
@@ -88,7 +90,18 @@ function ageFromDob(dob: Date | string): number {
 }
 
 /** Persistent under-18 block screen. Offers sign-out so the user isn't stuck. */
-function UnderageBlock({ onSignOut }: { onSignOut: () => void }) {
+function UnderageBlock({ onSignOut, onDeleteAccount }: { onSignOut: () => void; onDeleteAccount: () => Promise<void> }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await onDeleteAccount();
+    } finally {
+      setDeleting(false);
+    }
+  };
   return (
     <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col items-center text-center px-6 py-12 min-h-[80vh] justify-center">
       <div className="w-20 h-20 rounded-3xl bg-destructive/15 flex items-center justify-center mb-8">
@@ -101,9 +114,41 @@ function UnderageBlock({ onSignOut }: { onSignOut: () => void }) {
         XPLAY is for players aged 18 and over, so we can't set up your account today. Thanks
         for your interest — we'd love to see you on court when you're 18.
       </p>
-      <Button variant="outline" onClick={onSignOut} className="h-11 rounded-xl font-bold text-sm px-8">
+      <Button variant="outline" onClick={onSignOut} className="h-12 rounded-xl font-bold text-sm px-8 w-full max-w-xs">
         Sign out
       </Button>
+
+      {/* A saved date of birth can't be edited in-app (18+ gate), so a typo needs support. */}
+      <p className="text-[13px] text-muted-foreground leading-[1.6] max-w-xs mt-8">
+        Entered the wrong date by mistake?{" "}
+        <a href={`mailto:${SUPPORT_EMAIL}?subject=XPLAY%20date%20of%20birth%20correction`} className="text-primary underline">
+          Email {SUPPORT_EMAIL}
+        </a>{" "}
+        and we'll sort it out.
+      </p>
+
+      {!confirmDelete ? (
+        <button
+          type="button"
+          onClick={() => setConfirmDelete(true)}
+          className="mt-4 min-h-[44px] px-4 text-[13px] text-destructive underline"
+        >
+          Delete my account and data
+        </button>
+      ) : (
+        <div className="mt-4 w-full max-w-xs rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-left">
+          <p className="text-sm font-semibold text-foreground mb-1">Delete your account permanently?</p>
+          <p className="text-[13px] text-muted-foreground mb-3">This removes your account and personal data. It can't be undone.</p>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1 h-11 rounded-xl text-sm">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting} className="flex-1 h-11 rounded-xl text-sm">
+              {deleting ? "Deleting…" : "Delete forever"}
+            </Button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -112,14 +157,18 @@ function AgeTermsStep({
   onContinue,
   onUnderage,
   saving,
+  savedDob,
 }: {
   onContinue: (dobISO: string) => void;
   onUnderage: (dobISO: string) => void;
   saving: boolean;
+  /** ISO date already stored on the profile. The server never lets it change, so we show it locked. */
+  savedDob?: string | null;
 }) {
-  const [dd, setDd] = useState("");
-  const [mm, setMm] = useState("");
-  const [yyyy, setYyyy] = useState("");
+  const dobLocked = !!savedDob && /^\d{4}-\d{2}-\d{2}/.test(savedDob);
+  const [dd, setDd] = useState(dobLocked ? savedDob!.slice(8, 10) : "");
+  const [mm, setMm] = useState(dobLocked ? savedDob!.slice(5, 7) : "");
+  const [yyyy, setYyyy] = useState(dobLocked ? savedDob!.slice(0, 4) : "");
   const [confirm18, setConfirm18] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +201,8 @@ function AgeTermsStep({
   };
 
   const canContinue = dd && mm && yyyy && confirm18 && acceptTerms && !saving;
+  const typedDob = parseDob();
+  const looksUnder18 = !!typedDob && ageFromDob(typedDob) < 18;
 
   return (
     <motion.div variants={slideVariants} initial="enter" animate="center" exit="exit" className="flex flex-col px-6 py-12 min-h-[80vh] justify-center max-w-md mx-auto w-full">
@@ -177,6 +228,7 @@ function AgeTermsStep({
             onChange={(e) => setDd(e.target.value.replace(/\D/g, ""))}
             className="flex-1 min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
             aria-label="Day of birth"
+            readOnly={dobLocked}
           />
           <input
             inputMode="numeric"
@@ -187,6 +239,7 @@ function AgeTermsStep({
             onChange={(e) => setMm(e.target.value.replace(/\D/g, ""))}
             className="flex-1 min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
             aria-label="Month of birth"
+            readOnly={dobLocked}
           />
           <input
             inputMode="numeric"
@@ -197,33 +250,52 @@ function AgeTermsStep({
             onChange={(e) => setYyyy(e.target.value.replace(/\D/g, ""))}
             className="flex-[1.4] min-w-0 bg-background border border-border rounded-xl py-3 text-center font-mono font-bold text-lg text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary"
             aria-label="Year of birth"
+            readOnly={dobLocked}
           />
         </div>
 
+        <p className="text-[12px] text-muted-foreground mt-2 leading-[1.5]">
+          {dobLocked
+            ? "Your date of birth is already saved and can't be changed."
+            : "Check it carefully — your date of birth can't be changed later."}
+        </p>
+        {looksUnder18 && (
+          <p className="text-[13px] font-semibold text-secondary mt-2 leading-[1.5]" role="alert">
+            That date makes you under 18. Check the year before you continue.
+          </p>
+        )}
+
         <button
           type="button"
+          role="checkbox"
+          aria-checked={confirm18}
           onClick={() => setConfirm18(!confirm18)}
-          className="flex items-center gap-2.5 mt-4 text-left"
+          className="flex items-center gap-2.5 mt-2 text-left w-full min-h-[44px]"
         >
           <span className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 transition-colors ${confirm18 ? "bg-primary" : "border border-border bg-background"}`}>
             {confirm18 && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
           </span>
-          <span className="text-[12.5px] text-foreground/85">
+          <span className="text-[14px] text-foreground/90">
             I confirm I'm <b>18 or over</b>
           </span>
         </button>
       </div>
 
       {/* Terms */}
-      <button
-        type="button"
-        onClick={() => setAcceptTerms(!acceptTerms)}
-        className="flex items-start gap-2.5 text-left mb-6"
-      >
-        <span className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 transition-colors ${acceptTerms ? "bg-primary" : "border border-border bg-background"}`}>
-          {acceptTerms && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
-        </span>
-        <span className="text-[12px] text-muted-foreground leading-[1.5]">
+      <div className="flex items-center gap-0.5 text-left mb-6 min-h-[44px]">
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={acceptTerms}
+          aria-label="I agree to the Terms of Service and Privacy Policy"
+          onClick={() => setAcceptTerms(!acceptTerms)}
+          className="w-11 h-11 -ml-3 flex items-center justify-center shrink-0"
+        >
+          <span className={`w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-colors ${acceptTerms ? "bg-primary" : "border border-border bg-background"}`}>
+            {acceptTerms && <Check className="w-3 h-3 text-primary-foreground" strokeWidth={3.5} />}
+          </span>
+        </button>
+        <span className="text-[14px] text-foreground/80 leading-[1.5]" onClick={() => setAcceptTerms(!acceptTerms)}>
           I agree to the{" "}
           <a href="/terms" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-primary underline">
             Terms of Service
@@ -234,7 +306,7 @@ function AgeTermsStep({
           </a>
           .
         </span>
-      </button>
+      </div>
 
       {error && <p className="text-xs text-destructive mb-4">{error}</p>}
 
@@ -412,8 +484,11 @@ function LevelStep({
         className="w-32 h-32 rounded-full border-4 border-primary bg-primary/10 flex flex-col items-center justify-center mb-2"
       >
         <span className="font-display text-4xl font-bold text-primary">{selectedLevel.toFixed(1)}</span>
-        <span className="text-[10px] font-bold text-primary/70 uppercase tracking-wider">{levelLabel(selectedLevel)}</span>
       </motion.div>
+      {/* Label sits under the ring: "Beginner-Intermediate" does not fit inside a 128px circle. */}
+      <p className="text-[13px] font-bold text-primary uppercase tracking-wider text-center mb-3">
+        {levelLabel(selectedLevel)}
+      </p>
 
       {selectedLevel !== recommendedLevel && (
         <p className="text-[10px] text-muted-foreground mb-4">
@@ -662,7 +737,7 @@ function ExternalPlatformStep({
                 placeholder="e.g. 6.5"
                 value={platformLevel}
                 onChange={(e) => setPlatformLevel(e.target.value)}
-                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[14px] font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[16px] font-bold placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50"
               />
             </div>
             <div>
@@ -675,7 +750,7 @@ function ExternalPlatformStep({
                 placeholder="e.g. 47"
                 value={platformMatches}
                 onChange={(e) => setPlatformMatches(e.target.value)}
-                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[14px] font-bold placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50"
+                className="w-full bg-card/40 border border-border/20 rounded-xl px-4 py-3 text-foreground text-[16px] font-bold placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary/50"
               />
             </div>
             <motion.div
@@ -777,7 +852,11 @@ const Onboarding = () => {
   const { user, profile, refreshProfile, signOut } = useAuth();
   const { toast } = useToast();
 
-  const [step, setStep] = useState<Step>("age-terms");
+  // The age/terms gate is saved the moment it is passed, so a player who comes back
+  // mid-onboarding must not be asked again (and the server refuses a changed DOB).
+  const ageGateDone =
+    !!profile?.terms_accepted_at && !!profile?.date_of_birth && ageFromDob(profile.date_of_birth) >= 18;
+  const [step, setStep] = useState<Step>(ageGateDone ? "welcome" : "age-terms");
   const [savingAgeTerms, setSavingAgeTerms] = useState(false);
   // Persistent under-18 block: once a failing DOB is on the profile, the gate
   // can't be bypassed by reloading and re-entering a different date.
@@ -795,11 +874,27 @@ const Onboarding = () => {
     setUnderageBlocked(true);
     if (!user) return;
     // Save the DOB (without terms acceptance) so the block persists across reloads.
-    await supabase
+    // If a DOB is already stored the server keeps the stored one — nothing to save.
+    if (profile?.date_of_birth) return;
+    const { error } = await supabase
       .from("profiles")
       .update({ date_of_birth: dobISO })
       .eq("user_id", user.id);
+    if (error) console.warn("[onboarding] could not persist under-18 DOB:", error.message);
     refreshProfile();
+  };
+
+  const handleUnderageDelete = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE" } });
+      if (error) throw error;
+      if (data && (data as any).error) throw new Error((data as any).error);
+      toast({ title: "Account deleted", description: "Your account and personal data have been removed." });
+      await signOut();
+      navigate("/auth");
+    } catch (err: any) {
+      toast({ title: "Couldn't delete account", description: err?.message || "Please try again or email " + SUPPORT_EMAIL, variant: "destructive" });
+    }
   };
 
   const handleUnderageSignOut = async () => {
@@ -825,7 +920,8 @@ const Onboarding = () => {
       const { error } = await supabase
         .from("profiles")
         .update({
-          date_of_birth: dobISO,
+          // A stored DOB is immutable server-side — only send it the first time.
+          ...(profile?.date_of_birth ? {} : { date_of_birth: dobISO }),
           terms_accepted_at: new Date().toISOString(),
           terms_version: TERMS_VERSION,
         })
@@ -928,8 +1024,9 @@ const Onboarding = () => {
       // Welcome bonus (100 pts, rule complete_profile) is granted server-side by
       // trigger award_profile_completion when onboarding_completed flips to true.
 
-      await refreshProfile();
-      // Show celebration screen before navigating
+      // Show the celebration screen first. The profile is refreshed when the player
+      // leaves it — refreshing here flips onboarding_completed in context and the
+      // onboarding route guard would redirect to /matches before the screen shows.
       setStep("bonus");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -951,10 +1048,10 @@ const Onboarding = () => {
     <div className="min-h-screen bg-background overflow-y-auto">
       <AnimatePresence mode="wait">
         {underageBlocked && (
-          <UnderageBlock key="underage-block" onSignOut={handleUnderageSignOut} />
+          <UnderageBlock key="underage-block" onSignOut={handleUnderageSignOut} onDeleteAccount={handleUnderageDelete} />
         )}
         {!underageBlocked && step === "age-terms" && (
-          <AgeTermsStep key="age-terms" onContinue={handleAgeTerms} onUnderage={handleUnderage} saving={savingAgeTerms} />
+          <AgeTermsStep key="age-terms" onContinue={handleAgeTerms} onUnderage={handleUnderage} saving={savingAgeTerms} savedDob={profile?.date_of_birth ?? null} />
         )}
         {step === "welcome" && (
           <WelcomeStep key="welcome" onNext={() => setStep("quiz-0")} />
@@ -1001,7 +1098,10 @@ const Onboarding = () => {
         {step === "bonus" && (
           <WelcomeBonusStep
             key="bonus"
-            onContinue={() => navigate("/matches", { replace: true })}
+            onContinue={async () => {
+              await refreshProfile();
+              navigate("/matches", { replace: true });
+            }}
           />
         )}
       </AnimatePresence>

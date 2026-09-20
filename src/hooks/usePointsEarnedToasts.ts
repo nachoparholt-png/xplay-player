@@ -9,7 +9,7 @@
  * Anchor reminder: 100 pts = £1 of catalogue value.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,8 +28,11 @@ const FRIENDLY_LABEL: Record<string, string> = {
 };
 
 export function usePointsEarnedToasts(): void {
-  const { session } = useAuth();
+  const { session, refreshProfile } = useAuth();
   const queryClient = useQueryClient();
+  // Keep the latest refreshProfile without re-subscribing the channel on every render.
+  const refreshRef = useRef(refreshProfile);
+  refreshRef.current = refreshProfile;
 
   useEffect(() => {
     if (!LOYALTY_ENABLED) return;
@@ -54,7 +57,14 @@ export function usePointsEarnedToasts(): void {
             transaction_type?: string;
           };
           const amt = Number(row.amount ?? 0);
-          if (amt <= 0) return; // skip spends/refunds
+
+          // The balance shown in the header / Rewards / Profile comes from the
+          // AuthContext profile, not React Query — refresh it on every ledger
+          // change (earn or spend) or it stays stale until the app reloads.
+          void refreshRef.current();
+          queryClient.invalidateQueries({ queryKey: ["profile"] });
+
+          if (amt <= 0) return; // no toast for spends/refunds
 
           const reason = row.reason ?? row.transaction_type ?? "";
           const label = FRIENDLY_LABEL[reason] ?? "Points earned";
@@ -63,9 +73,6 @@ export function usePointsEarnedToasts(): void {
             description: label,
             duration: 4000,
           });
-
-          // Invalidate any cached profile so the balance chip refreshes
-          queryClient.invalidateQueries({ queryKey: ["profile"] });
         }
       )
       .subscribe();

@@ -150,7 +150,7 @@ const ClubsExplorer = () => {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search clubs..."
             style={{ fontSize: "16px" }}
-            className="w-full bg-card border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full bg-card border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-base md:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
 
@@ -252,7 +252,8 @@ const ClubsExplorer = () => {
           )}
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 gap-3">
+          {/* grid-cols-1 = minmax(0,1fr): without it the implicit column grows to the longest club name and cards overflow the screen */}
           {filtered.map((club) => (
             <ClubCard
               key={club.id}

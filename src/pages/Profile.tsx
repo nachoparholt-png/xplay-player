@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { POINTS, STARTER_MISSIONS_TOTAL } from "@/lib/pointsCopy";
 import xplayLogo from "@/assets/xplay-logo-full.png";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -216,9 +217,9 @@ const Profile = () => {
   // PR4 adjusted per Ignacio (12 Jun): stats stay VISIBLE for new players
   // (zeroed strip in the hero) — only the lower sections swap to missions/push.
   const missions = [
-    { label: "Complete your profile", xp: "+20", done: !!profile?.onboarding_completed },
-    { label: "Join your first match", xp: "+30", done: totalMatches > 0 },
-    { label: "Invite a friend", xp: "+25", done: false },
+    { label: "Complete your profile", xp: `+${POINTS.welcomeBonus}`, done: !!profile?.onboarding_completed },
+    { label: "Play your first match", xp: `+${POINTS.playMatch}`, done: totalMatches > 0 },
+    { label: "Invite a friend who plays", xp: `+${POINTS.referral}`, done: false },
   ];
 
   /* ── PR1 · player-card profile home ─────────────────────────── */
@@ -336,7 +337,7 @@ const Profile = () => {
           </div>
           <div className="px-1">
             <span className="text-[11px] font-black tracking-[0.14em] uppercase text-muted-foreground">
-              First-week missions · +75 XP bonus
+              Starter missions · up to {STARTER_MISSIONS_TOTAL} XP
             </span>
           </div>
           {missions.map((m) => (

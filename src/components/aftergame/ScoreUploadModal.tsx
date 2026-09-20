@@ -281,7 +281,7 @@ const ScoreUploadModal = ({ matchId, open, onOpenChange, players, onSubmitted }:
             placeholder="Optional comment..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            className="rounded-xl bg-muted/50 border-border/50 text-sm resize-none"
+            className="rounded-xl bg-muted/50 border-border/50 text-base md:text-sm resize-none"
             rows={2}
           />
 

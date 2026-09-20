@@ -231,7 +231,7 @@ const InvitePlayerModal = ({
               placeholder="Search players..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 rounded-xl h-9 text-sm"
+              className="pl-9 rounded-xl h-11 text-base md:text-sm"
             />
           </div>
           {/* quick side filter — fill the position you're missing */}

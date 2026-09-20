@@ -3,23 +3,24 @@ import { X, ChevronRight, Zap, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTour, REGULAR_STOPS } from "@/contexts/TourContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { POINTS, STARTER_MISSIONS_TOTAL } from "@/lib/pointsCopy";
 
 // ── Checklist definition ─────────────────────────────────────────────────────
 
 const CHECKLIST_ITEMS = [
   {
     label: "Complete your profile",
-    xp: 20,
+    xp: POINTS.welcomeBonus,
     flag: "profile_completed_bonus_granted",
   },
   {
-    label: "Join your first match",
-    xp: 30,
+    label: "Play your first match",
+    xp: POINTS.playMatch,
     flag: "first_match_bonus_granted",
   },
   {
-    label: "Invite a friend",
-    xp: 25,
+    label: "Invite a friend who plays",
+    xp: POINTS.referral,
     flag: null, // visual-only for now
   },
 ];
@@ -80,7 +81,7 @@ const AppTour = () => {
                   YOUR FIRST WEEK
                 </h2>
                 <p className="text-sm" style={{ color: "#888" }}>
-                  Complete these three missions to earn bonus XP
+                  Three ways to earn your first XPLAY Points
                 </p>
               </div>
 
@@ -138,15 +139,15 @@ const AppTour = () => {
               >
                 <div>
                   <p className="text-xs font-black uppercase tracking-wider" style={{ color: "#888" }}>
-                    Finish all three
+                    All three add up to
                   </p>
                   <p className="text-[10px]" style={{ color: "#555" }}>
-                    Bonus progression pack
+                    Paid as each one is completed
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 font-black" style={{ color: "#C8F135" }}>
                   <Zap className="w-4 h-4" />
-                  <span className="text-lg">+75 XP</span>
+                  <span className="text-lg">+{STARTER_MISSIONS_TOTAL} XP</span>
                   <span className="text-xs" style={{ color: "#888" }}>total</span>
                 </div>
               </div>
@@ -226,7 +227,7 @@ const AppTour = () => {
               YOU'RE<br />READY.
             </h2>
             <p className="text-sm leading-relaxed" style={{ color: "#888" }}>
-              50 XP is already in your account. Now go play.
+              Your {POINTS.welcomeBonus} XP welcome bonus is already in your account. Now go play.
             </p>
 
             {/* XP badge */}
@@ -245,7 +246,7 @@ const AppTour = () => {
                 className="font-black"
                 style={{ fontSize: 28, color: "#C8F135", lineHeight: 1 }}
               >
-                50 XP
+                {POINTS.welcomeBonus} XP
               </span>
             </motion.div>
 

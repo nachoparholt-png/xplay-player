@@ -26,7 +26,7 @@ const ClubCard = ({
   return (
     <motion.button
       onClick={() => navigate(`/clubs/${id}`, { state: { from: location.pathname } })}
-      className="w-full bg-card rounded-2xl border border-border/40 p-4 text-left hover:border-primary/30 transition-all active:scale-[0.98] group"
+      className="w-full min-w-0 bg-card rounded-2xl border border-border/40 p-4 text-left hover:border-primary/30 transition-all active:scale-[0.98] group"
       whileTap={{ scale: 0.98 }}
     >
       <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ const ClubCard = ({
           </div>
 
           <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> {city ?? "—"} • {courtCount} court{courtCount !== 1 ? "s" : ""}
+            <MapPin className="w-3 h-3" /> {city ?? "—"}{courtCount > 0 ? ` • ${courtCount} court${courtCount !== 1 ? "s" : ""}` : ""}
           </p>
 
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">

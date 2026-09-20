@@ -747,7 +747,7 @@ const Matches = () => {
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                         <span>{match.format}</span>
                         <span>Level {match.level_min}-{match.level_max}</span>
-                        {match.price_per_player && (
+                        {(match.price_per_player ?? 0) > 0 && (
                           <span className="text-amber-400 font-semibold">
                             {Math.ceil((match.price_per_player ?? 0) * 10)} XP
                           </span>

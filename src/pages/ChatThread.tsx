@@ -420,7 +420,11 @@ const ChatThread = () => {
       </div>
 
       {/* Input bar */}
-      <div className="shrink-0 px-4 py-3 border-t border-border/50 bg-card/95 backdrop-blur-sm">
+      {/* The tab bar is hidden on chat threads, so this bar is the bottom edge: keep it clear of the home indicator. */}
+      <div
+        className="shrink-0 px-4 pt-3 border-t border-border/50 bg-card/95 backdrop-blur-sm"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+      >
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
@@ -429,12 +433,12 @@ const ChatThread = () => {
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 bg-muted rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
+            className="flex-1 min-w-0 bg-muted rounded-xl px-4 py-2.5 text-base md:text-sm outline-none focus:ring-2 focus:ring-primary/30 placeholder:text-muted-foreground"
           />
           <button
             onClick={handleSend}
             disabled={!newMessage.trim() || sending}
-            className={`p-2.5 rounded-xl transition-colors ${
+            className={`w-11 h-11 flex items-center justify-center shrink-0 rounded-xl transition-colors ${
               newMessage.trim()
                 ? "bg-primary text-primary-foreground hover:bg-primary/90"
                 : "bg-muted text-muted-foreground"
