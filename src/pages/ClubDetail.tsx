@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Browser } from "@capacitor/browser";
+import OtherClubPage from "@/components/clubs/OtherClubPage";
+import { isOtherClub } from "@/components/clubs/clubTier";
 import CourtAvailabilityGrid from "@/components/clubs/CourtAvailabilityGrid";
 import MembershipCard from "@/components/clubs/MembershipCard";
 import EventCard from "@/components/clubs/EventCard";
@@ -396,6 +398,11 @@ const ClubDetail = () => {
         <button onClick={() => handleBack()} className="text-primary text-sm mt-2">Go back</button>
       </div>
     );
+  }
+
+  // Two-tier model: clubs not hosted by XPLAY get the light page (no tabs, no in-app booking)
+  if (isOtherClub((club as any).source)) {
+    return <OtherClubPage club={club} onBack={handleBack} />;
   }
 
   return (
