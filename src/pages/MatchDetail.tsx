@@ -112,6 +112,16 @@ const levelToCategory = (level: number | null): 1 | 2 | 3 | 4 | 5 => {
 
 const AFTER_GAME_STATUSES = ["awaiting_score", "score_submitted", "pending_review", "review_requested", "confirmed", "completed", "draw", "closed_as_draw", "auto_closed"];
 
+/** Shape returned by the get_my_join_status RPC. */
+type MyJoinStatus = {
+  status: "none" | "pending" | "approved" | "rejected";
+  request_id?: string;
+  level_fits?: boolean;
+  players?: number;
+  missing?: number;
+  approved_to_join?: boolean;
+};
+
 const MatchDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -139,6 +149,8 @@ const MatchDetail = () => {
   const [openingChat, setOpeningChat] = useState(false);
   const [slotAction, setSlotAction] = useState<{ team: string; slotIndex: number } | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [myJoin, setMyJoin] = useState<MyJoinStatus | null>(null);
+  const [requesting, setRequesting] = useState(false);
   const [joinRequests, setJoinRequests] = useState<{
     id: string; user_id: string; status: string; created_at: string;
     display_name: string | null; padel_level: number | null; approvals: string[];
@@ -294,7 +306,13 @@ const MatchDetail = () => {
     })));
   };
 
-  useEffect(() => { fetchMatch(); fetchJoinRequests(); }, [fetchMatch]);
+  const fetchMyJoinStatus = async () => {
+    if (!id || !user) return;
+    const { data } = await (supabase as any).rpc("get_my_join_status", { _match_id: id });
+    setMyJoin((data as MyJoinStatus) ?? null);
+  };
+
+  useEffect(() => { fetchMatch(); fetchJoinRequests(); fetchMyJoinStatus(); }, [fetchMatch, user?.id]);
 
   // Fetch cancellation settings
   useEffect(() => {
@@ -365,6 +383,9 @@ const MatchDetail = () => {
     if (error) {
       if (error.message.includes("duplicate") || error.message.includes("unique")) {
         toast({ title: "Slot taken", description: "This spot was just filled. Try another!", variant: "destructive" });
+      } else if (error.message.includes("row-level security")) {
+        toast({ title: "Can't join yet", description: "The spot was taken, or a player in the match still has to approve you.", variant: "destructive" });
+        fetchMyJoinStatus();
       } else {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       }
@@ -426,6 +447,27 @@ const MatchDetail = () => {
   const userLevelFits = profile?.padel_level != null && match
     ? profile.padel_level >= match.level_min && profile.padel_level <= match.level_max
     : true;
+
+  // Level gate: outside the range you ask first, every player in the match has to say yes,
+  // and even then you still have to take the spot yourself (first approved player wins it).
+  const needsApproval = !!user && !isOrganizer && !isJoined && !isWaitlisted && !userLevelFits;
+  const approvedToJoin = needsApproval && !!myJoin?.approved_to_join;
+  const requestPending = needsApproval && myJoin?.status === "pending" && !myJoin?.approved_to_join;
+  const requestDeclined = needsApproval && myJoin?.status === "rejected";
+  const approvalsHave = Math.max(0, (myJoin?.players ?? 0) - (myJoin?.missing ?? 0));
+
+  const handleRequestToJoin = async () => {
+    if (!user || !match || requesting) return;
+    setRequesting(true);
+    const { error } = await (supabase as any).rpc("request_to_join_match", { _match_id: match.id });
+    if (error) {
+      toast({ title: "Couldn't send request", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Request sent", description: "Every player in the match has to approve. We'll notify you." });
+    }
+    await fetchMyJoinStatus();
+    setRequesting(false);
+  };
 
   // Determine user's team and the submitter's team
   const currentPlayerEntry = players.find((p) => p.user_id === user?.id);
@@ -703,7 +745,7 @@ const MatchDetail = () => {
     if (error) {
       toast({ title: "Could not approve", description: error.message, variant: "destructive" });
     } else if ((data as any)?.approved) {
-      toast({ title: "Request approved", description: `${request.display_name || "Player"} has been added.` });
+      toast({ title: "Approved", description: `Everyone has said yes. ${request.display_name || "The player"} can now take a free spot.` });
     } else {
       toast({ title: "Approval recorded", description: `Waiting for ${(data as any)?.pending ?? "more"} more player(s).` });
     }
@@ -713,13 +755,10 @@ const MatchDetail = () => {
   const handleRejectRequest = async (request: typeof joinRequests[0]) => {
     if (!user || !match) return;
     setProcessingRequest(request.id);
-    await supabase.from("match_join_requests").update({ status: "rejected" }).eq("id", request.id);
-    await supabase.rpc("create_notification_for_user", {
-      _user_id: request.user_id, _type: "match_update", _title: "Request declined",
-      _body: `Your request to join the match at ${match.club} was declined.`,
-      _link: `/matches/${match.id}`,
-    });
-    toast({ title: "Request declined" });
+    // Server-side: closes the request and tells the player (one "no" ends it; they can ask again).
+    const { error } = await (supabase as any).rpc("decline_join_request", { _request_id: request.id });
+    if (error) toast({ title: "Couldn't decline", description: error.message, variant: "destructive" });
+    else toast({ title: "Request declined" });
     fetchJoinRequests(); setProcessingRequest(null);
   };
 
@@ -897,6 +936,8 @@ const MatchDetail = () => {
           if (inviteOnly) {
             setInviteTarget({ team, slotIndex: index });
             setShowInviteModal(true);
+          } else if (needsApproval && !approvedToJoin) {
+            if (!requestPending) handleRequestToJoin();
           } else {
             setSlotAction({ team, slotIndex: index });
           }
@@ -908,7 +949,7 @@ const MatchDetail = () => {
           <User className="w-4 h-4 text-muted-foreground/50" />
         </div>
         <span className="text-sm text-muted-foreground flex-1 whitespace-nowrap">Open</span>
-        <span className="text-xs text-primary font-semibold whitespace-nowrap">{isJoined ? "Invite" : "Join"}</span>
+        <span className="text-xs text-primary font-semibold whitespace-nowrap">{isJoined ? "Invite" : needsApproval && !approvedToJoin ? (requestPending ? "Waiting" : "Request") : "Join"}</span>
       </button>
     );
   };
@@ -1273,8 +1314,27 @@ const MatchDetail = () => {
         {/* Pre-game action buttons (non-FAB ones) */}
         {isPreGame && (
           <div className="space-y-2">
-            {!isOrganizer && !userLevelFits && !isJoined && !isWaitlisted && (
-              <p className="text-xs text-destructive text-center">Your level doesn't fit the required range ({match.level_min.toFixed(1)} – {match.level_max.toFixed(1)})</p>
+            {needsApproval && (
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center">
+                <p className="text-[13px] font-semibold text-amber-200">
+                  {approvedToJoin
+                    ? "You're approved to join"
+                    : requestPending
+                      ? `Waiting for approval · ${approvalsHave} of ${myJoin?.players ?? 0} players said yes`
+                      : requestDeclined
+                        ? "Your request was declined"
+                        : `Your level (${profile?.padel_level?.toFixed(1)}) is outside this match's range (${match.level_min.toFixed(1)}–${match.level_max.toFixed(1)})`}
+                </p>
+                <p className="text-[12px] text-foreground/70 mt-1 leading-[1.5]">
+                  {approvedToJoin
+                    ? isFull ? "The match is full right now. If a spot opens, the first approved player to join gets it." : "Take a free spot now. Other approved players can take it too — first one in gets it."
+                    : requestPending
+                      ? "Every player in the match has to approve. If someone new joins, they need to approve you too."
+                      : requestDeclined
+                        ? "You can ask again, for example if the players in the match change."
+                        : "You can ask to join. Every player already in the match has to approve you."}
+                </p>
+              </div>
             )}
             {!isOrganizer && (isJoined || isWaitlisted) && (
               <>
@@ -1424,7 +1484,20 @@ const MatchDetail = () => {
       {/* Join Match FAB — bottom offset clears the AppLayout bottom nav
           (fixed bottom-0 z-50, ~98px + safe-area tall). Was `bottom-20` (80px),
           which left the CTA mostly hidden underneath the nav on notched iPhones. */}
-      {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && userLevelFits && user && (
+      {isPreGame && needsApproval && !approvedToJoin && (
+        <div className="fixed left-0 right-0 px-4 z-40" style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}>
+          <Button
+            onClick={handleRequestToJoin}
+            disabled={requesting || requestPending}
+            className="w-full h-14 rounded-2xl font-bold text-base gap-2"
+            size="lg"
+          >
+            <Users className="w-5 h-5" />
+            {requestPending ? "Request sent · waiting for approval" : requestDeclined ? "Ask again" : "Request to join"}
+          </Button>
+        </div>
+      )}
+      {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && (userLevelFits || approvedToJoin) && user && (
         <div
           className="fixed left-0 right-0 px-4 z-40 space-y-2"
           style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}
@@ -1445,7 +1518,7 @@ const MatchDetail = () => {
             size="lg"
           >
             <Users className="w-5 h-5" />
-            {isFull ? "Join Waitlist" : "Join Match"}
+            {isFull ? "Join Waitlist" : approvedToJoin ? "You're approved · Join now" : "Join Match"}
           </Button>
         </div>
       )}

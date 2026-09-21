@@ -56,6 +56,16 @@ const Profile = () => {
   const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  // Matches outside my level range where every player has approved me — I still have to take the spot.
+  const [approvedJoins, setApprovedJoins] = useState<
+    { match_id: string; club: string | null; match_date: string; match_time: string | null; spots_left: number }[]
+  >([]);
+  useEffect(() => {
+    if (!user) return;
+    (supabase as any).rpc("get_my_approved_joins").then(({ data }: { data: typeof approvedJoins | null }) => {
+      setApprovedJoins(data ?? []);
+    });
+  }, [user?.id]);
 
   // lock background scroll while the share sheet is open
   useEffect(() => {
@@ -317,6 +327,38 @@ const Profile = () => {
           Rewards →
         </button>
       </motion.section>
+
+      {/* Approved to join — level-gated matches where everyone has said yes */}
+      {approvedJoins.length > 0 && (
+        <div className="space-y-2">
+          <div className="px-1">
+            <span className="text-[11px] font-black tracking-[0.14em] uppercase text-amber-300">
+              You're approved to join
+            </span>
+          </div>
+          {approvedJoins.map((j) => {
+            const d = new Date(`${j.match_date}T12:00:00`);
+            const when = `${isNaN(d.getTime()) ? j.match_date : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}${j.match_time ? ` · ${j.match_time.slice(0, 5)}` : ""}`;
+            return (
+              <button
+                key={j.match_id}
+                onClick={() => navigate(`/matches/${j.match_id}`)}
+                className="w-full text-left rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition-transform"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold text-foreground truncate">{j.club || "Match"}</div>
+                  <div className="text-[12px] text-foreground/70">
+                    {when} · {j.spots_left > 0 ? `${j.spots_left} spot${j.spots_left === 1 ? "" : "s"} left — first to join gets it` : "full right now"}
+                  </div>
+                </div>
+                <span className="text-[12px] font-bold text-amber-200 whitespace-nowrap">
+                  {j.spots_left > 0 ? "Join →" : "View →"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* New player: first-match push + missions (stats above stay visible, zeroed) */}
       {isNewPlayer && (
