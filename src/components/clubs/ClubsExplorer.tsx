@@ -136,12 +136,17 @@ const ClubsExplorer = () => {
 
     // Text search
     if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) =>
-          (c.club_name ?? "").toLowerCase().includes(q) ||
-          (c.city ?? c.location ?? "").toLowerCase().includes(q)
-      );
+      // Word-by-word, ignoring spaces/punctuation/accents, so "padel hub epsom"
+      // finds "PADELHUB KT19 Epsom" and "kt19" or a postcode also work.
+      const squash = (v: string) =>
+        v.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      const words = search.toLowerCase().split(/\s+/).map(squash).filter(Boolean);
+      list = list.filter((c) => {
+        const hay = squash(
+          [c.club_name, c.city, c.location, c.postcode, c.address_line_1].filter(Boolean).join(" ")
+        );
+        return words.every((w) => hay.includes(w));
+      });
     }
 
     // Near Me filter

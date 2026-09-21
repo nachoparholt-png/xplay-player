@@ -42,12 +42,14 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
     fetch();
   }, [open]);
 
+  // Word-by-word, ignoring spaces/punctuation/accents ("padel hub epsom" finds "PADELHUB KT19 Epsom").
+  // Null-safe: directory clubs have no `location`.
+  const squash = (v: string) =>
+    v.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  const words = search.toLowerCase().split(/\s+/).map(squash).filter(Boolean);
   const filtered = clubs.filter((c) => {
-    const matchSearch =
-      c.club_name.toLowerCase().includes(search.toLowerCase()) ||
-      c.location.toLowerCase().includes(search.toLowerCase()) ||
-      (c.city ?? "").toLowerCase().includes(search.toLowerCase());
-    return matchSearch;
+    const hay = squash([c.club_name, c.location, c.city].filter(Boolean).join(" "));
+    return words.every((w) => hay.includes(w));
   });
 
   const handleOther = () => {
