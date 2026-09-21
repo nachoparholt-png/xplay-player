@@ -36,7 +36,7 @@ const CreateFab = ({ label = "Create", onClick }: CreateFabProps) => {
       onClick={onClick}
       aria-label={label}
       // bottom = tab bar (~56px content) + its safe-area padding + breathing room
-      className="fixed bottom-[calc(env(safe-area-inset-bottom)+108px)] right-5 lg:bottom-8 lg:right-8 z-40 flex items-center justify-center bg-primary text-primary-foreground font-display font-black text-sm overflow-hidden h-14 glow-primary"
+      className="fixed bottom-[calc(var(--bottom-nav-clearance)+10px)] right-5 lg:bottom-8 lg:right-8 z-40 flex items-center justify-center bg-primary text-primary-foreground font-display font-black text-sm overflow-hidden h-14 glow-primary"
       style={{ minWidth: 56 }}
       whileTap={{ scale: 0.9 }}
       initial={{ scale: 0, opacity: 0 }}

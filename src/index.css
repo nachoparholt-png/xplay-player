@@ -18,13 +18,13 @@
     --foreground: 30 100% 99%;
 
     /* ── Bottom-nav clearance (G1) ─────────────────────────
-       Height of AppLayout's fixed bottom nav (content ~74px +
-       24px extra padding) + the device safe-area inset. Every
+       Height of AppLayout's fixed bottom nav (content ~68px) +
+       the device safe-area inset (min 8px where there is none). Every
        fixed/sticky element that must sit above the nav should
        use this var instead of a per-page magic number — the
        hand-tuned values caused two hidden-CTA bugs already.
     ─────────────────────────────────────────────────────── */
-    --bottom-nav-clearance: calc(env(safe-area-inset-bottom, 0px) + 98px);
+    --bottom-nav-clearance: calc(max(env(safe-area-inset-bottom, 0px), 8px) + 68px);
 
     --card: 206 33% 19%;
     --card-foreground: 30 100% 99%;

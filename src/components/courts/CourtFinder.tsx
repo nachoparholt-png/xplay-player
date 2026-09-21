@@ -21,6 +21,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+const RADIUS_OPTIONS = [5, 10, 15, 25, 50];
+const nextRadius = (km: number) => RADIUS_OPTIONS.find((r) => r > km) ?? null;
 const LONDON = { lat: 51.5074, lng: -0.1278, label: "London (city-wide)" };
 
 type Slot = {
@@ -71,6 +73,7 @@ const CourtFinder = () => {
   const [variantIdx, setVariantIdx] = useState(0);
   const [sheetStage, setSheetStage] = useState<"detail" | "confirm">("detail");
   const [creating, setCreating] = useState(false);
+  const [editingArea, setEditingArea] = useState(false);
 
   // lock background scroll while the sheet is open (device feedback)
   useEffect(() => {
@@ -85,26 +88,29 @@ const CourtFinder = () => {
     setLocating(true);
     try {
       const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 8000 });
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: "Near you" });
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: "Near you" };
+      setCoords(next);
+      return next;
     } catch {
       toast({ title: "Couldn't get your location", description: "Searching London-wide instead — you can still find courts." });
       setCoords(LONDON);
       setRadiusKm(15);
+      return LONDON;
     } finally {
       setLocating(false);
     }
   };
 
   const runSearch = useCallback(
-    async (overrides?: { radiusKm?: number; win?: Window; dayOffset?: number }) => {
-      const c = coords ?? LONDON;
+    async (overrides?: { radiusKm?: number; win?: Window; dayOffset?: number; coords?: { lat: number; lng: number; label: string } }) => {
+      const c = overrides?.coords ?? coords ?? LONDON;
       const r = overrides?.radiusKm ?? radiusKm;
       const w = overrides?.win ?? win;
       const d = overrides?.dayOffset ?? dayOffset;
       if (overrides?.radiusKm) setRadiusKm(overrides.radiusKm);
       if (overrides?.win) setWin(overrides.win);
       if (overrides?.dayOffset !== undefined) setDayOffset(overrides.dayOffset);
-      if (!coords) setCoords(c);
+      if (!coords || overrides?.coords) setCoords(c);
 
       setLoading(true);
       const day = addDays(new Date(), d);
@@ -244,8 +250,10 @@ const CourtFinder = () => {
 
       {/* location */}
       {coords ? (
+        <>
         <button
-          onClick={askLocation}
+          onClick={() => setEditingArea((v) => !v)}
+          aria-expanded={editingArea}
           className="w-full flex items-center gap-3 bg-card border border-border/40 rounded-[14px] px-4 py-3.5 text-left"
         >
           <MapPin className="w-[18px] h-[18px] text-primary flex-shrink-0" />
@@ -253,8 +261,39 @@ const CourtFinder = () => {
             <div className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-muted-foreground">Searching near</div>
             <div className="text-[15px] font-bold truncate">{coords.label} · {radiusKm} km</div>
           </div>
-          <span className="font-display text-[11px] font-extrabold uppercase text-primary">Change</span>
+          <span className="font-display text-[11px] font-extrabold uppercase text-primary">{editingArea ? "Done" : "Change"}</span>
         </button>
+        {editingArea && (
+          <div className="bg-card border border-border/40 rounded-[14px] px-4 py-3.5 space-y-3">
+            <div>
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-muted-foreground mb-2">Search from</div>
+              <div className="flex gap-2 flex-wrap">
+                {chip(locating ? "Locating…" : "My location", coords.label === "Near you", async () => {
+                  const next = await askLocation();
+                  if (results && next) runSearch({ coords: next, radiusKm: next === LONDON ? 15 : radiusKm });
+                }, "loc-me")}
+                {chip("London city-wide", coords.label === LONDON.label, () => {
+                  const r = Math.max(radiusKm, 15);
+                  setCoords(LONDON);
+                  setRadiusKm(r);
+                  if (results) runSearch({ coords: LONDON, radiusKm: r });
+                }, "loc-london")}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-extrabold uppercase tracking-[0.1em] text-muted-foreground mb-2">Distance</div>
+              <div className="flex gap-2 flex-wrap">
+                {RADIUS_OPTIONS.map((km) =>
+                  chip(`${km} km`, radiusKm === km, () => {
+                    setRadiusKm(km);
+                    if (results) runSearch({ radiusKm: km });
+                  }, `r-${km}`)
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        </>
       ) : (
         <div className="rounded-[18px] p-4 bg-[#5924C6]/10 border border-[#5924C6]/40">
           <div className="flex items-center gap-2.5 mb-2">
@@ -321,7 +360,7 @@ const CourtFinder = () => {
       {results && grid && grid.clubRows.length > 0 && (
         <div className="space-y-3">
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {chip(`Radius ${radiusKm}km`, false, () => runSearch({ radiusKm: radiusKm === 5 ? 10 : 5 }))}
+            {chip(`Radius ${radiusKm}km`, editingArea, () => { setEditingArea(true); window.scrollTo({ top: 0, behavior: "smooth" }); })}
             {chip("XPLAY only", xplayOnly, () => setXplayOnly(!xplayOnly))}
             <button onClick={() => runSearch()} className="px-3 py-2.5 rounded-full bg-muted/40 border border-border/40" aria-label="Refresh">
               <RefreshCw className={cn("w-3.5 h-3.5 text-foreground/60", loading && "animate-spin")} />
@@ -412,9 +451,13 @@ const CourtFinder = () => {
           </div>
           {[
             { t: "Try all day", s: "Widen the time window", fn: () => runSearch({ win: "all" }) },
-            { t: `Expand to ${radiusKm === 5 ? 10 : 25} km`, s: "More clubs, more slots", fn: () => runSearch({ radiusKm: radiusKm === 5 ? 10 : 25 }) },
-            { t: `${dayLabel(dayOffset + 1)} instead`, s: "Same window, next day", fn: () => runSearch({ dayOffset: dayOffset + 1 }) },
-          ].map((a) => (
+            ...(nextRadius(radiusKm)
+              ? [{ t: `Expand to ${nextRadius(radiusKm)} km`, s: "More clubs, more slots", fn: () => runSearch({ radiusKm: nextRadius(radiusKm)! }) }]
+              : []),
+            ...(dayOffset < 6
+              ? [{ t: `${dayLabel(dayOffset + 1)} instead`, s: "Same window, next day", fn: () => runSearch({ dayOffset: dayOffset + 1 }) }]
+              : []),
+          ].filter((a) => !(a.t === "Try all day" && win === "all")).map((a) => (
             <button
               key={a.t}
               onClick={a.fn}

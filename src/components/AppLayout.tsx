@@ -6,7 +6,8 @@ import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
 import PointsBalanceChip from "@/components/points/PointsBalanceChip";
 import AppTour from "@/components/AppTour";
-import xplayLogo from "@/assets/xplay-logo-full.png";
+// Transparent cut-out of the full logo, so it sits on the header colour (no purple box)
+import xplayLogo from "@/assets/xplay-logo-header.png";
 import {
   IconMatches,
   IconTournaments,
@@ -127,7 +128,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
         {/* Scrollable content area */}
         <div
-          className={`flex-1 overflow-y-scroll overflow-x-hidden ${location.pathname.startsWith('/messages/') ? '' : 'pb-36'}`}
+          className={`flex-1 overflow-y-scroll overflow-x-hidden ${location.pathname.startsWith('/messages/') ? '' : 'pb-28'}`}
           style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         >
           <div className={`max-w-4xl mx-auto ${location.pathname.startsWith("/messages/") ? "h-full" : ""}`}>{children}</div>
@@ -140,9 +141,9 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       {/* Mobile Bottom Nav - hidden on chat threads */}
       <nav
         className={`lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-white/5 ${location.pathname.startsWith('/messages/') ? 'hidden' : ''}`}
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' }}
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
       >
-        <div className="flex items-center justify-around px-2 pt-4 pb-3">
+        <div className="flex items-center justify-around px-2 pt-4 pb-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
             return (
