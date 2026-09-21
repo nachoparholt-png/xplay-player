@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation, useSearchParams } from "react-rout
 import { motion } from "framer-motion";
 import { ArrowLeft, MapPin, Clock, Phone, Mail, Globe, Car, Zap, Info, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
 import { getDay } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { formatInClubTz } from "@/utils/dateTimezone";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -151,7 +152,8 @@ const ClubDetail = () => {
       supabase.from("courts").select("*").eq("club_id", clubId).eq("active", true),
       supabase.from("membership_tiers").select("*").eq("club_id", clubId).eq("active", true).order("sort_order"),
       supabase.from("coaching_sessions").select("*").eq("club_id", clubId).eq("status", "scheduled").gte("starts_at", new Date().toISOString()).order("starts_at"),
-      supabase.from("club_events").select("*").eq("club_id", clubId).eq("status", "published").gte("starts_at", new Date().toISOString()).order("starts_at"),
+      // club_events stores a local date + time (event_date, start_time, end_time) — there is no starts_at column.
+      supabase.from("club_events").select("*").eq("club_id", clubId).eq("status", "published").gte("event_date", new Date().toISOString().slice(0, 10)).order("event_date").order("start_time"),
       supabase.from("club_operating_hours").select("*").eq("club_id", clubId).order("day_of_week"),
       user
         ? supabase.from("club_memberships").select("*").eq("user_id", user.id).eq("club_id", clubId).eq("active", true).maybeSingle()
@@ -163,7 +165,17 @@ const ClubDetail = () => {
     setCourts(courtsRes.data || []);
     setTiers(tiersRes.data || []);
     setSessions(sessRes.data || []);
-    setEvents(eventsRes.data || []);
+    // Turn the club-local date + time into the ISO timestamps the event cards expect.
+    const eventsTz = (clubRes.data as ClubRow | null)?.timezone || "Europe/London";
+    const toIso = (date: string, time?: string | null) =>
+      time ? fromZonedTime(`${date}T${time}`, eventsTz).toISOString() : null;
+    setEvents(
+      ((eventsRes.data as any[]) || []).map((e) => ({
+        ...e,
+        starts_at: toIso(e.event_date, e.start_time) ?? fromZonedTime(`${e.event_date}T00:00:00`, eventsTz).toISOString(),
+        ends_at: toIso(e.event_date, e.end_time),
+      }))
+    );
     setOperatingHours(hoursRes.data || []);
     setMyMembership((memRes.data as ClubMembershipRow | null) ?? null);
 
