@@ -521,7 +521,7 @@ const Matches = () => {
                     {nextMatch.match_time?.slice(0, 5) ?? "TBD"}{nextMatch.court ? ` · COURT ${nextMatch.court}` : ""}
                   </div>
                   <div className="text-[11px] font-semibold text-primary-foreground/75">
-                    {nextMatch.club} · {nextMatch.format} · {nextMatch.playerCount} confirmed
+                    {nextMatch.club} · <span className="capitalize">{nextMatch.format}</span> · {nextMatch.playerCount} confirmed
                   </div>
                 </motion.button>
               );
@@ -657,8 +657,8 @@ const Matches = () => {
                                     {match.match_date ? format(new Date(match.match_date + "T00:00:00"), "EEEE d MMM") : "TBD"} · {match.match_time?.slice(0, 5) ?? ""}
                                   </p>
                                 </div>
-                                <span className="text-[11px] font-black text-amber-400 bg-amber-400/15 px-2 py-1 rounded-full shrink-0">
-                                  {spotsNeeded} SPOT{spotsNeeded !== 1 ? "S" : ""} LEFT
+                                <span className="text-[11px] font-bold text-amber-300 bg-amber-400/15 px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap">
+                                  {spotsNeeded} spot{spotsNeeded !== 1 ? "s" : ""} left
                                 </span>
                               </div>
                               <div className="mt-3 flex items-center gap-2">

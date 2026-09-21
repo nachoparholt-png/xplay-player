@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, Trophy, Clock, AlertTriangle, Info, UserPlus, Check, MessageSquare } from "lucide-react";
@@ -195,6 +196,7 @@ const NotificationBell = () => {
         )}
       </button>
 
+      {createPortal(
       <AnimatePresence>
         {open && (
           <>
@@ -205,7 +207,7 @@ const NotificationBell = () => {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
-              className="fixed inset-x-0 bottom-0 z-[61] max-h-[80dvh] rounded-t-3xl lg:absolute lg:inset-x-auto lg:bottom-auto lg:left-0 lg:top-12 lg:w-80 lg:max-h-[70vh] lg:rounded-2xl bg-card border border-border/50 shadow-2xl shadow-black/30 overflow-y-auto"
+              className="fixed inset-x-0 bottom-0 z-[61] max-h-[80dvh] rounded-t-3xl lg:fixed lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-16 lg:w-80 lg:max-h-[70vh] lg:rounded-2xl bg-card border border-border/50 shadow-2xl shadow-black/30 overflow-y-auto"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
             >
               <div className="flex items-center justify-between p-4 border-b border-border/50">
@@ -282,7 +284,9 @@ const NotificationBell = () => {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 };

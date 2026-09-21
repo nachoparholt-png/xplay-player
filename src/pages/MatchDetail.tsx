@@ -908,7 +908,7 @@ const MatchDetail = () => {
           <User className="w-4 h-4 text-muted-foreground/50" />
         </div>
         <span className="text-sm text-muted-foreground flex-1 whitespace-nowrap">Open</span>
-        <span className="text-xs text-primary font-semibold whitespace-nowrap">{inviteOnly ? "Invite" : isJoined ? "Switch" : "Join"}</span>
+        <span className="text-xs text-primary font-semibold whitespace-nowrap">{isJoined ? "Invite" : "Join"}</span>
       </button>
     );
   };
