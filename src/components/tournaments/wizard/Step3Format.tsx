@@ -626,7 +626,7 @@ const Step3Format = ({ state, update }: Props) => {
                 canvas.phases.length === 0
                   ? "bg-muted/40 text-muted-foreground cursor-not-allowed"
                   : state.savedCanvasSummary && state.savedCanvasSummary === buildSavedCanvasSummary(canvas)
-                  ? "bg-accent/15 text-accent border border-accent/30"
+                  ? "bg-accent/15 text-foreground border border-accent/30"
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >

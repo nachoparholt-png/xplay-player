@@ -106,13 +106,13 @@ const CreateMatch = () => {
   const [selectedSlotDate, setSelectedSlotDate] = useState(""); // YYYY-MM-DD
   const [selectedSlot, setSelectedSlot] = useState<{ start: string; end: string } | null>(null);
 
-  // Duration is always locked to the court's configured slot_duration_minutes — never free choice
-  const selectedCourtObj = clubCourts.find(c => c.id === selectedCourtId);
-  const slotDuration = selectedCourtObj?.slot_duration_minutes ?? 90;
-
   const { data: clubCourts = [], isLoading: courtsLoading } = useClubCourtsForPlayer(
     venueMode === "xplay" ? (selectedClub?.id ?? null) : null
   );
+  // Duration is always locked to the court's configured slot_duration_minutes — never free choice.
+  // Must come AFTER the clubCourts hook: reading it earlier throws "Cannot access before initialization".
+  const selectedCourtObj = clubCourts.find(c => c.id === selectedCourtId);
+  const slotDuration = selectedCourtObj?.slot_duration_minutes ?? 90;
   const { data: availableWindows = [], isLoading: windowsLoading, isFetching: windowsFetching } = usePlayerCourtAvailability(
     venueMode === "xplay" ? (selectedClub?.id ?? null) : null,
     selectedCourtId || null,
