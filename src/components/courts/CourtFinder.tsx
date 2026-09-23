@@ -522,7 +522,7 @@ const CourtFinder = () => {
                   <button
                     onClick={() => createLinkedMatch(sel, true)}
                     disabled={creating}
-                    className="mt-5 w-full flex items-center gap-3 bg-green-500 text-white rounded-2xl px-4 py-4 text-left active:scale-[0.98] transition-transform"
+                    className="mt-5 w-full flex items-center gap-3 bg-green-500 text-[#1A2833] rounded-2xl px-4 py-4 text-left active:scale-[0.98] transition-transform"
                   >
                     <span className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
                       <Check className="w-5 h-5" strokeWidth={3} />

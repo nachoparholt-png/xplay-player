@@ -112,7 +112,7 @@ const Step5Review = ({ state, update, onJumpToStep, onCreate, saving }: Props) =
       : `${state.matchConfig.games_per_set ?? 4} games${(state.matchConfig.sets_per_match ?? 1) > 1 ? " (best of 3)" : ""}, ${state.matchConfig.deuce_mode ?? "normal"} deuce`;
 
   const fitColors: Record<string, string> = {
-    green: "bg-accent/15 text-accent border-accent/30",
+    green: "bg-accent/15 text-foreground border-accent/30",
     yellow: "bg-[hsl(45,93%,47%)]/15 text-[hsl(45,93%,47%)] border-[hsl(45,93%,47%)]/30",
     red: "bg-destructive/15 text-destructive border-destructive/30",
     none: "bg-muted text-muted-foreground border-border/50",

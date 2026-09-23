@@ -747,7 +747,7 @@ const PhaseBlockCard = ({
                   return "border-primary bg-primary text-primary-foreground";
                 }
                 if (showDeleteHint) {
-                  return "border-destructive bg-destructive text-white scale-110 shadow-md shadow-destructive/30";
+                  return "border-destructive bg-destructive text-destructive-foreground scale-110 shadow-md shadow-destructive/30";
                 }
                 if (isWired && isBestOf) {
                   // Best-of qualifier — warm amber-orange to match the arrow colour

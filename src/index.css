@@ -47,7 +47,7 @@
     --accent-foreground: 30 100% 99%;
 
     --destructive: 12 90% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 206 33% 15%; /* navy: 4.8:1 on coral (white was 3.1:1) */
 
     --border: 206 25% 22%;
     --input: 206 25% 22%;
@@ -57,7 +57,7 @@
     --radius: 1rem;
 
     --win: 150 60% 48%;
-    --win-foreground: 0 0% 100%;
+    --win-foreground: 206 33% 15%; /* navy: 6.7:1 on green (white was 2.3:1) */
     --loss: 0 45% 50%;
     --loss-foreground: 0 0% 100%;
     --gold: 45 100% 50%;
@@ -159,13 +159,13 @@
 
   .status-open { @apply bg-primary/20 text-primary; }
   .status-almost-full { background: hsl(var(--gold) / 0.2); color: hsl(var(--gold)); }
-  .status-full { @apply bg-accent/20 text-accent; }
-  .status-cancelled { @apply bg-destructive/20 text-destructive; }
+  .status-full { @apply bg-accent/20 text-foreground; }
+  .status-cancelled { @apply bg-destructive/20 text-foreground; }
   .status-completed { @apply bg-muted text-muted-foreground; }
   .status-awaiting { background: hsl(var(--primary) / 0.2); color: hsl(var(--primary)); }
-  .status-pending { background: hsl(var(--accent) / 0.2); color: hsl(var(--accent)); }
+  .status-pending { background: hsl(var(--accent) / 0.2); color: hsl(var(--foreground)); }
   .status-review { background: hsl(var(--gold) / 0.2); color: hsl(var(--gold)); }
-  .status-confirmed { background: hsl(var(--win) / 0.2); color: hsl(var(--win)); }
+  .status-confirmed { background: hsl(var(--win) / 0.2); color: hsl(var(--foreground)); }
   .status-draw { background: hsl(var(--gold) / 0.15); color: hsl(var(--gold)); }
 }
 
