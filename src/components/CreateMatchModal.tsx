@@ -213,7 +213,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
         const { data: clubs } = await supabase
           .from("clubs")
           .select("id, club_name, location, city, source")
-          .eq("club_status", "active");
+          .eq("club_status", "active")
+          .neq("kind", "organiser");
 
         if (clubs) {
           const match = findBestClubMatch(clubs, parsed.clubName);

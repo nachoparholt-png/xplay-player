@@ -17,6 +17,7 @@ export default {
       fontFamily: {
         sans: ["Manrope", "system-ui", "sans-serif"],
         display: ["Lexend", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",

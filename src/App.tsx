@@ -74,7 +74,6 @@ const Privacy             = lazyWithRetry(() => import("./pages/Privacy"));
 const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
 const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
 const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
-const TournamentWizard    = lazyWithRetry(() => import("./pages/tournaments/TournamentWizard"));
 const TournamentDetail    = lazyWithRetry(() => import("./pages/tournaments/TournamentDetail"));
 const TournamentLive      = lazyWithRetry(() => import("./pages/tournaments/TournamentLive"));
 const TournamentBetConfig = lazyWithRetry(() => import("./pages/tournaments/TournamentBetConfig"));
@@ -220,7 +219,6 @@ const AppRoutes = () => {
           {TOURNAMENTS_ENABLED ? (
             <>
               <Route path="/tournaments" element={<ProtectedRoute><AppLayout><TournamentsList /></AppLayout></ProtectedRoute>} />
-              <Route path="/tournaments/new" element={<ProtectedRoute><AppLayout><TournamentWizard /></AppLayout></ProtectedRoute>} />
               <Route path="/tournaments/:id" element={<ProtectedRoute><AppLayout><TournamentDetail /></AppLayout></ProtectedRoute>} />
               <Route path="/tournaments/:id/live" element={<ProtectedRoute><AppLayout><TournamentLive /></AppLayout></ProtectedRoute>} />
             </>

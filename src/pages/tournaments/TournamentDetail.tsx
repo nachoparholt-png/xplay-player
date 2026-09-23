@@ -1,11 +1,16 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Trophy, Users, MapPin, Calendar, Clock, Lock, Globe, Send, Play, Rocket, Trash2, TrendingUp, Coins, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Send, Trash2, TrendingUp, ShieldAlert, Share2, LogOut, Check, Gift, Hourglass, Ban, MapPin, CalendarDays, Clock, BarChart3, ShieldCheck } from "lucide-react";
+import { Chip, Mono, SeatsBar, FormatChip, XpLine, HUE, tint } from "@/components/tournaments/PlayerAtoms";
+import {
+  type SeatCounts, type VenueClub,
+  cancellationPolicyText, fetchClubs, fetchSeatCounts, formatDayTime, formatGBP, formatLabel as tournamentFormatLabel, formatShortDate,
+  levelRange, publicTournamentUrl, refundDeadline, tournamentStart, venueProvider,
+} from "@/lib/tournaments/playerView";
 import AdminBadge from "@/components/tournaments/AdminBadge";
 import TournamentStructurePreview from "@/components/tournaments/TournamentStructurePreview";
 import TournamentFixtureView from "@/components/tournaments/TournamentFixtureView";
 import type { BracketConfig } from "@/lib/tournaments/types";
-import { formatPrice } from "@/lib/shopify";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -35,6 +40,7 @@ import type { Tournament, TournamentPlayer } from "@/lib/tournaments/types";
 const TournamentDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -54,11 +60,33 @@ const TournamentDetail = () => {
   const [userPoints, setUserPoints] = useState(0);
   const [phaseOddsPreview, setPhaseOddsPreview] = useState<{ stage: string; multiplier: number; tier: string }[]>([]);
   const [viewMode, setViewMode] = useState<"structure" | "fixture">("structure");
+  // Player-side extras (PL3/PL5)
+  const [seats, setSeats] = useState<SeatCounts | null>(null);
+  const [organiserClub, setOrganiserClub] = useState<VenueClub | null>(null);
+  const [venueClub, setVenueClub] = useState<VenueClub | null>(null);
+  const [myPayment, setMyPayment] = useState<{ amount_cents: number; succeeded_at: string | null } | null>(null);
+  const [myGuestEntry, setMyGuestEntry] = useState<{ entry_type: string } | null>(null);
+  const [myWaitlist, setMyWaitlist] = useState<{ position: number; offered_at: string | null; offer_expires_at: string | null } | null>(null);
+  const [waitlistBusy, setWaitlistBusy] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const isCreator = tournament?.created_by === user?.id;
   const isJoined = players.some(p => p.user_id === user?.id && p.status === "confirmed");
   const playingCount = players.filter(p => p.status === "confirmed" && p.role !== "organiser").length;
-  const spotsLeft = tournament ? tournament.player_count - playingCount : 0;
+  // Seats: prefer the server RPC (counts unclaimed guest places too); fall back to the local count.
+  const spotsLeft = seats ? seats.free : (tournament ? tournament.player_count - playingCount : 0);
+  const seatsTaken = seats ? Math.max(0, seats.total - seats.free) : playingCount;
+  const tx = tournament as (Tournament & {
+    ticket_price_cents?: number | null; is_live?: boolean | null; venue_club_id?: string | null; venue_name?: string | null;
+    venue_address?: string | null; registration_deadline?: string | null; cancellation_policy?: string | null;
+    cancellation_policy_text?: string | null; waitlist_enabled?: boolean | null; slug?: string | null; description?: string | null;
+  }) | null;
+  const priceCents = tx?.ticket_price_cents ?? 0;
+  const isPaidTournament = priceCents > 0;
+  const guestComp = myGuestEntry?.entry_type === "comp";
+  const guestPaidOffline = myGuestEntry?.entry_type === "paid_offline";
+  const guestAwaiting = myGuestEntry?.entry_type === "awaiting_payment";
+  const isRegistered = isJoined || guestComp || guestPaidOffline || myGuestEntry?.entry_type === "paid";
 
   useEffect(() => {
     if (!id) return;
@@ -82,6 +110,25 @@ const TournamentDetail = () => {
       }
       const playersList = (tp as unknown as TournamentPlayer[]) || [];
       setPlayers(playersList);
+
+      // ── Player-side extras: seats, organiser + venue clubs, my payment / guest entry / waitlist ──
+      {
+        const sb = supabase as any;
+        const tRow = tournamentData as unknown as { club_id?: string | null; venue_club_id?: string | null } | null;
+        const [seatMap, clubMap, payRes, guestRes, waitRes] = await Promise.all([
+          fetchSeatCounts([id]),
+          fetchClubs([tRow?.club_id, tRow?.venue_club_id].filter(Boolean) as string[]),
+          user?.id ? sb.from("tournament_ticket_payments").select("amount_cents, succeeded_at").eq("tournament_id", id).eq("user_id", user.id).eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+          user?.id ? sb.from("tournament_guest_entries").select("entry_type").eq("tournament_id", id).eq("claimed_user_id", user.id).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+          user?.id ? sb.from("tournament_waitlist").select("position, offered_at, offer_expires_at").eq("tournament_id", id).eq("user_id", user.id).is("resolved", null).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+        ]);
+        setSeats(seatMap[id] ?? null);
+        setOrganiserClub(tRow?.club_id ? clubMap[tRow.club_id] ?? null : null);
+        setVenueClub(tRow?.venue_club_id ? clubMap[tRow.venue_club_id] ?? null : null);
+        setMyPayment(payRes.data ?? null);
+        setMyGuestEntry(guestRes.data ?? null);
+        setMyWaitlist(waitRes.data ?? null);
+      }
 
       if (playersList.length > 0) {
         const userIds = playersList.map(p => p.user_id);
@@ -142,6 +189,77 @@ const TournamentDetail = () => {
     load();
   }, [id, user?.id]);
 
+  // Deep link from the Tournaments page ("Accept & pay" / "Accept"): open the join sheet once loaded.
+  useEffect(() => {
+    if (loading || !tournament || !user) return;
+    if (searchParams.get("join") === "1") {
+      if (!isJoined && !isCreator) setJoinOpen(true);
+      searchParams.delete("join");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, tournament?.id, user?.id]);
+
+  const refreshSeats = async () => {
+    if (!id) return;
+    const m = await fetchSeatCounts([id]);
+    setSeats(m[id] ?? null);
+  };
+
+  const handleJoinWaitlist = async () => {
+    if (!user || !id) return;
+    setWaitlistBusy(true);
+    const sb = supabase as any;
+    const { data: rows } = await sb.from("tournament_waitlist").select("position").eq("tournament_id", id).order("position", { ascending: false }).limit(1);
+    const position = ((rows?.[0]?.position as number | undefined) ?? 0) + 1;
+    const { error } = await sb.from("tournament_waitlist").insert({ tournament_id: id, user_id: user.id, position });
+    setWaitlistBusy(false);
+    if (error) {
+      toast({ title: "Couldn't join the waitlist", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMyWaitlist({ position, offered_at: null, offer_expires_at: null });
+    toast({ title: `You're #${position} on the waitlist`, description: "You'll have 12h to pay if a place frees up." });
+    await refreshSeats();
+  };
+
+  const handleWithdraw = async () => {
+    if (!user || !id) return;
+    setWithdrawing(true);
+    const { error } = await (supabase as any)
+      .from("tournament_players")
+      .update({ status: "cancelled" })
+      .eq("tournament_id", id)
+      .eq("user_id", user.id);
+    setWithdrawing(false);
+    if (error) {
+      toast({ title: "Couldn't withdraw", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "You've withdrawn", description: cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text) });
+    setPlayers(prev => prev.map(p => (p.user_id === user.id ? { ...p, status: "cancelled" } : p)));
+    await Promise.all([refreshSeats(), triggerRecalc()]);
+  };
+
+  const handleShare = async () => {
+    if (!tournament) return;
+    const url = publicTournamentUrl({ slug: tx?.slug, id: tournament.id });
+    const start = tournamentStart(tournament);
+    const text = `${tournament.name}${start ? ` · ${formatDayTime(start)}` : ""}`;
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: tournament.name, text, url });
+        return;
+      }
+    } catch { /* user cancelled or share unsupported — fall through to clipboard */ }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied", description: url });
+    } catch {
+      toast({ title: "Share link", description: url });
+    }
+  };
+
   const triggerRecalc = async () => {
     if (!id) return;
     try {
@@ -191,7 +309,14 @@ const TournamentDetail = () => {
       slot_index: _slotIndex ?? null,
     };
     setPlayers((prev) => [...prev, newPlayer]);
-    await triggerRecalc();
+    // If this join came from an invitation, mark it accepted (RLS: invited_user_id = me).
+    await (supabase as any)
+      .from("tournament_invitations")
+      .update({ status: "accepted", responded_at: new Date().toISOString() })
+      .eq("tournament_id", id)
+      .eq("invited_user_id", user.id)
+      .eq("status", "pending");
+    await Promise.all([refreshSeats(), triggerRecalc()]);
   };
 
   const reloadPlayers = async () => {
@@ -199,22 +324,6 @@ const TournamentDetail = () => {
     const { data: tp } = await supabase.from("tournament_players").select("*").eq("tournament_id", id);
     const playersList = (tp as unknown as TournamentPlayer[]) || [];
     setPlayers(playersList);
-  };
-
-  const handleLeave = async () => {
-    if (!user || !id) return;
-    const { error } = await supabase
-      .from("tournament_players")
-      .delete()
-      .eq("tournament_id", id)
-      .eq("user_id", user.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Left tournament" });
-      setPlayers(prev => prev.filter(p => p.user_id !== user.id));
-      await triggerRecalc();
-    }
   };
 
   const handleLaunch = async () => {
@@ -317,18 +426,13 @@ const TournamentDetail = () => {
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex items-center gap-2">
-          {tournament.visibility === "draft" && tournament.status === "draft" && (
-            <Badge className="bg-primary/15 text-primary text-[10px] font-black uppercase tracking-[0.14em]">Draft</Badge>
-          )}
-          {tournament.visibility === "public" && (
-            <Badge className="bg-purple-500/20 text-purple-300 text-[10px] font-black uppercase tracking-[0.14em]">Public</Badge>
-          )}
-          {tournament.visibility === "private" && tournament.status !== "draft" && (
-            <Badge className="bg-amber-400/15 text-amber-400 text-[10px] font-black uppercase tracking-[0.14em]">Private</Badge>
-          )}
-          {STAKES_ENABLED && hasBetConfig && (
-            <Badge className="bg-primary/15 text-primary text-[10px] font-black uppercase tracking-[0.14em]">Betting</Badge>
-          )}
+          <button
+            onClick={handleShare}
+            aria-label="Share tournament"
+            className="w-8 h-8 rounded-[10px] bg-card flex items-center justify-center hover:bg-card/80 transition-colors text-foreground"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
           {/* Bracket shortcut — always available once the tournament is published
               (Apple Sports-style header button, deep-links to the bracket tab) */}
           {tournament.status !== "draft" && (
@@ -347,106 +451,181 @@ const TournamentDetail = () => {
         </div>
       </div>
 
-      <div className="px-4 py-5 space-y-6">
-        {/* Title Hero */}
-        <div>
-          <div className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-2">
-            {/* Real format from format_type — previously every pairs tournament
-                was labelled "Round robin" regardless of its actual format */}
-            🏆 {(tournament.format_type || "tournament").replace(/_/g, " ")} · {tournament.player_count} {tournament.tournament_type === "pairs" ? "pairs" : "players"}
-          </div>
-          <h1 className="font-display text-[30px] font-black italic uppercase text-foreground leading-[0.9] tracking-[-0.02em]">
-            {tournament.name}
-          </h1>
-          <div className="text-[11px] text-muted-foreground/55 mt-2 flex items-center gap-3">
-            {tournament.club && <span>{tournament.club}</span>}
-            {tournament.scheduled_date && (
-              <span>
-                {new Date(tournament.scheduled_date + 'T12:00:00').toLocaleDateString(undefined, {
-                  weekday: "short", day: "numeric", month: "short",
-                })}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Ticket price banner — only when the organiser set ticket_price_cents > 0.
-            Surfaces the £/€ amount so players can't get to the join CTA
-            without knowing they'll be charged. */}
-        {(() => {
-          const priceCents = (tournament as typeof tournament & { ticket_price_cents?: number | null }).ticket_price_cents ?? 0;
-          const discountPct = (tournament as typeof tournament & { member_discount_pct?: number | null }).member_discount_pct ?? 0;
-          if (priceCents <= 0) return null;
-          const currencyCode = "GBP"; // TODO: thread club.currency through here once exposed
-          const gross = priceCents / 100;
-          const discounted = discountPct > 0 ? gross * (1 - discountPct / 100) : null;
+      <div className="px-4 py-5 space-y-5">
+        {/* ── My status card (PL5) — first thing on the page once you have a place ── */}
+        {!isCreator && (isRegistered || myWaitlist || tournament.status === "cancelled") && (() => {
+          const isCancelled = tournament.status === "cancelled";
+          const tone = isCancelled ? HUE.red : myWaitlist && !isRegistered ? HUE.amber : guestComp ? HUE.lav : HUE.lime;
+          const Icon = isCancelled ? Ban : myWaitlist && !isRegistered ? Hourglass : guestComp ? Gift : Check;
+          const offerActive = !!myWaitlist?.offered_at && !!myWaitlist?.offer_expires_at && new Date(myWaitlist.offer_expires_at).getTime() > Date.now();
+          let title = "You're registered";
+          let body: React.ReactNode = null;
+          if (isCancelled) {
+            title = "Cancelled by the organiser";
+            body = myPayment ? <><Mono>{formatGBP(myPayment.amount_cents)}</Mono> refunded to your original payment method · <Mono>3–5</Mono> days</> : "Nothing to pay.";
+          } else if (isRegistered) {
+            if (guestComp) { title = "You have a free place"; body = <>Comp from {organiserClub?.club_name || tournament.club || "the organiser"} · nothing to pay</>; }
+            else if (myPayment) body = <>Paid <Mono>{formatShortDate(myPayment.succeeded_at ? new Date(myPayment.succeeded_at) : null) || "in the app"}</Mono> · <Mono>{formatGBP(myPayment.amount_cents)}</Mono></>;
+            else if (guestPaidOffline || isPaidTournament) body = "Paid the organiser directly · nothing to pay here";
+            else body = "Free tournament · nothing to pay";
+          } else if (myWaitlist) {
+            if (offerActive) { title = "A place is free — it's yours"; body = <>Pay <Mono>{formatGBP(priceCents)}</Mono> before <Mono>{formatDayTime(new Date(myWaitlist.offer_expires_at as string))}</Mono> or it goes to the next person</>; }
+            else { title = `Waitlist #${myWaitlist.position}`; body = "You'll have 12h to pay if a place frees up · we'll push + email you"; }
+          }
           return (
-            <div className="rounded-[14px] bg-primary/[0.06] border border-primary/30 p-4 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                  Entry ticket
+            <div className="rounded-2xl p-3.5" style={{ background: tint(tone, 14), border: `1.5px solid ${tint(tone, 55)}` }}>
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: tone }}>
+                  <Icon className="w-5 h-5" style={{ color: "hsl(var(--primary-foreground))" }} strokeWidth={2.5} />
                 </div>
-                <div className="font-display text-[26px] font-black italic text-foreground leading-none mt-1">
-                  {formatPrice(discounted ?? gross, currencyCode)}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[16px] font-extrabold text-foreground">{title}</p>
+                  {body && <p className="text-[13px] font-semibold text-foreground mt-0.5">{body}</p>}
                 </div>
-                {discounted != null && (
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span className="line-through">{formatPrice(gross, currencyCode)}</span>
-                    <span className="font-bold text-primary/80 uppercase tracking-[0.12em]">
-                      {Math.round(discountPct)}% members
-                    </span>
-                  </div>
+                {offerActive && !isRegistered && (
+                  <Button size="sm" className="rounded-xl font-bold" onClick={() => setJoinOpen(true)}>Pay {formatGBP(priceCents)}</Button>
                 )}
-              </div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/80 text-right max-w-[140px]">
-                {discounted != null
-                  ? "Member rate applied at checkout if eligible"
-                  : "Charged when you join"}
               </div>
             </div>
           );
         })()}
 
-        {/* 2 Dominant Numbers */}
-        <div className="flex gap-3">
-          {/* Pairs Joined Card */}
-          <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
-            <div className="leading-none">
-              <div className="font-display text-[24px] font-black italic text-foreground leading-[0.95]">
-                {playingCount}
-                <span className="text-[14px] text-muted-foreground/40 font-normal not-italic ml-0.5">/{tournament.player_count}</span>
+        {/* ── Live-day banner (PL5) — replaces the status card's job on the day ── */}
+        {tournament.status === "active" && tx?.is_live && (
+          <button onClick={() => navigate(`/tournaments/${tournament.id}/live`)} className="w-full text-left rounded-2xl px-4 py-3.5 flex items-center justify-between" style={{ background: HUE.lime, color: "hsl(var(--primary-foreground))" }}>
+            <div>
+              <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.1em]">
+                <span className="w-[7px] h-[7px] rounded-full animate-pulse" style={{ background: "hsl(var(--primary-foreground))" }} />
+                Live now
               </div>
+              <div className="font-display font-black italic uppercase text-[22px] mt-1">Open live view</div>
             </div>
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
-              {tournament.tournament_type === "pairs" ? "Pairs" : "Players"} Joined
-            </div>
-          </div>
+            <ArrowLeft className="w-5 h-5 rotate-180" />
+          </button>
+        )}
 
-          {/* XP Pool or Spots Left */}
-          {tournament.prize_pool && tournament.prize_pool > 0 ? (
-            <div className="flex-1 p-3 rounded-[14px] bg-amber-400/10 border border-amber-400/20">
-              <div className="leading-none">
-                <div className="font-display text-[24px] font-black italic text-amber-400 leading-[0.95]">
-                  {tournament.prize_pool}
-                </div>
-              </div>
-              <div className="text-[10px] font-bold text-amber-400/70 uppercase tracking-[0.1em] mt-1.5">
-                XP Prize Pool
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 p-3 rounded-[14px] bg-card border border-border/[0.07]">
-              <div className="leading-none">
-                <div className="font-display text-[24px] font-black italic text-foreground leading-[0.95]">
-                  {spotsLeft}
-                </div>
-              </div>
-              <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.1em] mt-1.5">
-                Spots Left
-              </div>
-            </div>
-          )}
+        {/* ── Hero (PL3) ── */}
+        <div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {tournament.status === "draft" ? <Chip k="unlisted" sm>Draft</Chip>
+              : tournament.visibility === "public" ? <Chip k="public" sm />
+              : (tournament.visibility as string) === "unlisted" ? <Chip k="unlisted" sm />
+              : <Chip k="private" sm />}
+            <FormatChip>{tournamentFormatLabel(tournament.format_type, tournament.tournament_type)}</FormatChip>
+            {STAKES_ENABLED && hasBetConfig && <Chip k="xp" sm>Betting</Chip>}
+          </div>
+          <h1 className="font-display text-[34px] font-black italic uppercase text-foreground leading-[0.95] tracking-[-0.02em] mt-2.5">
+            {tournament.name}
+          </h1>
+          {/* Organiser line */}
+          <div className="flex items-center gap-2 mt-2.5 min-w-0">
+            {organiserClub?.logo_url ? (
+              <img src={organiserClub.logo_url} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+            ) : (
+              <span className="w-6 h-6 rounded-full inline-flex items-center justify-center text-[11px] font-extrabold text-foreground shrink-0" style={{ background: tint(HUE.sky, 22) }}>
+                {(organiserClub?.club_name || tournament.club || "?")[0]?.toUpperCase()}
+              </span>
+            )}
+            <span className="text-[13px] font-bold text-foreground truncate">{organiserClub?.club_name || tournament.club || "Organiser"}</span>
+            <span className="text-[12px] font-medium text-foreground/90 shrink-0">· organiser</span>
+          </div>
         </div>
+
+        {/* Facts grid: date · time · level · places */}
+        {(() => {
+          const start = tournamentStart(tournament);
+          const lvl = levelRange(skillLevelMin, skillLevelMax);
+          const Fact = ({ icon, l, v }: { icon: React.ReactNode; l: string; v: React.ReactNode }) => (
+            <div className="flex items-start gap-2.5">
+              <span className="mt-0.5 shrink-0" style={{ color: HUE.sky }}>{icon}</span>
+              <div>
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-foreground/90">{l}</div>
+                <div className="mt-0.5"><Mono className="text-[14px] font-bold">{v}</Mono></div>
+              </div>
+            </div>
+          );
+          return (
+            <div className="grid grid-cols-2 gap-3.5 p-3.5 rounded-2xl bg-card">
+              <Fact icon={<CalendarDays className="w-4 h-4" />} l="Date" v={start ? start.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "TBC"} />
+              <Fact icon={<Clock className="w-4 h-4" />} l="Time" v={tournament.scheduled_time ? tournament.scheduled_time.slice(0, 5) : "TBC"} />
+              <Fact icon={<BarChart3 className="w-4 h-4" />} l="Level" v={lvl ?? "All levels"} />
+              <Fact icon={<Hourglass className="w-4 h-4" />} l="Duration" v={tournament.total_time_mins ? `~${Math.round(tournament.total_time_mins / 60 * 2) / 2}h` : "TBC"} />
+            </div>
+          );
+        })()}
+
+        {/* Venue card */}
+        {(() => {
+          const provider = venueProvider(venueClub);
+          const name = tx?.venue_name || venueClub?.club_name || tournament.club;
+          const addr = tx?.venue_address || venueClub?.location || venueClub?.city || null;
+          if (!name && !addr) return null;
+          return (
+            <div className="rounded-2xl bg-card p-3.5 flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0" style={{ color: HUE.sky }} />
+                <div className="min-w-0">
+                  <p className="text-[15px] font-extrabold text-foreground">{name || "Venue"}</p>
+                  {addr && <p className="text-[12px] font-semibold text-foreground/90">{addr}</p>}
+                </div>
+              </div>
+              {provider && <Chip k={provider.kind} sm>{provider.label}</Chip>}
+            </div>
+          );
+        })()}
+
+        {/* Seats card — "13 / 16 · 3 left" from the RPC */}
+        {(() => {
+          const total = seats?.total ?? tournament.player_count;
+          const deadline = tx?.registration_deadline ? new Date(tx.registration_deadline) : null;
+          return (
+            <div className="rounded-2xl bg-card p-3.5">
+              <div className="flex items-baseline justify-between">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-foreground/90">Places</div>
+                <div className="flex items-center gap-2">
+                  <Mono className="text-[18px] font-bold">{seatsTaken} / {total}</Mono>
+                  {spotsLeft <= 0 ? <Chip k="full" sm /> : spotsLeft <= 3 ? <Chip k="left" sm>{spotsLeft} left</Chip> : <Mono className="text-[12px] font-bold">{spotsLeft} left</Mono>}
+                </div>
+              </div>
+              <div className="mt-2.5"><SeatsBar taken={seatsTaken} total={total} /></div>
+              {deadline && (
+                <p className="text-[12px] font-medium text-foreground mt-2">Registration closes <Mono className="text-[12px]">{formatDayTime(deadline)}</Mono></p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Price + policy card (hidden once you're in — the status card says what you paid) */}
+        {!isRegistered && !isCreator && (() => {
+          const dl = refundDeadline(tournament as typeof tournament & { registration_deadline?: string | null; cancellation_policy?: string | null });
+          const policy = cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text);
+          return (
+            <div className="rounded-2xl p-3.5" style={{ background: tint(HUE.lime, 6), border: `1px solid ${tint(HUE.lime, 40)}` }}>
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-extrabold uppercase tracking-[0.1em]" style={{ color: HUE.lime }}>{isPaidTournament ? "Entry ticket" : "Entry"}</div>
+                <Mono className="text-[22px] font-bold">{formatGBP(priceCents)}</Mono>
+              </div>
+              {isPaidTournament && dl && dl.getTime() > Date.now() && (
+                <p className="text-[13px] font-bold text-foreground mt-1.5">Full refund until <Mono className="text-[13px]">{formatDayTime(dl)}</Mono></p>
+              )}
+              <div className="flex items-start gap-2 mt-2">
+                <ShieldCheck className="w-[15px] h-[15px] mt-0.5 shrink-0" style={{ color: HUE.sky }} />
+                <p className="text-[12px] font-semibold text-foreground">{policy}</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Points hint */}
+        <XpLine text={isRegistered ? "XPLAY Points when you play" : "XPLAY Points for playing"} />
+
+        {/* About */}
+        {tx?.description && (
+          <div className="rounded-2xl bg-card p-3.5">
+            <h2 className="font-display font-extrabold text-[16px] text-foreground">About</h2>
+            <p className="text-[14px] font-medium text-foreground mt-1.5 whitespace-pre-line">{tx.description}</p>
+          </div>
+        )}
 
         {/* Betting Card — gated behind STAKES_ENABLED (see src/lib/featureFlags.ts) */}
         {STAKES_ENABLED && (hasBetConfig || isJoined) && (
@@ -710,58 +889,81 @@ const TournamentDetail = () => {
             // let players open the live screen — but the label makes it clear it's a
             // status view, not the start action.
             const isActuallyLive = (tournament as typeof tournament & { is_live?: boolean | null }).is_live === true;
+            // When live, the lime banner at the top of the page is the way in — don't double up here.
+            if (isActuallyLive) return null;
             return (
               <button
                 onClick={() => navigate(`/tournaments/${tournament.id}/live`)}
-                className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
+                className="w-full h-[44px] rounded-[14px] border border-border bg-card text-foreground text-[13px] font-extrabold flex items-center justify-between px-[16px] hover:bg-card/80 transition-all"
               >
-                <span>{isActuallyLive ? "Open live screen" : "View status"}</span>
-                {isActuallyLive ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-primary-foreground/90 animate-pulse" />
-                    Live
-                  </span>
-                ) : (
-                  <ArrowLeft className="w-5 h-5 rotate-180" />
-                )}
+                <span>Fixtures &amp; bracket</span>
+                <ArrowLeft className="w-4 h-4 rotate-180" />
               </button>
             );
           })()}
 
           {(tournament.status === "draft" || tournament.status === "active") && (
             <>
-              {!isJoined && !isCreator && spotsLeft > 0 && (
-                <button
-                  onClick={() => setJoinOpen(true)}
-                  className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[14px] font-black italic uppercase tracking-[0.04em] flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
-                >
-                  <span>Join tournament</span>
-                  <span>{spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} left</span>
-                </button>
+              {!isRegistered && !isCreator && spotsLeft > 0 && (
+                <>
+                  {isPaidTournament && (
+                    <p className="text-[12px] font-semibold text-center text-foreground">
+                      <Mono className="text-[12px] font-bold">{formatGBP(priceCents)}</Mono>
+                      {(() => { const dl = refundDeadline(tournament as typeof tournament & { registration_deadline?: string | null; cancellation_policy?: string | null }); return dl && dl.getTime() > Date.now() ? <> · Full refund until <Mono className="text-[12px]">{formatDayTime(dl)}</Mono></> : null; })()}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setJoinOpen(true)}
+                    className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[15px] font-extrabold flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 transition-all"
+                  >
+                    <span>{guestAwaiting ? "Accept" : "Join"}{isPaidTournament ? <> &amp; pay <Mono className="text-[15px] font-bold">{formatGBP(priceCents)}</Mono></> : ""}</span>
+                    <Mono className="text-[12px] font-bold">{spotsLeft} left</Mono>
+                  </button>
+                </>
+              )}
+              {!isRegistered && !isCreator && spotsLeft <= 0 && tournament.status === "active" && (
+                myWaitlist ? (
+                  <p className="text-[13px] font-bold text-center text-foreground">
+                    You're <Mono>#{myWaitlist.position}</Mono> on the waitlist · you'll have <Mono>12h</Mono> to pay if a place frees up
+                  </p>
+                ) : tx?.waitlist_enabled ? (
+                  <button
+                    onClick={handleJoinWaitlist}
+                    disabled={waitlistBusy}
+                    className="w-full h-[54px] rounded-[16px] bg-primary text-primary-foreground font-display text-[15px] font-extrabold flex items-center justify-between px-[18px] shadow-[0_6px_24px_hsl(var(--primary)/0.35)] hover:bg-primary/90 disabled:opacity-50 transition-all"
+                  >
+                    <span>Join the waitlist</span>
+                    <span className="text-[12px] font-bold">No charge now</span>
+                  </button>
+                ) : (
+                  <p className="text-[13px] font-bold text-center text-foreground">This tournament is full</p>
+                )
               )}
               {isJoined && !isCreator && (
-                // Confirmation dialog — leaving is destructive (loses the slot,
-                // and can forfeit a paid ticket), so it must not fire on one tap
+                // Withdraw — quiet action with the cancellation policy in the confirm dialog
                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button className="w-full h-[54px] rounded-[16px] border border-destructive/30 text-destructive font-display text-[14px] font-black italic uppercase tracking-[0.04em] hover:bg-destructive/10 transition-all">
-                      Leave Tournament
-                    </button>
-                  </AlertDialogTrigger>
+                  <div className="flex items-start justify-between gap-3 pt-1">
+                    <p className="text-[12px] font-semibold text-foreground">
+                      {(() => { const dl = refundDeadline(tournament as typeof tournament & { registration_deadline?: string | null; cancellation_policy?: string | null }); return isPaidTournament && dl && dl.getTime() > Date.now() ? <>Full refund until <Mono className="text-[12px]">{formatDayTime(dl)}</Mono>. No refund after that.</> : cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text); })()}
+                    </p>
+                    <AlertDialogTrigger asChild>
+                      <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-foreground shrink-0 whitespace-nowrap">
+                        <LogOut className="w-3.5 h-3.5" /> Withdraw
+                      </button>
+                    </AlertDialogTrigger>
+                  </div>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Leave this tournament?</AlertDialogTitle>
+                      <AlertDialogTitle>Withdraw from {tournament.name}?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        You'll give up your spot in "{tournament.name}"
-                        {((tournament as typeof tournament & { ticket_price_cents?: number | null }).ticket_price_cents ?? 0) > 0
-                          ? " and your entry ticket may not be refunded — check with the organiser"
-                          : ""}. You can rejoin later if spots are still available.
+                        {cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text)}
+                        {isPaidTournament ? " Refunds are handled by the organiser." : ""} You can rejoin later if places are still available.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-xl">Stay</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleLeave} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Leave
+                      <AlertDialogCancel className="rounded-xl">Stay in</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleWithdraw} disabled={withdrawing} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Withdraw
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

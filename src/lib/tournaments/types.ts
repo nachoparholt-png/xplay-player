@@ -78,7 +78,7 @@ export interface TournamentPlayer {
   status: TournamentPlayerStatus;
   side_preference: string | null;
   joined_at: string;
-  role: "admin" | "organiser" | "player";
+  role: "admin" | "organiser" | "organiser_player" | "player";
   partner_status: string;
   partner_user_id: string | null;
   slot_index: number | null;

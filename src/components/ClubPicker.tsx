@@ -34,6 +34,7 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
         .from("clubs")
         .select("id, club_name, location, city, source")
         .eq("club_status", "active")
+        .neq("kind", "organiser")
         .order("source", { ascending: false }) // xplay_partner before directory
         .order("club_name");
       if (data) setClubs(data);

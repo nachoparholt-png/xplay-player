@@ -37,6 +37,7 @@ const ClubsExplorer = () => {
         .from("clubs")
         .select("*")
         .eq("club_status", "active")
+        .neq("kind", "organiser")
         .order("club_name");
 
       const { data: courts } = await supabase

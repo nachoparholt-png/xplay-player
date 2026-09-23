@@ -153,6 +153,7 @@ const CreateMatch = () => {
           .from("clubs")
           .select("id, club_name, location, city, opening_time, closing_time, timezone")
           .eq("club_status", "active")
+          .neq("kind", "organiser")
           .returns<ClubSelection[]>();
 
         if (clubs) {
