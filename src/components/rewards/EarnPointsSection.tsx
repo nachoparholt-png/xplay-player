@@ -28,14 +28,15 @@ const EarnPointsSection = ({ title, settings: _settings }: EarnPointsSectionProp
 
   const methods: EarnMethod[] = [
     { icon: UserPlus, title: "Refer a friend who plays", points: "+500", highlight: true },
-    { icon: Trophy, title: "Play a match", points: "+100" },
-    { icon: Flame, title: "Weekly play streak", points: "+100" },
+    { icon: Trophy, title: "Play a match, anywhere", points: "+50" },
+    { icon: Trophy, title: "Play at an XPLAY Club", points: "+100", highlight: true },
+    { icon: Flame, title: "Monthly play streak", points: "+50" },
     ...(TOURNAMENTS_ENABLED ? [{ icon: Trophy, title: "Play a tournament", points: "+100" } as EarnMethod] : []),
     { icon: Gift, title: "Complete your profile", points: "+100" },
     { icon: Award, title: "Win bonus", points: "+25" },
     { icon: Calendar, title: "Daily check-in", points: "+5" },
   ];
-  const visible = expanded ? methods : methods.slice(0, 4);
+  const visible = expanded ? methods : methods.slice(0, 5);
 
   return (
     <div className="space-y-3">
