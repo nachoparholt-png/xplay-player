@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Send, Trash2, TrendingUp, ShieldAlert, Share2, LogOut, Check, Gift, Hourglass, Ban, MapPin, CalendarDays, Clock, BarChart3, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Send, Trash2, TrendingUp, ShieldAlert, Share2, LogOut, Check, Gift, Hourglass, Ban, MapPin, CalendarDays, Clock, BarChart3, ShieldCheck, Megaphone, Loader2, Mail } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
 import { Chip, Mono, SeatsBar, FormatChip, XpLine, HUE, tint } from "@/components/tournaments/PlayerAtoms";
 import {
   type SeatCounts, type VenueClub,
@@ -64,7 +65,12 @@ const TournamentDetail = () => {
   const [seats, setSeats] = useState<SeatCounts | null>(null);
   const [organiserClub, setOrganiserClub] = useState<VenueClub | null>(null);
   const [venueClub, setVenueClub] = useState<VenueClub | null>(null);
-  const [myPayment, setMyPayment] = useState<{ amount_cents: number; succeeded_at: string | null } | null>(null);
+  const [myPayment, setMyPayment] = useState<{ amount_cents: number; succeeded_at: string | null; refunded_cents: number | null; status: string } | null>(null);
+  const [latestBroadcast, setLatestBroadcast] = useState<{ subject: string | null; body: string | null; created_at: string } | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  // Dry-run of the withdraw call: what this player would get back under the tournament's policy.
+  const [withdrawPreview, setWithdrawPreview] = useState<{ loading: boolean; refundCents: number | null; message: string | null }>({ loading: false, refundCents: null, message: null });
   const [myGuestEntry, setMyGuestEntry] = useState<{ entry_type: string } | null>(null);
   const [myWaitlist, setMyWaitlist] = useState<{ position: number; offered_at: string | null; offer_expires_at: string | null } | null>(null);
   const [waitlistBusy, setWaitlistBusy] = useState(false);
@@ -118,7 +124,8 @@ const TournamentDetail = () => {
         const [seatMap, clubMap, payRes, guestRes, waitRes] = await Promise.all([
           fetchSeatCounts([id]),
           fetchClubs([tRow?.club_id, tRow?.venue_club_id].filter(Boolean) as string[]),
-          user?.id ? sb.from("tournament_ticket_payments").select("amount_cents, succeeded_at").eq("tournament_id", id).eq("user_id", user.id).eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+          // refunded / partial_refund rows are kept so a cancelled or withdrawn player can see their refund
+          user?.id ? sb.from("tournament_ticket_payments").select("amount_cents, succeeded_at, refunded_cents, status").eq("tournament_id", id).eq("user_id", user.id).in("status", ["succeeded", "partial_refund", "refunded"]).order("created_at", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null }),
           user?.id ? sb.from("tournament_guest_entries").select("entry_type").eq("tournament_id", id).eq("claimed_user_id", user.id).limit(1).maybeSingle() : Promise.resolve({ data: null }),
           user?.id ? sb.from("tournament_waitlist").select("position, offered_at, offer_expires_at").eq("tournament_id", id).eq("user_id", user.id).is("resolved", null).limit(1).maybeSingle() : Promise.resolve({ data: null }),
         ]);
@@ -128,6 +135,14 @@ const TournamentDetail = () => {
         setMyPayment(payRes.data ?? null);
         setMyGuestEntry(guestRes.data ?? null);
         setMyWaitlist(waitRes.data ?? null);
+
+        // Latest organiser broadcast (RLS: seated players read kind='broadcast'); a read error just hides the card.
+        const seated = !!user?.id && playersList.some(p => p.user_id === user.id && p.status === "confirmed");
+        const guestIn = ["comp", "paid_offline", "paid"].includes((guestRes.data as { entry_type?: string } | null)?.entry_type ?? "");
+        if (seated || guestIn) {
+          const { data: msg } = await sb.from("tournament_messages").select("subject, body, created_at").eq("tournament_id", id).eq("kind", "broadcast").order("created_at", { ascending: false }).limit(1).maybeSingle();
+          setLatestBroadcast(msg ?? null);
+        } else setLatestBroadcast(null);
       }
 
       if (playersList.length > 0) {
@@ -187,7 +202,7 @@ const TournamentDetail = () => {
       setLoading(false);
     };
     load();
-  }, [id, user?.id]);
+  }, [id, user?.id, reloadKey]);
 
   // Deep link from the Tournaments page ("Accept & pay" / "Accept"): open the join sheet once loaded.
   useEffect(() => {
@@ -223,22 +238,40 @@ const TournamentDetail = () => {
     await refreshSeats();
   };
 
+  /** Error body from tournament-refunds ({ error, message }) — FunctionsHttpError keeps it on context. */
+  const fnErrorMessage = async (err: unknown) => {
+    const ctx = (err as { context?: { json?: () => Promise<unknown> } })?.context;
+    try { const b = (await ctx?.json?.()) as { message?: string; error?: string } | undefined; if (b?.message || b?.error) return b.message ?? b.error!; } catch { /* not JSON */ }
+    return (err as Error)?.message ?? "Please try again.";
+  };
+
+  // Opening the confirm dialog asks the server what the refund would be (dry run) — nothing changes yet.
+  const openWithdraw = async () => {
+    setWithdrawOpen(true);
+    if (!id || !myPayment) { setWithdrawPreview({ loading: false, refundCents: null, message: null }); return; }
+    setWithdrawPreview({ loading: true, refundCents: null, message: null });
+    const { data, error } = await supabase.functions.invoke("tournament-refunds", { body: { action: "withdraw", tournament_id: id, dry_run: true } });
+    if (error) { setWithdrawPreview({ loading: false, refundCents: null, message: await fnErrorMessage(error) }); return; }
+    const d = (data ?? {}) as { total_refund_cents?: number; refunded_cents?: number; plan?: { refund_cents?: number }[]; message?: string };
+    const cents = d.total_refund_cents ?? (Array.isArray(d.plan) ? d.plan.reduce((a, x) => a + (Number(x?.refund_cents) || 0), 0) : d.refunded_cents ?? 0);
+    setWithdrawPreview({ loading: false, refundCents: Number(cents) || 0, message: d.message ?? null });
+  };
+
   const handleWithdraw = async () => {
     if (!user || !id) return;
     setWithdrawing(true);
-    const { error } = await (supabase as any)
-      .from("tournament_players")
-      .update({ status: "cancelled" })
-      .eq("tournament_id", id)
-      .eq("user_id", user.id);
+    const { data, error } = await supabase.functions.invoke("tournament-refunds", { body: { action: "withdraw", tournament_id: id } });
     setWithdrawing(false);
     if (error) {
-      toast({ title: "Couldn't withdraw", description: error.message, variant: "destructive" });
+      toast({ title: "Couldn't withdraw", description: await fnErrorMessage(error), variant: "destructive" });
       return;
     }
-    toast({ title: "You've withdrawn", description: cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text) });
+    setWithdrawOpen(false);
+    const res = (data ?? {}) as { refunded_cents?: number; message?: string };
+    toast({ title: "You've withdrawn", description: res.message ?? ((res.refunded_cents ?? 0) > 0 ? `${formatGBP(res.refunded_cents!)} is on its way back to you.` : undefined) });
     setPlayers(prev => prev.map(p => (p.user_id === user.id ? { ...p, status: "cancelled" } : p)));
     await Promise.all([refreshSeats(), triggerRecalc()]);
+    setReloadKey(k => k + 1);
   };
 
   const handleShare = async () => {
@@ -462,7 +495,9 @@ const TournamentDetail = () => {
           let body: React.ReactNode = null;
           if (isCancelled) {
             title = "Cancelled by the organiser";
-            body = myPayment ? <><Mono>{formatGBP(myPayment.amount_cents)}</Mono> refunded to your original payment method · <Mono>3–5</Mono> days</> : "Nothing to pay.";
+            const reason = (tournament as { cancelled_reason?: string | null }).cancelled_reason?.trim();
+            const refunded = myPayment ? (myPayment.refunded_cents || myPayment.amount_cents) : 0;
+            body = <>{reason ? <>“{reason}”</> : null}{reason && refunded > 0 ? " · " : null}{refunded > 0 ? <>your <Mono>{formatGBP(refunded)}</Mono> refund is on its way</> : !reason ? "Nothing to pay." : null}</>;
           } else if (isRegistered) {
             if (guestComp) { title = "You have a free place"; body = <>Comp from {organiserClub?.club_name || tournament.club || "the organiser"} · nothing to pay</>; }
             else if (myPayment) body = <>Paid <Mono>{formatShortDate(myPayment.succeeded_at ? new Date(myPayment.succeeded_at) : null) || "in the app"}</Mono> · <Mono>{formatGBP(myPayment.amount_cents)}</Mono></>;
@@ -489,6 +524,22 @@ const TournamentDetail = () => {
             </div>
           );
         })()}
+
+        {/* ── Latest organiser message (PL5) — pinned under the status card ── */}
+        {!isCreator && isRegistered && tournament.status !== "cancelled" && latestBroadcast && (latestBroadcast.subject || latestBroadcast.body) && (
+          <div className="rounded-2xl p-3.5 bg-card" style={{ border: `1px solid ${tint(HUE.sky, 40)}` }}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Megaphone className="w-4 h-4 shrink-0" style={{ color: HUE.sky }} />
+                <span className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-foreground truncate">Message from the organiser</span>
+              </div>
+              <Mono className="text-[12px] shrink-0">{formatDistanceToNowStrict(new Date(latestBroadcast.created_at), { addSuffix: true })}</Mono>
+            </div>
+            {latestBroadcast.subject && <p className="text-[15px] font-extrabold text-foreground mt-2.5">{latestBroadcast.subject}</p>}
+            {latestBroadcast.body && <p className="text-[14px] font-semibold text-foreground mt-1 whitespace-pre-line break-words">{latestBroadcast.body}</p>}
+            <p className="text-[12px] font-semibold text-foreground/80 mt-2 inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Also sent to your email · reply there to reach the organiser</p>
+          </div>
+        )}
 
         {/* ── Live-day banner (PL5) — replaces the status card's job on the day ── */}
         {tournament.status === "active" && tx?.is_live && (
@@ -941,29 +992,42 @@ const TournamentDetail = () => {
               )}
               {isJoined && !isCreator && (
                 // Withdraw — quiet action with the cancellation policy in the confirm dialog
-                <AlertDialog>
+                <AlertDialog open={withdrawOpen} onOpenChange={o => { if (!withdrawing) setWithdrawOpen(o); }}>
                   <div className="flex items-start justify-between gap-3 pt-1">
                     <p className="text-[12px] font-semibold text-foreground">
                       {(() => { const dl = refundDeadline(tournament as typeof tournament & { registration_deadline?: string | null; cancellation_policy?: string | null }); return isPaidTournament && dl && dl.getTime() > Date.now() ? <>Full refund until <Mono className="text-[12px]">{formatDayTime(dl)}</Mono>. No refund after that.</> : cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text); })()}
                     </p>
-                    <AlertDialogTrigger asChild>
-                      <button className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-foreground shrink-0 whitespace-nowrap">
-                        <LogOut className="w-3.5 h-3.5" /> Withdraw
-                      </button>
-                    </AlertDialogTrigger>
+                    <button onClick={openWithdraw} className="inline-flex items-center gap-1.5 text-[13px] font-extrabold text-foreground shrink-0 whitespace-nowrap">
+                      <LogOut className="w-3.5 h-3.5" /> Withdraw
+                    </button>
                   </div>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Withdraw from {tournament.name}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text)}
-                        {isPaidTournament ? " Refunds are handled by the organiser." : ""} You can rejoin later if places are still available.
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-3">
+                          {myPayment && (
+                            <div className="rounded-xl px-3.5 py-3 text-foreground" style={{ background: tint(withdrawPreview.refundCents ? HUE.lime : HUE.amber, 14), border: `1px solid ${tint(withdrawPreview.refundCents ? HUE.lime : HUE.amber, 50)}` }}>
+                              {withdrawPreview.loading ? (
+                                <span className="inline-flex items-center gap-2 text-[14px] font-bold"><Loader2 className="w-4 h-4 animate-spin" />Checking your refund…</span>
+                              ) : withdrawPreview.refundCents ? (
+                                <p className="text-[15px] font-extrabold">You'll get <Mono>{formatGBP(withdrawPreview.refundCents)}</Mono> back</p>
+                              ) : withdrawPreview.refundCents === 0 ? (
+                                <p className="text-[15px] font-extrabold">{tx?.cancellation_policy === "custom" ? "No automatic refund — the organiser decides" : "No refund under this tournament's policy"}</p>
+                              ) : (
+                                <p className="text-[14px] font-bold">We couldn't check your refund right now.</p>
+                              )}
+                              {!withdrawPreview.loading && withdrawPreview.message && <p className="text-[13px] font-semibold mt-1">{withdrawPreview.message}</p>}
+                            </div>
+                          )}
+                          <p className="text-[13px] text-foreground">{cancellationPolicyText(tx?.cancellation_policy, tx?.cancellation_policy_text)} You can rejoin later if places are still available.</p>
+                        </div>
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="rounded-xl">Stay in</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleWithdraw} disabled={withdrawing} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Withdraw
+                      <AlertDialogCancel className="rounded-xl" disabled={withdrawing}>Stay in</AlertDialogCancel>
+                      <AlertDialogAction onClick={e => { e.preventDefault(); handleWithdraw(); }} disabled={withdrawing || withdrawPreview.loading} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        {withdrawing && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}Withdraw
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

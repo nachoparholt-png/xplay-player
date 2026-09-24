@@ -76,11 +76,12 @@ export function usePushNotifications() {
               return;
             }
 
-            // ── Player-side tournament routing (reminders, organiser broadcasts, waitlist offers) ──
+            // ── Player-side tournament routing (reminders, organiser broadcasts, waitlist offers, cancellations) ──
             if (
               type === "tournament_reminder" ||
               type === "tournament_broadcast" ||
-              type === "waitlist_offer"
+              type === "waitlist_offer" ||
+              type === "tournament_cancelled"
             ) {
               if (tournamentId) {
                 navigate(`/tournaments/${tournamentId}`);
