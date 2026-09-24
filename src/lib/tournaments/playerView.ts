@@ -193,8 +193,8 @@ export async function fetchClubs(ids: string[]): Promise<Record<string, VenueClu
 
 export function publicTournamentUrl(t: { slug?: string | null; id: string }) {
   return t.slug
-    ? `https://xplay-landing-delta.vercel.app/t/${t.slug}`
-    : `https://xplay-landing-delta.vercel.app/t/${t.id}`;
+    ? `https://www.joinxplay.com/t/${t.slug}`
+    : `https://www.joinxplay.com/t/${t.id}`;
 }
 
 /** Venue provider chip semantics: 'xclub' | 'playtomic' | 'padelmates' | 'external' | null */

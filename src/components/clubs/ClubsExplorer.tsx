@@ -183,7 +183,7 @@ const ClubsExplorer = () => {
     const payload = {
       title: "XPLAY for padel clubs",
       text: "We organise our padel matches on XPLAY. If the club joined, we could book and pay courts in the app too:",
-      url: "https://xplay-landing-delta.vercel.app/",
+      url: "https://www.joinxplay.com/",
     };
     try {
       const cap = await import("@capacitor/share");
