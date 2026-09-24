@@ -233,7 +233,7 @@ const ClubUploadModal = ({ open, onOpenChange, onUploaded }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <FileSpreadsheet className="w-5 h-5" /> Bulk Upload Clubs

@@ -212,7 +212,7 @@ const PlayerProfileModal = ({ open, onOpenChange, playerId, allowDirectMessage }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm p-0 rounded-2xl overflow-hidden bg-background border-border max-h-[85vh]">
+      <DialogContent className="max-w-sm p-0 rounded-2xl overflow-hidden bg-background border-border">
         <DialogTitle className="sr-only">Player Profile</DialogTitle>
         {loading ? (
           <div className="flex items-center justify-center py-16">

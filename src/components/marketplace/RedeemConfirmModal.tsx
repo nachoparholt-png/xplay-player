@@ -70,7 +70,7 @@ const MarketplaceRedeemModal = ({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-display">{hasUsableXP ? "Redeem product" : "Buy with card"}</DialogTitle>
           <DialogDescription>

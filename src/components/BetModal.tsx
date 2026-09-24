@@ -202,7 +202,7 @@ const BetModal = ({ matchId, open, onOpenChange }: BetModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-card border-border/50 p-0">
+      <DialogContent className="sm:max-w-md bg-card border-border/50 p-0">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

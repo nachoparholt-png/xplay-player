@@ -48,7 +48,7 @@ const ClaimClubSheet = ({ open, onOpenChange, clubId, clubName }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setDone(false); }}>
-      <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
         {done ? (
           <div className="py-6 text-center space-y-3">
             <div className="w-14 h-14 mx-auto rounded-full bg-primary flex items-center justify-center">

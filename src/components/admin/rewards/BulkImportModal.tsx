@@ -132,7 +132,7 @@ const BulkImportModal = ({ open, onOpenChange, rewards, preselectedRewardId, onI
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) { setParsedRows([]); setImportResult(null); } onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="font-display flex items-center gap-2">
             <Upload className="w-5 h-5 text-primary" />

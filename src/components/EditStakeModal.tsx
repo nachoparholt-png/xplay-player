@@ -123,7 +123,7 @@ const EditStakeModal = ({ stake, open, onOpenChange, onUpdated }: EditStakeModal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-card border-border/50 p-0">
+      <DialogContent className="sm:max-w-md bg-card border-border/50 p-0">
         <div className="p-5 pb-0">
           <DialogHeader>
             <DialogTitle className="font-display text-xl flex items-center gap-2">
