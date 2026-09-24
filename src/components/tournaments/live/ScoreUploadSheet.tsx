@@ -79,11 +79,21 @@ export default function ScoreUploadSheet({
         submitted_by: meUserId,
         submitted_at: new Date().toISOString(),
       };
-      const { error } = await (supabase.from('tournament_matches') as any)
-        .update({ result, status: 'awaiting_score', completed_at: new Date().toISOString() })
-        .eq('id', match.id);
-      if (error) throw error;
-      toast.success('Score submitted', { description: 'Your opponent will confirm.' });
+      // 24 Sep 2026: players have no UPDATE right on tournament_matches, so the
+      // old direct update changed 0 rows WITHOUT an error — the score was lost.
+      // The server function checks you play in this match, stores the score as
+      // 'awaiting_score' and frees the court (the next match is called).
+      const { error } = await (supabase as any).rpc('tournament_submit_score', {
+        p_match_id: match.id,
+        p_result: result,
+      });
+      if (error) {
+        if (String(error.message ?? '').includes('score_locked')) {
+          throw new Error('The organiser has already confirmed this score.');
+        }
+        throw error;
+      }
+      toast.success('Score sent', { description: 'The organiser can adjust it if needed.' });
       onSaved();
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to submit');
