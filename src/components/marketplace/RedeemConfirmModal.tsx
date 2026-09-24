@@ -30,8 +30,8 @@ const Row = ({ label, value, tone = "muted" }: { label: React.ReactNode; value: 
       tone === "primary" ? "bg-primary/10 border border-primary/20" : tone === "card" ? "bg-secondary border border-border" : "bg-muted/50"
     }`}
   >
-    <span className="flex items-center gap-1.5 text-muted-foreground">{label}</span>
-    <span className={`font-bold ${tone === "primary" ? "text-primary" : ""}`}>{value}</span>
+    <span className={`flex items-center gap-1.5 ${tone === "card" ? "text-secondary-foreground font-semibold" : "text-muted-foreground"}`}>{label}</span>
+    <span className={`font-bold ${tone === "primary" ? "text-primary" : tone === "card" ? "text-secondary-foreground" : ""}`}>{value}</span>
   </div>
 );
 
@@ -106,6 +106,11 @@ const MarketplaceRedeemModal = ({
             <p className="text-xs text-muted-foreground px-1">You've used this month's free XPLAY Pro delivery.</p>
           )}
           <Row tone="card" label="To pay by card" value={formatPence(totalCardPence)} />
+          {pointsToUse > 0 && (
+            <p className="text-xs text-muted-foreground px-1">
+              Your {pointsToUse.toLocaleString()} XP save you {formatPence(xpToPence(pointsToUse))}. Without points: {formatPence(xpToPence(pointPrice) + delivery.feePence)}{delivery.feePence > 0 ? " (product + delivery)" : ""}.
+            </p>
+          )}
           {hasUsableXP && <Row tone="primary" label="Points balance after" value={`${balanceAfter.toLocaleString()} XP`} />}
         </div>
 
