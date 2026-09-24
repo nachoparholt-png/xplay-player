@@ -19,10 +19,11 @@ import { LOYALTY_ENABLED } from "@/lib/featureFlags";
 // Friendly labels for each transaction type
 const FRIENDLY_LABEL: Record<string, string> = {
   play_match:          "Match played",
+  xplay_club_bonus:    "XPLAY Club bonus ⚡",
   win_match_bonus:     "Match won 🏆",
   complete_profile:    "Profile complete 🎉",
   daily_check_in:      "Daily check-in",
-  weekly_streak:       "Streak bonus 🔥",
+  weekly_streak:       "Monthly streak 🔥",
   referral_complete:   "Referral landed 🤝",
   tournament_play:     "Tournament check-in",
 };

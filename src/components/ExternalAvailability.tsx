@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { AVAILABILITY_ENABLED } from "@/lib/featureFlags";
+import { isMembersOnly } from "@/components/clubs/clubTier";
 
 export interface ExternalSlot {
   id: string;
@@ -34,6 +35,8 @@ export interface ExternalSlot {
 interface ExternalAvailabilityProps {
   clubId: string;
   clubName?: string;
+  /** clubs.external_provider when the caller has it; otherwise looked up here. */
+  provider?: string | null;
   /** When provided, slot chips become tappable and call back to prefill the form. */
   onSelectSlot?: (slot: ExternalSlot) => void;
   /** Currently selected date+time in the parent form — highlights the matching chip. */
@@ -42,10 +45,12 @@ interface ExternalAvailabilityProps {
 
 const STALE_MS = 30 * 60 * 1000;
 
-const ExternalAvailability = ({ clubId, clubName, onSelectSlot, selected }: ExternalAvailabilityProps) => {
+const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, selected }: ExternalAvailabilityProps) => {
   const [slots, setSlots] = useState<ExternalSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Members-only clubs (David Lloyd): no feed, never call the collectors.
+  const [membersOnly, setMembersOnly] = useState(isMembersOnly(provider));
 
   const fetchSlots = useCallback(async () => {
     const { data } = await supabase
@@ -65,6 +70,16 @@ const ExternalAvailability = ({ clubId, clubName, onSelectSlot, selected }: Exte
 
     const load = async () => {
       setLoading(true);
+      let prov = provider;
+      if (prov === undefined) {
+        const { data: c } = await supabase.from("clubs").select("external_provider").eq("id", clubId).maybeSingle();
+        prov = (c as { external_provider?: string | null } | null)?.external_provider ?? null;
+      }
+      if (isMembersOnly(prov)) {
+        if (!cancelled) { setMembersOnly(true); setSlots([]); setLoading(false); }
+        return;
+      }
+      if (!cancelled) setMembersOnly(false);
       let data = await fetchSlots();
       const stale =
         data.length === 0 ||
@@ -93,9 +108,17 @@ const ExternalAvailability = ({ clubId, clubName, onSelectSlot, selected }: Exte
     };
     load();
     return () => { cancelled = true; };
-  }, [clubId, fetchSlots]);
+  }, [clubId, fetchSlots, provider]);
 
   if (!AVAILABILITY_ENABLED) return null;
+
+  if (membersOnly) {
+    return (
+      <p className="rounded-xl border border-border/40 bg-card p-3.5 text-xs text-foreground/85">
+        Members only · book the court in the David Lloyd Clubs app, then mark it booked here.
+      </p>
+    );
+  }
 
   // Group by day, dedupe by start time (multiple courts, same slot)
   const byDay = new Map<string, Map<string, ExternalSlot>>();

@@ -9,7 +9,6 @@ import { AdminProvider } from "@/contexts/AdminContext";
 import { TourProvider } from "@/contexts/TourContext";
 import AppLayout from "./components/AppLayout";
 import SplashOverlay from "./components/SplashOverlay";
-import { useCartSync } from "./hooks/useCartSync";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useDailyCheckIn } from "./hooks/useDailyCheckIn";
 import { usePointsEarnedToasts } from "./hooks/usePointsEarnedToasts";
@@ -75,7 +74,6 @@ const Privacy             = lazyWithRetry(() => import("./pages/Privacy"));
 const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
 const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
 const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
-const TournamentWizard    = lazyWithRetry(() => import("./pages/tournaments/TournamentWizard"));
 const TournamentDetail    = lazyWithRetry(() => import("./pages/tournaments/TournamentDetail"));
 const TournamentLive      = lazyWithRetry(() => import("./pages/tournaments/TournamentLive"));
 const TournamentBetConfig = lazyWithRetry(() => import("./pages/tournaments/TournamentBetConfig"));
@@ -90,6 +88,7 @@ const AdminRatingSettings     = lazyWithRetry(() => import("./pages/admin/AdminR
 const AdminRewardsSettings    = lazyWithRetry(() => import("./pages/admin/AdminRewardsSettings"));
 const AdminRewardCodes        = lazyWithRetry(() => import("./pages/admin/AdminRewardCodes"));
 const AdminProducts           = lazyWithRetry(() => import("./pages/admin/AdminProducts"));
+const AdminOrders             = lazyWithRetry(() => import("./pages/admin/AdminOrders"));
 const AdminStores             = lazyWithRetry(() => import("./pages/admin/AdminStores"));
 const AdminBettingSettings    = lazyWithRetry(() => import("./pages/admin/AdminBettingSettings"));
 const AdminTournamentCategories = lazyWithRetry(() => import("./pages/admin/AdminTournamentCategories"));
@@ -194,7 +193,6 @@ const RecoveryRedirect = () => {
 };
 
 const AppRoutes = () => {
-  useCartSync();
   usePushNotifications();
   useDailyCheckIn();
   usePointsEarnedToasts();
@@ -221,7 +219,6 @@ const AppRoutes = () => {
           {TOURNAMENTS_ENABLED ? (
             <>
               <Route path="/tournaments" element={<ProtectedRoute><AppLayout><TournamentsList /></AppLayout></ProtectedRoute>} />
-              <Route path="/tournaments/new" element={<ProtectedRoute><AppLayout><TournamentWizard /></AppLayout></ProtectedRoute>} />
               <Route path="/tournaments/:id" element={<ProtectedRoute><AppLayout><TournamentDetail /></AppLayout></ProtectedRoute>} />
               <Route path="/tournaments/:id/live" element={<ProtectedRoute><AppLayout><TournamentLive /></AppLayout></ProtectedRoute>} />
             </>
@@ -264,6 +261,7 @@ const AppRoutes = () => {
             <Route path="/admin/betting" element={<AdminRoute><AdminLayout><AdminBettingSettings /></AdminLayout></AdminRoute>} />
           )}
           <Route path="/admin/products" element={<AdminRoute><AdminLayout><AdminProducts /></AdminLayout></AdminRoute>} />
+          <Route path="/admin/orders" element={<AdminRoute><AdminLayout><AdminOrders /></AdminLayout></AdminRoute>} />
           {TOURNAMENTS_ENABLED && (
             <Route path="/admin/tournament-categories" element={<AdminRoute><AdminLayout><AdminTournamentCategories /></AdminLayout></AdminRoute>} />
           )}

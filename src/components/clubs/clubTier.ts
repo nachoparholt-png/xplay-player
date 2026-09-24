@@ -15,7 +15,18 @@ const PROVIDER_LABELS: Record<string, string> = {
   playtomic: "Playtomic",
   padelmates: "Padelmates",
   matchi: "Matchi",
+  davidlloyd: "David Lloyd",
 };
+
+/**
+ * Members-only chains (24 Sep 2026): listed in the directory so players can organise
+ * XPLAY matches there, but courts are booked in the chain's own members app.
+ * No availability feed, never collected — do not call the collectors for these clubs.
+ */
+export const isMembersOnly = (provider?: string | null) => provider?.toLowerCase() === "davidlloyd";
+
+/** True when the club has a live availability feed (Playtomic, Padelmates…). */
+export const providerHasFeed = (provider?: string | null) => !!provider && !isMembersOnly(provider);
 
 /** "Playtomic" / "Padelmates" / null when the club has no availability feed. */
 export const providerLabel = (provider?: string | null): string | null => {

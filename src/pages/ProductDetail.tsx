@@ -1,52 +1,39 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { storefrontApiRequest, PRODUCT_BY_HANDLE_QUERY, ShopifyProduct, formatPrice, resolveXpPrice, shopifyInStock } from "@/lib/shopify";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCartStore } from "@/stores/cartStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CartDrawer } from "@/components/marketplace/CartDrawer";
 import MarketplaceRedeemModal from "@/components/marketplace/RedeemConfirmModal";
-import { ArrowLeft, ShoppingCart, Zap, Loader2 } from "lucide-react";
+import { ArrowLeft, Zap, Loader2, Truck } from "lucide-react";
 import { toast } from "sonner";
+import { xpToPence } from "@/lib/pointsCopy";
+import {
+  formatPence, sellableVariants, useDeliveryQuote, useSavedAddress, useStoreProduct, type ShippingAddress,
+} from "@/lib/store";
 
 const ProductDetail = () => {
-  const { handle } = useParams<{ handle: string }>();
+  // route param is still called :handle; it now carries the product id
+  const { handle: productId } = useParams<{ handle: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, refreshProfile } = useAuth();
-  const { addItem, isLoading: cartLoading } = useCartStore();
-  const [selectedVariantIdx, setSelectedVariantIdx] = useState(0);
+  const { data: product, isLoading } = useStoreProduct(productId);
+  const { data: savedAddress } = useSavedAddress();
+  const delivery = useDeliveryQuote(product?.delivery_size);
+
+  const variants = useMemo(() => (product ? sellableVariants(product) : []), [product]);
+  const [variantId, setVariantId] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
   const [redeemOpen, setRedeemOpen] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
 
-  const { data: product, isLoading } = useQuery({
-    queryKey: ["shopify-product", handle],
-    queryFn: async () => {
-      const data = await storefrontApiRequest(PRODUCT_BY_HANDLE_QUERY, { handle });
-      if (!data?.data?.product) return null;
-      return { node: data.data.product } as ShopifyProduct;
-    },
-    enabled: !!handle,
-  });
-
-  const { data: localProduct } = useQuery({
-    queryKey: ["local-product", product?.node?.id],
-    queryFn: async () => {
-      if (!product?.node?.id) return null;
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("shopify_product_id", product.node.id)
-        .eq("active", true)
-        .maybeSingle();
-      return data;
-    },
-    enabled: !!product?.node?.id,
-  });
+  // preselect the first size that is in stock
+  useEffect(() => {
+    if (variantId || variants.length === 0) return;
+    setVariantId((variants.find((v) => v.stock > 0) ?? variants[0]).id);
+  }, [variants, variantId]);
 
   if (isLoading) {
     return (
@@ -60,151 +47,116 @@ const ProductDetail = () => {
     return (
       <div className="p-4 text-center py-20">
         <p className="text-muted-foreground">Product not found</p>
-        <Button variant="link" onClick={() => navigate("/marketplace")}>Back to Marketplace</Button>
+        <Button variant="link" onClick={() => navigate("/marketplace")}>Back to the store</Button>
       </div>
     );
   }
 
-  const { node } = product;
-  const variants = node.variants.edges;
-  const selectedVariant = variants[selectedVariantIdx]?.node;
-  const images = node.images.edges;
+  const selected = variants.find((v) => v.id === variantId) ?? null;
   const userPoints = profile?.padel_park_points ?? 0;
-  // XP price: local DB (what the server charges) → Shopify metafield → formula
-  const pointPrice = resolveXpPrice(product, localProduct?.point_price);
-  // ✅ Option 2: stock status from Shopify (availableForSale), not local DB
-  const outOfStock = !shopifyInStock(product);
+  const pointPrice = Math.ceil(product.point_price);
+  const outOfStock = !selected || selected.stock <= 0;
+  const lowStock = !!selected && selected.stock > 0 && selected.stock <= selected.low_stock_threshold;
 
-  const handleAddToCart = async () => {
-    if (!selectedVariant || outOfStock) return;
-    await addItem({
-      product,
-      variantId: selectedVariant.id,
-      variantTitle: selectedVariant.title,
-      price: selectedVariant.price,
-      quantity: 1,
-      selectedOptions: selectedVariant.selectedOptions || [],
-    });
-    toast.success("Added to cart", { description: node.title });
-  };
-
-  const handleFullPointsRedeem = async (shippingAddress: Record<string, string>) => {
-    if (!localProduct) {
-      toast.error("This product isn't set up for points redemption yet.");
-      return;
-    }
+  const handleConfirm = async (shippingAddress: ShippingAddress, pointsToUse: number) => {
+    if (!selected) return;
     setRedeeming(true);
     try {
-      const { data, error } = await supabase.functions.invoke("redeem-product", {
-        body: { product_id: localProduct.id, shipping_address: shippingAddress },
+      const { data, error } = await supabase.functions.invoke("store-order", {
+        body: { action: "create", variant_id: selected.id, points_to_use: pointsToUse, shipping_address: shippingAddress },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success("Redeemed!", { description: `${node.title} has been redeemed successfully.` });
-      queryClient.invalidateQueries({ queryKey: ["local-product"] });
-      queryClient.invalidateQueries({ queryKey: ["local-products"] });
-      queryClient.invalidateQueries({ queryKey: ["shopify-products"] });
+
+      if (data?.url) {
+        window.location.href = data.url; // Stripe; we come back on /payment-success
+        return;
+      }
+      toast.success("Order confirmed", { description: `${product.title} — order #${data?.order?.order_number}` });
+      queryClient.invalidateQueries({ queryKey: ["store-product"] });
+      queryClient.invalidateQueries({ queryKey: ["store-products"] });
+      queryClient.invalidateQueries({ queryKey: ["store-saved-address"] });
+      queryClient.invalidateQueries({ queryKey: ["store-delivery-settings"] });
       refreshProfile();
       setRedeemOpen(false);
       navigate("/orders");
-    } catch (err: any) {
-      toast.error("Redemption failed", { description: err.message });
+    } catch (err) {
+      toast.error("Order not placed", { description: err instanceof Error ? err.message : "Something went wrong" });
+      queryClient.invalidateQueries({ queryKey: ["store-product"] });
     } finally {
-      setRedeeming(false);
-    }
-  };
-
-  const handleHybridRedeem = async (shippingAddress: Record<string, string>, pointsToUse: number) => {
-    if (!localProduct) return;
-    setRedeeming(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("create-payment-intent", {
-        body: { product_id: localProduct.id, shipping_address: shippingAddress, points_to_use: pointsToUse },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (!data?.url) throw new Error("No checkout URL returned");
-      window.location.href = data.url;
-    } catch (err: any) {
-      toast.error("Payment failed", { description: err.message });
       setRedeeming(false);
     }
   };
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/marketplace")}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Back
-        </Button>
-        <CartDrawer />
-      </div>
+      <Button variant="ghost" size="sm" onClick={() => navigate("/marketplace")}>
+        <ArrowLeft className="w-4 h-4 mr-1" /> Back
+      </Button>
 
       <div className="aspect-square overflow-hidden rounded-xl bg-secondary/20">
-        {images[0] ? (
-          <img src={images[0].node.url} alt={images[0].node.altText || node.title} className="w-full h-full object-cover" />
+        {product.image_url ? (
+          <img src={product.image_url} alt={product.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">No image</div>
         )}
       </div>
 
       <div className="space-y-3">
-        <h1 className="font-display text-2xl font-bold">{node.title}</h1>
+        <h1 className="font-display text-2xl font-bold">{product.title}</h1>
         <div className="flex items-center gap-3">
-          {pointPrice > 0 && (
-            <div className="flex items-center gap-1.5 text-primary text-lg font-bold">
-              <Zap className="w-5 h-5" />
-              {pointPrice.toLocaleString()} XP
-            </div>
-          )}
-          <p className="text-muted-foreground">
-            {selectedVariant ? `${pointPrice > 0 ? "or " : ""}${formatPrice(selectedVariant.price.amount, selectedVariant.price.currencyCode)}` : ""}
-          </p>
+          <div className="flex items-center gap-1.5 text-primary text-lg font-bold">
+            <Zap className="w-5 h-5" />
+            {pointPrice.toLocaleString()} XP
+          </div>
+          <p className="text-muted-foreground">or {formatPence(xpToPence(pointPrice))}</p>
         </div>
-        {outOfStock && <Badge variant="destructive">Out of Stock</Badge>}
+        <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Truck className="w-4 h-4" />
+          {delivery.free ? "Free UK delivery with XPLAY Pro" : `UK delivery ${formatPence(delivery.feePence)}`}
+        </p>
+        {outOfStock && <Badge variant="destructive">Out of stock</Badge>}
+        {lowStock && <Badge variant="outline">Only {selected!.stock} left</Badge>}
 
         {variants.length > 1 && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">Variant</p>
+            <p className="text-sm font-medium">Size</p>
             <div className="flex flex-wrap gap-2">
-              {variants.map((v, idx) => (
-                <Badge
-                  key={v.node.id}
-                  variant={idx === selectedVariantIdx ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedVariantIdx(idx)}
+              {variants.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  disabled={v.stock <= 0}
+                  onClick={() => setVariantId(v.id)}
+                  className={`min-h-[44px] min-w-[44px] px-4 rounded-xl border text-sm font-bold transition-colors ${
+                    v.id === variantId
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : v.stock <= 0
+                        ? "border-border/40 text-muted-foreground/50 line-through"
+                        : "border-border text-foreground"
+                  }`}
                 >
-                  {v.node.title}
-                </Badge>
+                  {v.label}
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Buttons come before the long description so they are on the first screen. */}
-        <div className="space-y-3 pt-1">
-          {pointPrice > 0 && (
-            <Button className="w-full h-12 rounded-xl" size="lg" disabled={outOfStock} onClick={() => setRedeemOpen(true)}>
-              <Zap className="w-4 h-4 mr-2" />
-              Redeem with XPLAY Points
-            </Button>
-          )}
-          <Button variant="outline" className="w-full h-12 rounded-xl" size="lg" onClick={handleAddToCart} disabled={cartLoading || outOfStock}>
-            {cartLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShoppingCart className="w-4 h-4 mr-2" />}
-            Add to cart (pay by card)
+        {/* Button before the long description so it is on the first screen. */}
+        <div className="pt-1">
+          <Button className="w-full h-12 rounded-xl" size="lg" disabled={outOfStock} onClick={() => setRedeemOpen(true)}>
+            <Zap className="w-4 h-4 mr-2" />
+            {userPoints > 0 ? "Redeem with XPLAY Points" : "Buy now"}
           </Button>
         </div>
 
-        {node.description && (
+        {product.description && (
           <div className="pb-6">
             <h2 className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground mb-2">About this product</h2>
-            <p className={`text-sm text-foreground/80 leading-relaxed ${descOpen ? "" : "line-clamp-5"}`}>{node.description}</p>
-            {node.description.length > 260 && (
-              <button
-                type="button"
-                onClick={() => setDescOpen(!descOpen)}
-                className="mt-1 min-h-[44px] text-sm font-semibold text-primary"
-              >
+            <p className={`text-sm text-foreground/80 leading-relaxed whitespace-pre-line ${descOpen ? "" : "line-clamp-5"}`}>{product.description}</p>
+            {product.description.length > 260 && (
+              <button type="button" onClick={() => setDescOpen(!descOpen)} className="mt-1 min-h-[44px] text-sm font-semibold text-primary">
                 {descOpen ? "Show less" : "Read more"}
               </button>
             )}
@@ -212,15 +164,16 @@ const ProductDetail = () => {
         )}
       </div>
 
-
       <MarketplaceRedeemModal
         open={redeemOpen}
         onClose={() => setRedeemOpen(false)}
-        onConfirmFullPoints={handleFullPointsRedeem}
-        onConfirmHybrid={handleHybridRedeem}
-        productTitle={node.title}
+        onConfirm={handleConfirm}
+        productTitle={product.title}
+        variantLabel={selected?.label}
         pointPrice={pointPrice}
         userPoints={userPoints}
+        delivery={delivery}
+        savedAddress={savedAddress}
         isLoading={redeeming}
       />
     </div>

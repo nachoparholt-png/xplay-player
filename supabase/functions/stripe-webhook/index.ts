@@ -2,56 +2,6 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
-// ─── Shopify: create £0.00 order to trigger fulfilment + inventory decrement ──
-async function createShopifyOrder(
-  product: { title: string; shopify_variant_id: string | null },
-  shippingAddress: Record<string, string> | null,
-  userId: string,
-): Promise<string | null> {
-  const domain = Deno.env.get("SHOPIFY_STORE_DOMAIN");
-  const token = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  if (!domain || !token || !product.shopify_variant_id) return null;
-
-  const numericId = product.shopify_variant_id.replace("gid://shopify/ProductVariant/", "");
-  const orderPayload: Record<string, unknown> = {
-    order: {
-      line_items: [{ variant_id: parseInt(numericId), quantity: 1, price: "0.00" }],
-      financial_status: "paid",
-      tags: "xplay-redemption,xplay-hybrid",
-      note: `XPLAY hybrid XP+card redemption — user ${userId}`,
-    },
-  };
-
-  if (shippingAddress) {
-    (orderPayload.order as Record<string, unknown>).shipping_address = {
-      first_name: shippingAddress.name?.split(" ")[0] ?? "",
-      last_name: shippingAddress.name?.split(" ").slice(1).join(" ") ?? "",
-      address1: shippingAddress.address1 ?? shippingAddress.line1 ?? "",
-      address2: shippingAddress.address2 ?? shippingAddress.line2 ?? "",
-      city: shippingAddress.city ?? "",
-      zip: shippingAddress.postcode ?? shippingAddress.zip ?? "",
-      country: shippingAddress.country ?? "GB",
-    };
-  }
-
-  try {
-    const resp = await fetch(`https://${domain}/admin/api/2025-07/orders.json`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
-      body: JSON.stringify(orderPayload),
-    });
-    if (!resp.ok) {
-      console.error("Shopify order creation failed:", resp.status, await resp.text());
-      return null;
-    }
-    const { order } = await resp.json();
-    return order?.id?.toString() ?? null;
-  } catch (err) {
-    console.error("Shopify order error:", err);
-    return null;
-  }
-}
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -79,7 +29,7 @@ serve(async (req) => {
 
   if (webhookSecret && sig) {
     try {
-      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+      event = await stripe.webhooks.constructEventAsync(body, sig, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
       return new Response("Webhook signature verification failed", { status: 400 });
@@ -88,6 +38,17 @@ serve(async (req) => {
     // Fallback: parse without verification (dev/test only — set STRIPE_WEBHOOK_SECRET in prod)
     console.warn("STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
     event = JSON.parse(body);
+    // Unsigned event: never trust what was posted. Reload the checkout session from
+    // Stripe so nobody can invent a "paid" session by calling this URL directly.
+    if (typeof event.type === "string" && event.type.startsWith("checkout.session.")) {
+      try {
+        const posted = event.data.object as { id?: string };
+        event.data.object = await stripe.checkout.sessions.retrieve(posted.id ?? "");
+      } catch (err) {
+        console.error("Unsigned webhook: session could not be loaded from Stripe:", err);
+        return new Response("Unknown checkout session", { status: 400 });
+      }
+    }
   }
 
   try {
@@ -113,11 +74,21 @@ serve(async (req) => {
           case "points_purchase":
             await handlePointsPurchase(supabase, session, meta);
             break;
-          case "product_redemption":
-            await handleProductRedemption(supabase, session, meta);
+          case "store_order":
+            await handleStoreOrder(supabase, stripe, session, meta);
             break;
           default:
             console.warn("Unknown metadata type:", type, "session:", session.id);
+        }
+        break;
+      }
+
+      // ── Store checkout abandoned: put the held item back into stock ──────
+      case "checkout.session.expired": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const meta = session.metadata || {};
+        if (meta.type === "store_order" && meta.order_id) {
+          await supabase.rpc("store_release_order", { _order_id: meta.order_id, _reason: "hold_expired" });
         }
         break;
       }
@@ -502,72 +473,50 @@ async function handlePointsPurchase(
   });
 }
 
-// ─── Product Redemption ───────────────────────────────────────────────────────
+// ─── Store order (XPLAY Store, no Shopify) ─────────────────────────────────────
+// Points are deducted and the order is marked paid in one DB transaction
+// (store_confirm_order). If the order can no longer be honoured, the card
+// payment is refunded straight away.
 
-async function handleProductRedemption(
+async function handleStoreOrder(
   supabase: ReturnType<typeof createClient>,
+  stripe: Stripe,
   session: Stripe.Checkout.Session,
   meta: Record<string, string>
 ) {
-  const userId = meta.user_id;
-  const productId = meta.product_id;
-  const pointsToUse = parseInt(meta.points_to_use || "0", 10);
-  const shippingAddress = meta.shipping_address ? JSON.parse(meta.shipping_address) : null;
+  if (session.payment_status !== "paid") return;
+  const orderId = meta.order_id;
+  if (!orderId) throw new Error("store_order session without order_id");
+  const paymentIntent = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null;
 
-  const { data: existing } = await supabase
-    .from("redemption_orders")
-    .select("id")
-    .eq("stripe_payment_intent_id", session.id)
-    .maybeSingle();
-  if (existing) return;
-
-  const { data: product } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", productId)
-    .eq("active", true)
-    .maybeSingle();
-  if (!product) throw new Error("Product not found");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("padel_park_points")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!profile) throw new Error("Profile not found");
-
-  const actualPointsToUse = Math.min(pointsToUse, profile.padel_park_points);
-  const cashPaidCents = product.point_price - actualPointsToUse;
-
-  if (actualPointsToUse > 0) {
-    const newBalance = profile.padel_park_points - actualPointsToUse;
-    await supabase
-      .from("profiles")
-      .update({ padel_park_points: newBalance })
-      .eq("user_id", userId);
-
-    await supabase.from("points_transactions").insert({
-      user_id: userId,
-      amount: -actualPointsToUse,
-      balance_before: profile.padel_park_points,
-      balance_after: newBalance,
-      transaction_type: "spent",
-      reason: `Redeemed: ${product.title}`,
-    });
-  }
-
-  // ✅ Option 2: Shopify order creation decrements inventory automatically.
-  // No local stock decrement needed.
-  const shopifyOrderId = await createShopifyOrder(product, shippingAddress, userId);
-
-  await supabase.from("redemption_orders").insert({
-    user_id: userId,
-    product_id: productId,
-    points_used: actualPointsToUse,
-    cash_paid_cents: cashPaidCents,
-    stripe_payment_intent_id: session.id,
-    status: "paid",
-    shipping_address: shippingAddress,
-    shopify_order_id: shopifyOrderId,
+  const { data, error } = await supabase.rpc("store_confirm_order", {
+    _order_id: orderId,
+    _session_id: session.id,
+    _payment_intent: paymentIntent,
   });
+  if (error) throw new Error("store_confirm_order failed: " + error.message);
+
+  const result = data as { result: string; refund?: boolean };
+  if (result?.refund && paymentIntent) {
+    const refund = await stripe.refunds.create(
+      { payment_intent: paymentIntent, metadata: { order_id: orderId, reason: result.result } },
+      { idempotencyKey: `store-auto-refund-${orderId}` },
+    );
+    await supabase.from("redemption_orders").update({ stripe_refund_id: refund.id }).eq("id", orderId);
+    const { data: order } = await supabase.from("redemption_orders").select("user_id, order_number").eq("id", orderId).maybeSingle();
+    if (order) {
+      await supabase.from("notifications").insert({
+        user_id: order.user_id,
+        type: "store_order",
+        title: "Order could not be completed",
+        body: result.result === "insufficient_points"
+          ? `Order #${order.order_number}: you no longer had enough XPLAY Points, so your card payment has been refunded.`
+          : `Order #${order.order_number}: the item sold out before your payment arrived, so your card payment has been refunded.`,
+        link: "/orders",
+      });
+    }
+  }
+  console.log("Store order", orderId, "→", result?.result);
 }

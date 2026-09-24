@@ -241,3 +241,14 @@
 .xp-live-dot.red::after { background: #FF6B35; }
 .xp-live-dot.dark       { background: #1A2833; }
 .xp-live-dot.dark::after { background: #1A2833; }
+/* 24 Sep 2026 — keep centred pop-ups above the iOS keyboard (--kb-h set by src/lib/keyboardInset.ts).
+   Bottom sheets that set top-auto keep their own position. */
+.xplay-dialog:not(.top-auto) {
+  top: calc((100dvh - var(--kb-h, 0px)) / 2);
+  max-height: min(88dvh, calc(100dvh - var(--kb-h, 0px) - 1.5rem));
+  transition: top 0.2s ease, max-height 0.2s ease;
+}
+.xplay-dialog.top-auto {
+  bottom: var(--kb-h, 0px);
+  max-height: calc(100dvh - var(--kb-h, 0px) - 1.5rem);
+}

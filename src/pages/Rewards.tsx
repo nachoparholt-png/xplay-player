@@ -5,12 +5,7 @@ import { ShoppingCart, Package, Zap, ArrowRight, Loader2, Store, ChevronRight, B
 import { useAuth } from "@/contexts/AuthContext";
 import { useRewards, useRedeemReward, type Reward, type PointsPack } from "@/hooks/useRewards";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  storefrontApiRequest,
-  COLLECTION_BY_HANDLE_QUERY,
-  getMetafieldValue,
-  type ShopifyCollectionProduct,
-} from "@/lib/shopify";
+import { useStoreProducts, productInStock } from "@/lib/store";
 
 import { toast } from "@/hooks/use-toast";
 
@@ -25,9 +20,6 @@ interface ReferralRow {
   referral_status: string;
 }
 
-interface ShopifyNodeWithTags {
-  tags?: string[];
-}
 
 import ClubsMarketSection from "@/components/rewards/ClubsMarketSection";
 import RewardDetailModal from "@/components/rewards/RewardDetailModal";
@@ -61,8 +53,9 @@ const Rewards = () => {
   const [successOpen, setSuccessOpen] = useState(false);
   const [successData, setSuccessData] = useState<unknown>(null);
   const [suggestedMissing, setSuggestedMissing] = useState<number | undefined>();
-  const [shopifyRewards, setShopifyRewards] = useState<ShopifyCollectionProduct[]>([]);
-  const [shopifyLoading, setShopifyLoading] = useState(true);
+  // XPLAY Store products (own catalogue — no Shopify)
+  const { data: storeProducts, isLoading: storeLoading } = useStoreProducts();
+  const storeItems = storeProducts ?? [];
   const [activeCategory, setActiveCategory] = useState("all");
   const [marketTab, setMarketTab] = useState<"xplay" | "clubs">("xplay");
   const [proPaywallOpen, setProPaywallOpen] = useState(false);
@@ -81,24 +74,6 @@ const Rewards = () => {
       searchParams.delete("points_success");
       setSearchParams(searchParams, { replace: true });
     }
-  }, []);
-
-  useEffect(() => {
-    const fetchShopifyRewards = async () => {
-      try {
-        const data = await storefrontApiRequest(COLLECTION_BY_HANDLE_QUERY, {
-          handle: "xplay-rewards",
-          first: 50,
-        });
-        const edges = data?.data?.collection?.products?.edges || [];
-        setShopifyRewards(edges);
-      } catch (err) {
-        console.error("Failed to fetch Shopify rewards:", err);
-      } finally {
-        setShopifyLoading(false);
-      }
-    };
-    fetchShopifyRewards();
   }, []);
 
   useEffect(() => {
@@ -183,21 +158,11 @@ const Rewards = () => {
     );
   }
 
-  // Extract Shopify categories
-  const categories = Array.from(
-    new Set(
-      shopifyRewards.flatMap((p) =>
-        (p.node as ShopifyNodeWithTags).tags
-          ?.filter((t) => t.startsWith("xplay-cat-"))
-          .map((t) => t.replace("xplay-cat-", "")) || []
-      )
-    )
-  );
-  const filteredShopifyProducts = activeCategory === "all"
-    ? shopifyRewards
-    : shopifyRewards.filter((p) =>
-        (p.node as ShopifyNodeWithTags).tags?.includes(`xplay-cat-${activeCategory}`)
-      );
+  // Store categories
+  const categories = Array.from(new Set(storeItems.map((p) => p.category).filter(Boolean)));
+  const filteredStoreItems = activeCategory === "all"
+    ? storeItems
+    : storeItems.filter((p) => p.category === activeCategory);
 
   return (
     <div className="px-5 py-6 space-y-8 pb-32">
@@ -306,7 +271,7 @@ const Rewards = () => {
               </motion.div>
             ))}
           </div>
-        ) : (!shopifyLoading && shopifyRewards.length === 0) ? (
+        ) : (!storeLoading && storeItems.length === 0) ? (
           <div className="text-center py-6 text-muted-foreground">
             <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm">No rewards available right now</p>
@@ -314,8 +279,8 @@ const Rewards = () => {
         ) : null}
       </motion.div>
 
-      {/* ── Shopify Rewards ── */}
-      {(shopifyLoading || shopifyRewards.length > 0) && (
+      {/* ── XPLAY Store products ── */}
+      {(storeLoading || storeItems.length > 0) && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -344,7 +309,7 @@ const Rewards = () => {
             </div>
           )}
 
-          {shopifyLoading ? (
+          {storeLoading ? (
             <div className="space-y-3">
               {[1, 2].map((i) => (
                 <div key={i} className="h-24 rounded-2xl bg-muted animate-pulse" />
@@ -352,15 +317,15 @@ const Rewards = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredShopifyProducts.map((product, i) => {
-                const redemptionCost = getMetafieldValue(product.node.metafields, "xplay_redemption_cost");
-                const costNum = redemptionCost ? parseInt(redemptionCost) : null;
-                const canAfford = costNum ? userPoints >= costNum : true;
-                const image = product.node.images.edges[0]?.node;
+              {filteredStoreItems.map((product, i) => {
+                const costNum = Math.ceil(product.point_price);
+                const inStock = productInStock(product);
+                const canAfford = userPoints >= costNum;
+                const image = product.image_url ? { url: product.image_url } : null;
 
                 return (
                   <motion.div
-                    key={product.node.id}
+                    key={product.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
@@ -372,17 +337,17 @@ const Rewards = () => {
                       <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
                         <img
                           src={image.url}
-                          alt={image.altText || product.node.title}
+                          alt={product.title}
                           className="w-full h-full object-cover"
                         />
                       </div>
                     )}
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="font-display text-sm font-black italic uppercase leading-tight truncate">
-                        {product.node.title}
+                        {product.title}
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                        {product.node.description}
+                        {product.description}
                       </p>
                       {costNum != null && costNum > 0 && (
                         <div className="flex items-baseline gap-1.5">
@@ -398,14 +363,14 @@ const Rewards = () => {
                         Routes to the product order sheet (pay with XP or card). */}
                     <div className="flex-shrink-0 text-right">
                       <button
-                        onClick={() => navigate(`/marketplace/${product.node.handle}`)}
+                        onClick={() => navigate(`/marketplace/${product.id}`)}
                         className={`px-3 py-2 rounded-xl text-xs font-black uppercase transition-colors ${
                           canAfford
                             ? "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
                             : "bg-muted text-muted-foreground hover:bg-muted/80 active:scale-95"
                         }`}
                       >
-                        {canAfford ? "Redeem" : "View"}
+                        {!inStock ? "Sold out" : canAfford ? "Redeem" : "View"}
                       </button>
                       {!canAfford && costNum && (
                         <div className="text-[11px] font-bold text-amber-400 mt-1">

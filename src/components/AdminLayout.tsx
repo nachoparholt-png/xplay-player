@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Users, BarChart3, Shield, ArrowLeft, Building2, Sliders, Gift, Package, Store, TrendingUp, ShoppingBag } from "lucide-react";
+import { Users, BarChart3, Shield, ArrowLeft, Building2, Sliders, Gift, Package, Store, TrendingUp, ShoppingBag, ClipboardList } from "lucide-react";
 import { motion } from "framer-motion";
 import { STAKES_ENABLED } from "@/lib/featureFlags";
 
@@ -13,6 +13,7 @@ const allAdminNavItems = [
     ? [{ path: "/admin/betting", icon: TrendingUp, label: "Betting" } as const]
     : []),
   { path: "/admin/products", icon: ShoppingBag, label: "Products" },
+  { path: "/admin/orders", icon: ClipboardList, label: "Orders" },
   { path: "/admin/rewards", icon: Gift, label: "Rewards" },
   { path: "/admin/reward-codes", icon: Package, label: "Codes" },
   { path: "/admin/stores", icon: Store, label: "Stores" },

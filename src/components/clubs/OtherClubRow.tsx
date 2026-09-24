@@ -5,7 +5,7 @@
 import { ChevronRight, ExternalLink, Info } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { formatMiles } from "@/lib/distance";
-import { clubInitials, formatNextSlot, providerLabel } from "./clubTier";
+import { clubInitials, formatNextSlot, isMembersOnly, providerLabel } from "./clubTier";
 
 interface Props {
   id: string;
@@ -22,6 +22,7 @@ const OtherClubRow = ({ id, name, area, provider, nextSlotAt, nextSlotPriceCents
   const navigate = useNavigate();
   const location = useLocation();
   const via = providerLabel(provider);
+  const membersOnly = isMembersOnly(provider);
   const next = nextSlotAt ? formatNextSlot(nextSlotAt) : null;
 
   return (
@@ -42,15 +43,28 @@ const OtherClubRow = ({ id, name, area, provider, nextSlotAt, nextSlotPriceCents
           ) : area ? (
             <span className="text-[11px] text-foreground/80 truncate">{area}</span>
           ) : null}
-          <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2 py-0.5 text-[10px] font-semibold">
-            {via ? <ExternalLink className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
-            {via ? `via ${via}` : "Info only"}
-          </span>
+          {membersOnly ? (
+            <>
+              <span className="inline-flex items-center flex-shrink-0 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2 py-0.5 text-[10px] font-semibold">
+                {via}
+              </span>
+              <span className="inline-flex items-center flex-shrink-0 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2 py-0.5 text-[10px] font-semibold">
+                Members only
+              </span>
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2 py-0.5 text-[10px] font-semibold">
+              {via ? <ExternalLink className="w-2.5 h-2.5" /> : <Info className="w-2.5 h-2.5" />}
+              {via ? `via ${via}` : "Info only"}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-shrink-0 text-right">
-        {next ? (
+        {membersOnly ? (
+          <p className="text-[11px] text-foreground/70">Book in the DL app</p>
+        ) : next ? (
           <>
             <p className="text-xs text-foreground">
               {next.day} <span className="font-mono font-bold">{next.time}</span>

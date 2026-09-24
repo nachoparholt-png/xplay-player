@@ -218,7 +218,7 @@ const AdminStores = () => {
 
       {/* Form Modal */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display">{editStore ? "Edit Store" : "Add Store"}</DialogTitle>
           </DialogHeader>

@@ -31,7 +31,8 @@ export function usePushNotifications() {
         // Save device token to Supabase so edge functions can send targeted pushes
         const regListener = await PushNotifications.addListener("registration", async (token) => {
           if (!mounted) return;
-          await supabase
+          // push_token exists in the DB but not yet in the generated types
+          await (supabase as any)
             .from("profiles")
             .update({ push_token: token.value })
             .eq("user_id", user.id);
@@ -67,6 +68,23 @@ export function usePushNotifications() {
             ) {
               if (tournamentId) {
                 navigate(`/tournaments/${tournamentId}/live`);
+              } else if (route) {
+                navigate(route);
+              } else {
+                navigate("/tournaments");
+              }
+              return;
+            }
+
+            // ── Player-side tournament routing (reminders, organiser broadcasts, waitlist offers, cancellations) ──
+            if (
+              type === "tournament_reminder" ||
+              type === "tournament_broadcast" ||
+              type === "waitlist_offer" ||
+              type === "tournament_cancelled"
+            ) {
+              if (tournamentId) {
+                navigate(`/tournaments/${tournamentId}`);
               } else if (route) {
                 navigate(route);
               } else {

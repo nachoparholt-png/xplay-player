@@ -31,7 +31,8 @@ export default function StatsTab({
       let played = 0, wins = 0, losses = 0, pf = 0, pa = 0;
       for (const m of matches) {
         if (m.team_a_id !== team.id && m.team_b_id !== team.id) continue;
-        if (m.status !== 'completed' || !m.result) continue;
+        // 'awaiting_score' = a player sent the score (24 Sep: counts, same as the organiser's screen)
+        if ((m.status !== 'completed' && m.status !== 'awaiting_score') || !m.result) continue;
         played += 1;
         const myA = m.team_a_id === team.id;
         const myScore  = myA ? Number(m.result.team_a_score ?? 0) : Number(m.result.team_b_score ?? 0);
@@ -52,8 +53,17 @@ export default function StatsTab({
     });
   }, [matches, teamsById, meUserId]);
 
-  const myRow = standings.find(r => r.isMe);
-  const myRank = myRow ? standings.indexOf(myRow) + 1 : null;
+  // One table per group when the tournament has groups (before 24 Sep all
+  // groups were mixed in a single table).
+  const groups = useMemo(() => {
+    const keys = Array.from(new Set(standings.map(r => r.team.group_id).filter((g): g is string => !!g))).sort();
+    if (keys.length <= 1) return [{ key: null as string | null, rows: standings }];
+    return keys.map(k => ({ key: k as string | null, rows: standings.filter(r => r.team.group_id === k) }));
+  }, [standings]);
+
+  const myGroup = groups.find(g => g.rows.some(r => r.isMe));
+  const myRow = myGroup?.rows.find(r => r.isMe);
+  const myRank = myRow && myGroup ? myGroup.rows.indexOf(myRow) + 1 : null;
 
   return (
     <div style={{ flex: 1, overflow: 'auto', paddingBottom: 92, color: 'white' }}>
@@ -135,7 +145,16 @@ export default function StatsTab({
             color: 'rgba(255,255,255,.5)', fontSize: 13,
           }}>No teams yet.</div>
         )}
-        {standings.map((r, i) => (
+        {groups.map((g) => (
+          <div key={g.key ?? 'all'}>
+            {g.key && (
+              <div style={{
+                padding: '14px 14px 6px',
+                fontFamily: "'Lexend', sans-serif", fontSize: 13, fontWeight: 900, fontStyle: 'italic',
+                textTransform: 'uppercase', color: 'white',
+              }}>Group {g.key}</div>
+            )}
+        {g.rows.map((r, i) => (
           <div key={r.team.id} style={{
             display: 'grid',
             gridTemplateColumns: '24px 1fr 26px 22px 22px 36px 38px',
@@ -178,6 +197,8 @@ export default function StatsTab({
               fontSize: 11,
               color: r.diff > 0 ? XP.lime : r.diff < 0 ? '#ff8a6b' : 'rgba(255,255,255,.5)',
             }}>{r.diff > 0 ? `+${r.diff}` : r.diff}</span>
+          </div>
+        ))}
           </div>
         ))}
       </div>

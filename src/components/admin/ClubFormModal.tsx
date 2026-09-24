@@ -174,7 +174,7 @@ const ClubFormModal = ({ open, onOpenChange, club, onSaved }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display">{club ? "Edit Club" : "Add Club"}</DialogTitle>
         </DialogHeader>

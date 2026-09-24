@@ -104,22 +104,35 @@ export default function TournamentLive() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  /* Realtime — refetch on any change to matches / help / tournament */
+  /* Realtime — refetch on any change to matches / help / tournament.
+   * 24 Sep 2026: the DB now re-plans courts + times live, so one score can
+   * update many match rows at once → reloads are debounced, and a 30 s poll
+   * keeps the screen right if the realtime connection drops. */
   useEffect(() => {
     if (!id) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; reload(); }, 400);
+    };
     const channel = supabase
       .channel(`tournament-live-${id}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'tournament_matches', filter: `tournament_id=eq.${id}` },
-        () => reload())
+        soon)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'tournament_help_requests', filter: `tournament_id=eq.${id}` },
-        () => reload())
+        soon)
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tournaments', filter: `id=eq.${id}` },
-        () => reload())
+        soon)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const poll = setInterval(() => reload(), 30_000);
+    return () => {
+      if (timer) clearTimeout(timer);
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -128,7 +141,7 @@ export default function TournamentLive() {
   const profilesById = useMemo(() => new Map(profiles.map(p => [p.user_id, p])), [profiles]);
 
   const matchesTotal = matches.length;
-  const matchesDone  = matches.filter(m => m.status === 'completed').length;
+  const matchesDone  = matches.filter(m => m.status === 'completed' || m.status === 'awaiting_score').length;
   const totalRounds  = matchesTotal === 0 ? 0 : Math.max(...matches.map(m => m.round_number ?? 1));
   const currentRound = matchesTotal === 0
     ? 0

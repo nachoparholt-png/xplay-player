@@ -4,6 +4,7 @@ import { Search, MapPin, Building2, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { isMembersOnly } from "@/components/clubs/clubTier";
 
 type Club = {
   id: string;
@@ -11,6 +12,7 @@ type Club = {
   location: string;
   city: string | null;
   source?: string; // 'xplay_partner' | 'directory'
+  external_provider?: string | null;
 };
 
 interface Props {
@@ -32,8 +34,9 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
       setLoading(true);
       const { data } = await supabase
         .from("clubs")
-        .select("id, club_name, location, city, source")
+        .select("id, club_name, location, city, source, external_provider")
         .eq("club_status", "active")
+        .neq("kind", "organiser")
         .order("source", { ascending: false }) // xplay_partner before directory
         .order("club_name");
       if (data) setClubs(data);
@@ -116,7 +119,11 @@ const ClubPicker = ({ open, onOpenChange, onSelect, onOther }: Props) => {
                     </div>
                     <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3 h-3 shrink-0" /> {club.location || club.city || "—"}
-                      {club.source === "directory" && <span className="text-muted-foreground"> · book on club's site</span>}
+                      {club.source === "directory" && (
+                        <span className="text-muted-foreground">
+                          {isMembersOnly(club.external_provider) ? " · David Lloyd · Members only" : " · book on club's site"}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />

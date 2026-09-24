@@ -3368,6 +3368,7 @@ export type Database = {
         | "referral_complete"
         | "tournament_play"
         | "xplay_pro_multiplier"
+        | "xplay_club_bonus"
       stake_status: "active" | "won" | "lost" | "settled" | "cancelled"
       tournament_format: "groups" | "americano" | "king_of_court"
       tournament_player_status: "confirmed" | "cancelled"
@@ -3548,6 +3549,7 @@ export const Constants = {
         "referral_complete",
         "tournament_play",
         "xplay_pro_multiplier",
+        "xplay_club_bonus",
       ],
       stake_status: ["active", "won", "lost", "settled", "cancelled"],
       tournament_format: ["groups", "americano", "king_of_court"],

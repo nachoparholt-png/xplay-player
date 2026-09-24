@@ -228,7 +228,7 @@ const InvitePlayerModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault() /* don't raise the phone keyboard over the list on open */}>
+      <DialogContent className="sm:max-w-md flex flex-col p-0" onOpenAutoFocus={(e) => e.preventDefault() /* don't raise the phone keyboard over the list on open */}>
         <DialogHeader className="p-5 pb-0">
           <DialogTitle className="font-display text-lg flex items-center gap-2">
             <Send className="w-4 h-4 text-primary" />

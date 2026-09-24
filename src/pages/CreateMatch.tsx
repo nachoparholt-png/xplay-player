@@ -49,6 +49,7 @@ type ClubSelection = {
   closing_time?: string;
   timezone?: string;
   source?: string; // 'xplay_partner' | 'directory'
+  external_provider?: string | null;
 };
 
 import { parsePlaytomicClipboard, findBestClubMatch } from "@/lib/parsePlaytomic";
@@ -82,7 +83,7 @@ const CreateMatch = () => {
     if (!prefillId) return;
     supabase
       .from("clubs")
-      .select("id, club_name, location, city, opening_time, closing_time, timezone, source")
+      .select("id, club_name, location, city, opening_time, closing_time, timezone, source, external_provider")
       .eq("id", prefillId)
       .maybeSingle()
       .then(({ data }) => {
@@ -153,6 +154,7 @@ const CreateMatch = () => {
           .from("clubs")
           .select("id, club_name, location, city, opening_time, closing_time, timezone")
           .eq("club_status", "active")
+          .neq("kind", "organiser")
           .returns<ClubSelection[]>();
 
         if (clubs) {
@@ -516,7 +518,7 @@ const CreateMatch = () => {
                 availability + organizer booking attestation. The court itself
                 is booked on the club's own system, not through XPLAY. */}
             {venueMode === "xplay" && selectedClub?.source === "directory" && (
-              <ExternalAvailability clubId={selectedClub.id} />
+              <ExternalAvailability clubId={selectedClub.id} provider={selectedClub.external_provider} />
             )}
 
             <button

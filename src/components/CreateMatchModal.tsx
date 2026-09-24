@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import ClubPicker from "@/components/ClubPicker";
+import { isMembersOnly } from "@/components/clubs/clubTier";
 import PlacesVenueInput from "@/components/PlacesVenueInput";
 import ExternalAvailability, { type ExternalSlot } from "@/components/ExternalAvailability";
 import { type PlaceResult } from "@/hooks/useGooglePlaces";
@@ -27,6 +28,7 @@ type ClubSelection = {
   location: string;
   city: string | null;
   source?: string; // 'xplay_partner' | 'directory' | 'demo'
+  external_provider?: string | null;
 };
 
 interface CreateMatchModalProps {
@@ -212,8 +214,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       if (parsed.clubName) {
         const { data: clubs } = await supabase
           .from("clubs")
-          .select("id, club_name, location, city, source")
-          .eq("club_status", "active");
+          .select("id, club_name, location, city, source, external_provider")
+          .eq("club_status", "active")
+          .neq("kind", "organiser");
 
         if (clubs) {
           const match = findBestClubMatch(clubs, parsed.clubName);
@@ -557,7 +560,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                           </span>
                           <span className="text-[11px] text-muted-foreground">
                             {selectedClub.location || selectedClub.city || "—"}
-                            {isDirectoryClub && " · book on club's site"}
+                            {isDirectoryClub && (isMembersOnly(selectedClub.external_provider) ? " · David Lloyd · Members only" : " · book on club's site")}
                           </span>
                         </div>
                       </div>
@@ -634,6 +637,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     <div className="space-y-2 pt-1">
                       <ExternalAvailability
                         clubId={selectedClub.id}
+                        provider={selectedClub.external_provider}
                         onSelectSlot={handleExternalSlotSelect}
                         selected={matchDate && matchTime
                           ? { date: format(matchDate, "yyyy-MM-dd"), time: matchTime }

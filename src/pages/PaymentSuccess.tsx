@@ -27,15 +27,16 @@ const PaymentSuccess = () => {
 
     const finalise = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("redeem-product", {
-          body: { stripe_session_id: sessionId },
+        const { data, error } = await supabase.functions.invoke("store-order", {
+          body: { action: "finalise", stripe_session_id: sessionId },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
         setStatus("success");
         refreshProfile();
-        queryClient.invalidateQueries({ queryKey: ["local-products"] });
-        queryClient.invalidateQueries({ queryKey: ["shopify-products"] });
+        queryClient.invalidateQueries({ queryKey: ["store-products"] });
+        queryClient.invalidateQueries({ queryKey: ["store-product"] });
+        queryClient.invalidateQueries({ queryKey: ["store-delivery-settings"] });
         queryClient.invalidateQueries({ queryKey: ["redemption-orders"] });
       } catch (err: any) {
         setStatus("error");
@@ -58,9 +59,9 @@ const PaymentSuccess = () => {
       {status === "success" && (
         <>
           <CheckCircle className="w-16 h-16 text-green-500" />
-          <h1 className="font-display text-2xl font-bold">Payment Successful!</h1>
-          <p className="text-muted-foreground">Your order has been placed and points deducted.</p>
-          <Button onClick={() => navigate("/orders")}>View My Orders</Button>
+          <h1 className="font-display text-2xl font-bold">Order confirmed</h1>
+          <p className="text-muted-foreground">Thanks! We'll let you know when it's on its way.</p>
+          <Button onClick={() => navigate("/orders")}>View my orders</Button>
         </>
       )}
 
@@ -69,7 +70,7 @@ const PaymentSuccess = () => {
           <XCircle className="w-16 h-16 text-destructive" />
           <h1 className="font-display text-2xl font-bold">Something went wrong</h1>
           <p className="text-muted-foreground">{errorMsg}</p>
-          <Button variant="outline" onClick={() => navigate("/marketplace")}>Back to Shop</Button>
+          <Button variant="outline" onClick={() => navigate("/marketplace")}>Back to the store</Button>
         </>
       )}
     </div>

@@ -165,8 +165,8 @@ export default function MyMatchTab(props: MyMatchTabProps) {
               {/* My team */}
               <div>
                 <Pair
-                  a={{ i: singleInitial(meInfo.names[0]),  t: XP.navy }}
-                  b={{ i: singleInitial(meInfo.names[1]),  t: XP.navy }}
+                  a={{ i: singleInitial(meInfo.names[0]),  t: XP.lime }}
+                  b={{ i: singleInitial(meInfo.names[1]),  t: XP.lime }}
                   size={28}
                 />
                 <div style={{
@@ -190,8 +190,8 @@ export default function MyMatchTab(props: MyMatchTabProps) {
               >
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                   <Pair
-                    a={{ i: singleInitial(oppInfo.names[0]), t: XP.navy }}
-                    b={{ i: singleInitial(oppInfo.names[1]), t: XP.navy }}
+                    a={{ i: singleInitial(oppInfo.names[0]), t: XP.lime }}
+                    b={{ i: singleInitial(oppInfo.names[1]), t: XP.lime }}
                     size={28}
                   />
                 </div>
