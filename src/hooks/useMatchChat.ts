@@ -4,8 +4,19 @@ import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Hook for match group chat and direct chat operations.
- * Handles creation, participant management, and system messages.
+ *
+ * Since 24 Sep 2026 every write goes through server functions
+ * (migration 20260924100000_chat_privacy_and_tournament_join_guards.sql):
+ * the database no longer lets the app add people to a conversation directly,
+ * because that allowed anyone to join (and read) any chat.
+ *   open_match_chat(match_id, title)      – create/open; adds every confirmed player
+ *   leave_match_chat(match_id, user, why) – left / removed / cancelled + system line
+ *   post_match_system_message(match_id, text)
+ *   open_direct_chat(other_user_id)       – 1:1 chat, created once and reused
  */
+// RPC names are not in the generated types yet
+const rpc = (fn: string, args: Record<string, unknown>) => (supabase as any).rpc(fn, args);
+
 export const useMatchChat = () => {
   const { user } = useAuth();
 
@@ -13,103 +24,21 @@ export const useMatchChat = () => {
   const getOrCreateMatchChat = useCallback(
     async (matchId: string, matchTitle: string) => {
       if (!user) return null;
-
-      const { data: existing } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("match_id", matchId)
-        .maybeSingle();
-
-      if (existing) {
-        await ensureParticipant(existing.id, user.id);
-        return existing.id;
+      const { data, error } = await rpc("open_match_chat", { _match_id: matchId, _title: matchTitle });
+      if (error) {
+        console.warn("[chat] open_match_chat failed", error.message);
+        return null;
       }
-
-      // Create new match conversation
-      const convId = crypto.randomUUID();
-      const { error } = await supabase
-        .from("conversations")
-        .insert({ id: convId, type: "match", match_id: matchId, title: matchTitle });
-
-      if (error) return null;
-      const conv = { id: convId };
-
-      // Add current user first
-      await supabase.from("conversation_participants").insert({
-        conversation_id: conv.id,
-        user_id: user.id,
-      });
-
-      // Add all other confirmed players
-      const { data: players } = await supabase
-        .from("match_players")
-        .select("user_id")
-        .eq("match_id", matchId)
-        .eq("status", "confirmed");
-
-      if (players && players.length > 0) {
-        const others = players.filter((p) => p.user_id !== user.id);
-        if (others.length > 0) {
-          await supabase.from("conversation_participants").insert(
-            others.map((p) => ({ conversation_id: conv.id, user_id: p.user_id }))
-          );
-        }
-      }
-
-      // Get creator name for system message
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", user.id)
-        .single();
-
-      const creatorName = profile?.display_name || "Someone";
-
-      // System messages
-      await supabase.from("messages").insert([
-        {
-          conversation_id: conv.id,
-          message_text: "Match chat created 🎾",
-          message_type: "system_message",
-        },
-        {
-          conversation_id: conv.id,
-          message_text: `${creatorName} created this match`,
-          message_type: "system_message",
-        },
-      ]);
-
-      return conv.id;
+      return (data as string) ?? null;
     },
     [user]
   );
 
-  /** Add a player to a match chat with a system message */
+  /** Add the current player to a match chat (posts "X joined the match") */
   const addPlayerToMatchChat = useCallback(
-    async (matchId: string, userId: string) => {
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("match_id", matchId)
-        .maybeSingle();
-
-      if (!conv) return;
-
-      const added = await ensureParticipant(conv.id, userId);
-      if (!added) return; // Already a participant
-
-      // Get player name for system message
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", userId)
-        .single();
-
-      await supabase.from("messages").insert({
-        conversation_id: conv.id,
-        message_text: `${profile?.display_name || "A player"} joined the match`,
-        message_type: "system_message",
-      });
+    async (matchId: string, _userId?: string) => {
+      const { error } = await rpc("open_match_chat", { _match_id: matchId, _title: null });
+      if (error) console.warn("[chat] join match chat failed", error.message);
     },
     []
   );
@@ -117,40 +46,8 @@ export const useMatchChat = () => {
   /** Remove a player from a match chat with a system message */
   const removePlayerFromMatchChat = useCallback(
     async (matchId: string, userId: string, reason: "left" | "removed" | "cancelled" = "left") => {
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("match_id", matchId)
-        .maybeSingle();
-
-      if (!conv) return;
-
-      // Mark as left
-      await supabase
-        .from("conversation_participants")
-        .update({ left_at: new Date().toISOString() })
-        .eq("conversation_id", conv.id)
-        .eq("user_id", userId)
-        .is("left_at", null);
-
-      // Get player name
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("user_id", userId)
-        .single();
-
-      const name = profile?.display_name || "A player";
-      const actionText =
-        reason === "removed" ? `${name} was removed from the match` :
-        reason === "cancelled" ? `${name} cancelled their registration` :
-        `${name} left the match`;
-
-      await supabase.from("messages").insert({
-        conversation_id: conv.id,
-        message_text: actionText,
-        message_type: "system_message",
-      });
+      const { error } = await rpc("leave_match_chat", { _match_id: matchId, _user_id: userId, _reason: reason });
+      if (error) console.warn("[chat] leave match chat failed", error.message);
     },
     []
   );
@@ -158,19 +55,8 @@ export const useMatchChat = () => {
   /** Send a system message to a match chat */
   const addSystemMessage = useCallback(
     async (matchId: string, text: string) => {
-      const { data: conv } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("match_id", matchId)
-        .maybeSingle();
-
-      if (!conv) return;
-
-      await supabase.from("messages").insert({
-        conversation_id: conv.id,
-        message_text: text,
-        message_type: "system_message",
-      });
+      const { error } = await rpc("post_match_system_message", { _match_id: matchId, _text: text });
+      if (error) console.warn("[chat] system message failed", error.message);
     },
     []
   );
@@ -181,7 +67,6 @@ export const useMatchChat = () => {
       if (!user) return null;
 
       if (!skipContactCheck) {
-        // Check if users are contacts
         const { data: contactCheck } = await supabase
           .from("contact_requests")
           .select("id")
@@ -194,53 +79,12 @@ export const useMatchChat = () => {
         }
       }
 
-      const { data: myConvs } = await supabase
-        .from("conversation_participants")
-        .select("conversation_id")
-        .eq("user_id", user.id)
-        .is("left_at", null);
-
-      if (myConvs && myConvs.length > 0) {
-        const convIds = myConvs.map((c) => c.conversation_id);
-        const { data: directConvs } = await supabase
-          .from("conversations")
-          .select("id")
-          .in("id", convIds)
-          .eq("type", "direct");
-
-        if (directConvs) {
-          for (const dc of directConvs) {
-            const { data: participants } = await supabase
-              .from("conversation_participants")
-              .select("user_id")
-              .eq("conversation_id", dc.id)
-              .is("left_at", null);
-
-            const userIds = participants?.map((p) => p.user_id) || [];
-            if (userIds.includes(otherUserId) && userIds.includes(user.id)) {
-              return dc.id;
-            }
-          }
-        }
+      const { data, error } = await rpc("open_direct_chat", { _other_user_id: otherUserId });
+      if (error) {
+        console.warn("[chat] open_direct_chat failed", error.message);
+        return null;
       }
-
-      // Generate ID client-side to avoid SELECT policy conflict on new conversation
-      const convId = crypto.randomUUID();
-      const { error } = await supabase
-        .from("conversations")
-        .insert({ id: convId, type: "direct" });
-
-      if (error) return null;
-
-      // Insert self first so is_conversation_member passes for adding the other user
-      await supabase.from("conversation_participants").insert({
-        conversation_id: convId, user_id: user.id,
-      });
-      await supabase.from("conversation_participants").insert({
-        conversation_id: convId, user_id: otherUserId,
-      });
-
-      return convId;
+      return (data as string) ?? null;
     },
     [user]
   );
@@ -253,31 +97,3 @@ export const useMatchChat = () => {
     addSystemMessage,
   };
 };
-
-/**
- * Ensure a user is a participant in a conversation.
- * Returns true if the user was newly added (or rejoined), false if already active.
- */
-async function ensureParticipant(conversationId: string, userId: string): Promise<boolean> {
-  const { data: existing } = await supabase
-    .from("conversation_participants")
-    .select("id, left_at")
-    .eq("conversation_id", conversationId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!existing) {
-    await supabase.from("conversation_participants").insert({
-      conversation_id: conversationId,
-      user_id: userId,
-    });
-    return true;
-  } else if (existing.left_at) {
-    await supabase
-      .from("conversation_participants")
-      .update({ left_at: null })
-      .eq("id", existing.id);
-    return true;
-  }
-  return false;
-}
