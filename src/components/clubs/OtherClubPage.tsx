@@ -13,7 +13,7 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "@/integrations/supabase/client";
 import { AVAILABILITY_ENABLED } from "@/lib/featureFlags";
-import { providerLabel } from "./clubTier";
+import { isMembersOnly, providerLabel } from "./clubTier";
 import ClaimClubSheet from "./ClaimClubSheet";
 
 interface Slot {
@@ -52,6 +52,8 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
   const [claimOpen, setClaimOpen] = useState(false);
 
   const currency = club.currency_symbol ?? "£";
+  // David Lloyd & co: members-only, no availability feed — never call the collectors.
+  const membersOnly = isMembersOnly(club.external_provider);
 
   const fetchSlots = useCallback(async () => {
     const { data } = await supabase
@@ -68,7 +70,7 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
 
   // Availability — cache-aside, same contract as ExternalAvailability (fails soft)
   useEffect(() => {
-    if (!AVAILABILITY_ENABLED) { setLoadingSlots(false); return; }
+    if (!AVAILABILITY_ENABLED || membersOnly) { setLoadingSlots(false); return; }
     let cancelled = false;
     (async () => {
       setLoadingSlots(true);
@@ -89,7 +91,7 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [club.id, fetchSlots]);
+  }, [club.id, fetchSlots, membersOnly]);
 
   // XPLAY matches at this club (matches.club is free text = club name)
   useEffect(() => {
@@ -135,7 +137,7 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
     club.latitude != null && club.longitude != null
       ? `https://www.google.com/maps/search/?api=1&query=${club.latitude},${club.longitude}${club.google_place_id ? `&query_place_id=${club.google_place_id}` : ""}`
       : null;
-  const bookSystem = via ?? "the club's system";
+  const bookSystem = membersOnly ? "the David Lloyd Clubs app" : via ?? "the club's system";
 
   const dayLabel = (day: string) => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -168,10 +170,21 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
         <section className="space-y-2">
           <h1 className="font-display font-bold text-2xl leading-tight text-foreground">{club.club_name}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
-              {via ? <ExternalLink className="w-3 h-3" /> : <Info className="w-3 h-3" />}
-              {via ? `via ${via}` : "Info only"}
-            </span>
+            {membersOnly ? (
+              <>
+                <span className="inline-flex items-center rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
+                  {via}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
+                  Members only
+                </span>
+              </>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
+                {via ? <ExternalLink className="w-3 h-3" /> : <Info className="w-3 h-3" />}
+                {via ? `via ${via}` : "Info only"}
+              </span>
+            )}
           </div>
           {address && (
             mapsUrl ? (
@@ -190,13 +203,21 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
         {/* The one plain notice — a fact, not an error (neutral, never amber) */}
         <section className="rounded-2xl border border-outline-variant bg-surface-container-high p-4 flex items-start gap-3">
           <Info className="w-5 h-5 text-foreground flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-foreground leading-relaxed">
-            <span className="font-bold">This club isn't on XPLAY yet.</span> You book and pay on {bookSystem}, so we
-            can't secure the court for you.
-          </p>
+          {membersOnly ? (
+            <p className="text-sm text-foreground leading-relaxed">
+              <span className="font-bold">This club is for David Lloyd members.</span> Members book padel courts in the
+              David Lloyd Clubs app, up to 9 days ahead. Everyone can organise or join an XPLAY match here and earn points.
+            </p>
+          ) : (
+            <p className="text-sm text-foreground leading-relaxed">
+              <span className="font-bold">This club isn't on XPLAY yet.</span> You book and pay on {bookSystem}, so we
+              can't secure the court for you.
+            </p>
+          )}
         </section>
 
-        {/* Availability */}
+        {/* Availability — not rendered for members-only clubs (no feed, nothing to show) */}
+        {!membersOnly && (
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-display font-black italic uppercase text-base text-foreground tracking-tight">Next 48 hours</h2>
@@ -237,8 +258,29 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
             </p>
           )}
         </section>
+        )}
 
         {/* Actions: external path keeps primary weight but stays neutral; lime marks the XPLAY action */}
+        {membersOnly ? (
+        <section className="space-y-2.5">
+          <button
+            type="button"
+            onClick={organise}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground py-3.5 text-xs font-display font-black uppercase tracking-widest active:scale-[0.98] transition-transform"
+          >
+            <Users className="w-4 h-4" /> Organise a match here
+          </button>
+          {website && (
+            <button
+              type="button"
+              onClick={() => openExternal(website)}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-surface-bright text-foreground py-3 text-sm font-bold active:scale-[0.98] transition-transform"
+            >
+              Padel at {club.club_name} <ExternalLink className="w-4 h-4" />
+            </button>
+          )}
+        </section>
+        ) : (
         <section className="space-y-2.5">
           {(bookingUrl || website) && (
             <button
@@ -257,6 +299,7 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
             <Users className="w-4 h-4" /> Organise a match here
           </button>
         </section>
+        )}
 
         {/* Matches here */}
         <section className="space-y-2.5">
