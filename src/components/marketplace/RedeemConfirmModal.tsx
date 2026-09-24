@@ -109,18 +109,29 @@ const MarketplaceRedeemModal = ({
           {hasUsableXP && <Row tone="primary" label="Points balance after" value={`${balanceAfter.toLocaleString()} XP`} />}
         </div>
 
-        <div className="space-y-3">
+        <div
+          className="space-y-3"
+          onKeyDown={(e) => {
+            // iOS keyboard: Return moves to the next field; on the last field it closes the keyboard.
+            if (e.key !== "Enter" || !(e.target instanceof HTMLInputElement)) return;
+            e.preventDefault();
+            const fields = Array.from(e.currentTarget.querySelectorAll("input"));
+            const i = fields.indexOf(e.target);
+            if (i >= 0 && i < fields.length - 1) fields[i + 1].focus();
+            else e.target.blur();
+          }}
+        >
           <Label className="text-sm font-medium">Delivery address (UK only)</Label>
-          <Input placeholder="Full name" autoComplete="name" value={address.name}
+          <Input placeholder="Full name" autoComplete="name" enterKeyHint="next" autoCapitalize="words" value={address.name}
             onChange={(e) => setAddress({ ...address, name: e.target.value })} style={{ fontSize: "16px" }} />
-          <Input placeholder="Address line 1" autoComplete="address-line1" value={address.line1}
+          <Input placeholder="Address line 1" autoComplete="address-line1" enterKeyHint="next" value={address.line1}
             onChange={(e) => setAddress({ ...address, line1: e.target.value })} style={{ fontSize: "16px" }} />
-          <Input placeholder="Address line 2 (optional)" autoComplete="address-line2" value={address.line2}
+          <Input placeholder="Address line 2 (optional)" autoComplete="address-line2" enterKeyHint="next" value={address.line2}
             onChange={(e) => setAddress({ ...address, line2: e.target.value })} style={{ fontSize: "16px" }} />
           <div className="flex gap-2">
-            <Input placeholder="Town or city" autoComplete="address-level2" value={address.city}
+            <Input placeholder="Town or city" autoComplete="address-level2" enterKeyHint="next" value={address.city}
               onChange={(e) => setAddress({ ...address, city: e.target.value })} style={{ fontSize: "16px" }} />
-            <Input placeholder="Postcode" autoComplete="postal-code" value={address.postcode}
+            <Input placeholder="Postcode" autoComplete="postal-code" enterKeyHint="done" autoCapitalize="characters" value={address.postcode}
               onChange={(e) => setAddress({ ...address, postcode: e.target.value.toUpperCase() })} style={{ fontSize: "16px" }} />
           </div>
           {postcodeTyped && !postcodeOk ? (
