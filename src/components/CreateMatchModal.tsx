@@ -74,6 +74,14 @@ const DAY_PARTS: Record<DayPart, { label: string; from: string; to: string }> = 
   afternoon: { label: "Afternoon", from: "12:00", to: "17:00" },
   evening: { label: "Evening", from: "17:00", to: "24:00" },
 };
+/** The next half-hour from now (HH:mm), e.g. 14:12 → 14:30. */
+const nextHalfHour = () => {
+  const d = new Date();
+  const mins = Math.ceil((d.getHours() * 60 + d.getMinutes() + (d.getSeconds() > 0 ? 1 : 0)) / 30) * 30;
+  if (mins >= 24 * 60) return "24:00";
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${mins % 60 === 0 ? "00" : "30"}`;
+};
+const partOf = (t: string): DayPart => (t < DAY_PARTS.morning.to ? "morning" : t < DAY_PARTS.afternoon.to ? "afternoon" : "evening");
 const RECENT_KEY = "xplay.recentClubs";
 const fmtDur = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}` : `${m} min`);
 
@@ -109,7 +117,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
   const [matchDate, setMatchDate] = useState<Date | undefined>();
   const [matchTime, setMatchTime] = useState("");
   const [durationMins, setDurationMins] = useState(90);
-  const [dayPart, setDayPart] = useState<DayPart>("evening");
+  const [dayPart, setDayPart] = useState<DayPart>(() => partOf(nextHalfHour()));
   const [manualTime, setManualTime] = useState(false);
   const [liveSlotCount, setLiveSlotCount] = useState<number | null>(null);
   const [liveSlot, setLiveSlot] = useState<ExternalSlot | null>(null); // the tapped club slot (price + booking link)
@@ -119,6 +127,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
     const part = (Object.keys(DAY_PARTS) as DayPart[]).find((k) => matchTime >= DAY_PARTS[k].from && matchTime < DAY_PARTS[k].to);
     if (part) setDayPart(part);
   }, [matchTime]);
+  // No time yet: open on the part of day that holds the next half-hour.
+  useEffect(() => {
+    if (!matchTime && open) setDayPart(partOf(nextHalfHour()));
+  }, [open, matchDate, matchTime]);
 
   // ── Who ──
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
@@ -475,7 +487,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
         ))}
       </div>
       <div className="grid grid-cols-4 gap-2">
-        {TIME_SLOTS.filter((t) => t >= DAY_PARTS[dayPart].from && t < DAY_PARTS[dayPart].to).map((t) => (
+        {TIME_SLOTS.filter((t) => t >= DAY_PARTS[dayPart].from && t < DAY_PARTS[dayPart].to && !(matchDate && isSameDay(matchDate, new Date()) && t < nextHalfHour())).map((t) => (
           <button key={t} type="button" onClick={() => { setMatchTime(t); setLiveSlot(null); setErrorMsg(null); }}
             className={cn("h-11 rounded-xl font-mono text-[15px] font-bold border", matchTime === t ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border")}>
             {t}
@@ -630,8 +642,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
               {hasLiveFeed && selectedClub && !manualTime && (
                 <div className="space-y-2">
                   <ExternalAvailability
-                    clubId={selectedClub.id} provider={selectedClub.external_provider}
-                    date={matchDate ? format(matchDate, "yyyy-MM-dd") : null}
+                    clubId={selectedClub.id} clubName={selectedClub.club_name} provider={selectedClub.external_provider}
+                    date={matchDate ? format(matchDate, "yyyy-MM-dd") : null} watchDurationMins={durationMins}
                     onSelectSlot={handleLiveSlot} onSlotCount={setLiveSlotCount}
                     selected={matchDate && matchTime ? { date: format(matchDate, "yyyy-MM-dd"), time: matchTime, duration: durationMins } : null}
                   />

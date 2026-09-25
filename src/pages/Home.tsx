@@ -1,14 +1,14 @@
 /**
  * Home — the player's landing screen (Home redesign, 25 Sep 2026).
  *
- * Top to bottom: greeting · Coming up (my next matches + tournaments) ·
+ * Top to bottom: greeting · Coming up (my next matches, lessons + tournaments) ·
  * Play at your clubs (the clubs I play at, with their next free slots) ·
  * Another club / Court Radar rows · Open games near you · pinned "New match".
  * One action per block, times in mono, lime = XPLAY, purple = tournament, amber = value.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Star, Radar, Trophy, CircleDot, CalendarX2 } from "lucide-react";
+import { ChevronRight, Star, Radar, Trophy, CircleDot, CalendarX2, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { format, addDays } from "date-fns";
 import { Capacitor } from "@capacitor/core";
@@ -26,8 +26,10 @@ import { TOURNAMENTS_ENABLED, AVAILABILITY_ENABLED } from "@/lib/featureFlags";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type UpcomingItem = {
-  kind: "match" | "tournament";
+  kind: "match" | "tournament" | "lesson";
   id: string;
+  /** Lessons: the club page to open. */
+  clubId?: string;
   at: Date;
   time: string;
   durationMins: number | null;
@@ -167,6 +169,24 @@ const Home = () => {
             const at = new Date(`${t.scheduled_date}T${t.scheduled_time ?? "00:00"}`);
             items.push({ kind: "tournament", id: t.id, at, time, durationMins: t.total_time_mins ?? null, club: t.venue_name ?? t.club ?? t.name,
               status: (t.ticket_price_cents ?? 0) > 0 ? { text: "Ticket paid", tone: "green" } : { text: "Registered", tone: "green" } });
+          }
+        }
+      }
+      // Lessons I'm enrolled in.
+      {
+        const sb = supabase as any;
+        const { data: en } = await sb.from("coaching_enrollments").select("session_id").eq("user_id", user.id).eq("status", "confirmed");
+        const sids = [...new Set(((en || []) as { session_id: string }[]).map((e) => e.session_id))];
+        if (sids.length) {
+          const { data: ss } = await sb.from("coaching_sessions").select("id, club_id, title, session_date, start_time, end_time, starts_at, ends_at, status, clubs(club_name), coach:profiles!coaching_sessions_coach_id_fkey(display_name, full_name)")
+            .in("id", sids).gte("session_date", today).neq("status", "cancelled").order("session_date").order("start_time").limit(8);
+          for (const c of (ss || []) as any[]) {
+            const at = c.starts_at ? new Date(c.starts_at) : new Date(`${c.session_date}T${c.start_time}`);
+            const end = c.ends_at ? new Date(c.ends_at) : new Date(`${c.session_date}T${c.end_time}`);
+            if (end.getTime() < Date.now() - 60 * 60 * 1000) continue;
+            const coach = c.coach?.display_name || c.coach?.full_name || null;
+            items.push({ kind: "lesson", id: c.id, clubId: c.club_id, at, time: format(at, "HH:mm"), durationMins: Math.max(0, Math.round((end.getTime() - at.getTime()) / 60000)) || null,
+              club: c.title ? `${c.title} · ${c.clubs?.club_name ?? ""}` : c.clubs?.club_name ?? "", status: coach ? { text: `With ${coach}`, tone: "green" } : { text: "Booked", tone: "green" } });
           }
         }
       }
@@ -313,14 +333,15 @@ const Home = () => {
           <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 scrollbar-hide">
             {upcoming.map((it) => {
               const isT = it.kind === "tournament";
+              const isL = it.kind === "lesson";
               return (
-                <button key={`${it.kind}-${it.id}`} onClick={() => navigate(isT ? `/tournaments/${it.id}` : `/matches/${it.id}`)}
+                <button key={`${it.kind}-${it.id}`} onClick={() => navigate(isT ? `/tournaments/${it.id}` : isL ? `/clubs/${it.clubId}` : `/matches/${it.id}`)}
                   className="w-[240px] flex-shrink-0 snap-start text-left rounded-2xl bg-card border border-border/60 p-4 active:scale-[0.98] transition-transform">
                   <div className="flex items-center justify-between">
                     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider",
-                      isT ? "bg-accent/25 text-accent-foreground" : "bg-primary text-primary-foreground")}>
-                      {isT ? <Trophy className="w-3 h-3" /> : <CircleDot className="w-3 h-3" />}
-                      {isT ? "Tournament" : "Match"}
+                      isT ? "bg-accent/25 text-accent-foreground" : isL ? "bg-secondary/20 text-secondary" : "bg-primary text-primary-foreground")}>
+                      {isT ? <Trophy className="w-3 h-3" /> : isL ? <GraduationCap className="w-3 h-3" /> : <CircleDot className="w-3 h-3" />}
+                      {isT ? "Tournament" : isL ? "Lesson" : "Match"}
                     </span>
                     <span className="text-[11px] font-bold text-muted-foreground">{dayLabel(it.at.toISOString())}</span>
                   </div>

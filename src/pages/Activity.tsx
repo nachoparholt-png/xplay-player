@@ -4,17 +4,19 @@
  * Upcoming / Past · a 14-day strip (dot = something on that day, "Pick a date"
  * for anything further) · type chips (All · Matches · Tournaments · Lessons) ·
  * the list grouped by day. One card = one thing to do; tap → its page.
+ * Also here: lessons the player is enrolled in (coaching_enrollments) and slot
+ * watches (waiting list, "We'll tell you if it frees up", with a Cancel).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, CircleDot, Trophy, GraduationCap, CalendarDays } from "lucide-react";
+import { ChevronRight, CircleDot, Trophy, GraduationCap, CalendarDays, Bell } from "lucide-react";
 import { format, addDays, startOfDay, isSameDay } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
-type Kind = "match" | "tournament" | "lesson";
+type Kind = "match" | "tournament" | "lesson" | "watch";
 type Tone = "amber" | "green" | "lime" | "muted";
 type Item = {
   kind: Kind;
@@ -24,6 +26,10 @@ type Item = {
   time: string;
   durationMins: number | null;
   club: string;
+  /** Lessons: the session title (shown above the club). */
+  title?: string;
+  /** Lessons and watches: where a tap goes. */
+  clubId?: string;
   status: { text: string; tone: Tone };
 };
 
@@ -110,11 +116,50 @@ const Activity = () => {
           }
         }
       }
+      // Lessons I'm enrolled in (coaching_enrollments → coaching_sessions).
+      {
+        const sb = supabase as any;
+        const { data: en } = await sb.from("coaching_enrollments").select("session_id").eq("user_id", user.id).eq("status", "confirmed");
+        const sids = [...new Set(((en || []) as { session_id: string }[]).map((e) => e.session_id))];
+        if (sids.length) {
+          const nowIso = new Date().toISOString();
+          let q = sb.from("coaching_sessions").select("id, club_id, title, session_date, start_time, end_time, starts_at, ends_at, status, clubs(club_name), coach:profiles!coaching_sessions_coach_id_fkey(display_name, full_name)").in("id", sids);
+          q = segment === "upcoming" ? q.gte("session_date", today).neq("status", "cancelled").order("session_date").order("start_time")
+            : q.lt("session_date", today).order("session_date", { ascending: false }).order("start_time", { ascending: false });
+          const { data: ss } = await q.limit(60);
+          for (const c of (ss || []) as any[]) {
+            const at = c.starts_at ? new Date(c.starts_at) : new Date(`${c.session_date}T${c.start_time}`);
+            const end = c.ends_at ? new Date(c.ends_at) : new Date(`${c.session_date}T${c.end_time}`);
+            if (segment === "upcoming" && end.getTime() < Date.parse(nowIso) - 60 * 60 * 1000) continue;
+            const coach = c.coach?.display_name || c.coach?.full_name || null;
+            const status: Item["status"] = segment === "past" ? { text: c.status === "cancelled" ? "Cancelled" : "Done", tone: "muted" }
+              : c.status === "cancelled" ? { text: "Cancelled", tone: "muted" } : coach ? { text: `With ${coach}`, tone: "green" } : { text: "Booked", tone: "green" };
+            out.push({ kind: "lesson", id: c.id, at, dateKey: format(at, "yyyy-MM-dd"), time: format(at, "HH:mm"),
+              durationMins: Math.max(0, Math.round((end.getTime() - at.getTime()) / 60000)) || null, club: c.clubs?.club_name ?? "", title: c.title, clubId: c.club_id, status });
+          }
+        }
+      }
+      // Slot watches (waiting list) — upcoming only.
+      if (segment === "upcoming") {
+        const { data: ws } = await (supabase as any).from("slot_watches").select("id, club_id, slot_date, start_time, duration_mins, status, clubs(club_name)")
+          .eq("user_id", user.id).eq("status", "active").gte("slot_date", today).order("slot_date").order("start_time").limit(60);
+        for (const w of (ws || []) as any[]) {
+          const at = new Date(`${w.slot_date}T${w.start_time}`);
+          if (at.getTime() < Date.now()) continue;
+          out.push({ kind: "watch", id: w.id, at, dateKey: w.slot_date, time: String(w.start_time).slice(0, 5), durationMins: w.duration_mins ?? null,
+            club: w.clubs?.club_name ?? "", clubId: w.club_id, status: { text: "We'll tell you if it frees up", tone: "amber" } });
+        }
+      }
       out.sort((a, b) => segment === "upcoming" ? a.at.getTime() - b.at.getTime() : b.at.getTime() - a.at.getTime());
       if (!cancelled) { setItems(out); setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [user, segment, today]);
+
+  const cancelWatch = async (id: string) => {
+    setItems((prev) => prev.filter((i) => !(i.kind === "watch" && i.id === id)));
+    await (supabase as any).from("slot_watches").delete().eq("id", id);
+  };
 
   const busyDays = useMemo(() => new Set(items.map((i) => i.dateKey)), [items]);
   const visible = useMemo(() => items.filter((i) => (type === "all" || i.kind === type) && (!day || i.dateKey === day)), [items, type, day]);
@@ -192,12 +237,15 @@ const Activity = () => {
             <div key={key} className="space-y-2">
               <div className="text-[11px] font-black tracking-[0.14em] text-muted-foreground uppercase">{dayHeader(key)}</div>
               {list.map((it) => {
-                const Icon = it.kind === "tournament" ? Trophy : it.kind === "lesson" ? GraduationCap : CircleDot;
+                const Icon = it.kind === "tournament" ? Trophy : it.kind === "lesson" ? GraduationCap : it.kind === "watch" ? Bell : CircleDot;
+                const isWatch = it.kind === "watch";
+                const Card: any = isWatch ? "div" : "button";
+                const go = () => navigate(it.kind === "tournament" ? `/tournaments/${it.id}` : it.kind === "lesson" ? `/clubs/${it.clubId}` : `/matches/${it.id}`);
                 return (
-                  <button key={`${it.kind}-${it.id}`} onClick={() => navigate(it.kind === "tournament" ? `/tournaments/${it.id}` : `/matches/${it.id}`)}
-                    className="w-full rounded-2xl bg-card border border-border/60 px-3.5 py-3 flex items-center gap-3 text-left active:scale-[0.99] transition-transform">
+                  <Card key={`${it.kind}-${it.id}`} onClick={isWatch ? undefined : go}
+                    className={cn("w-full rounded-2xl bg-card border border-border/60 px-3.5 py-3 flex items-center gap-3 text-left transition-transform", !isWatch && "active:scale-[0.99]")}>
                     <div className={cn("w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0",
-                      it.kind === "tournament" ? "bg-accent/25 text-accent-foreground" : it.kind === "lesson" ? "bg-secondary/20 text-secondary" : "bg-primary/15 text-primary")}>
+                      it.kind === "tournament" ? "bg-accent/25 text-accent-foreground" : it.kind === "lesson" || isWatch ? "bg-secondary/20 text-secondary" : "bg-primary/15 text-primary")}>
                       <Icon className="w-[18px] h-[18px]" />
                     </div>
                     <div className="flex-shrink-0 w-[58px]">
@@ -205,11 +253,16 @@ const Activity = () => {
                       {it.durationMins ? <div className="font-mono text-[11px] text-muted-foreground mt-1">{fmtDur(it.durationMins)}</div> : null}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold truncate">{it.club}</div>
+                      <div className="text-sm font-bold truncate">{it.title ?? it.club}</div>
+                      {it.title && it.club ? <div className="text-xs text-muted-foreground truncate">{it.club}</div> : null}
                       <div className={cn("text-xs font-semibold mt-0.5", toneClass[it.status.tone])}>{it.status.text}</div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  </button>
+                    {isWatch ? (
+                      <button type="button" onClick={() => cancelWatch(it.id)} className="flex-shrink-0 text-xs font-bold text-muted-foreground px-2 py-1 rounded-full border border-border">Cancel</button>
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    )}
+                  </Card>
                 );
               })}
             </div>

@@ -15,14 +15,17 @@
  *    time, one pill per duration with its price — nothing deduped away, so 12:00
  *    shows 1h, 1h30 and 2h when the club lists all three. Tapping a pill calls
  *    `onSelectSlot` with that exact slot (time, length, price, booking link).
+ *    Start times on the club's usual grid with no free court are still listed,
+ *    dimmed, as "Taken · notify me" → SlotWatchSheet (waiting list).
  */
-import { useState, useEffect, useCallback } from "react";
-import { ExternalLink, Clock, RefreshCw } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { ExternalLink, Clock, RefreshCw, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { AVAILABILITY_ENABLED } from "@/lib/featureFlags";
 import { isMembersOnly } from "@/components/clubs/clubTier";
+import SlotWatchSheet, { type SlotWatchTarget } from "@/components/SlotWatchSheet";
 
 export interface ExternalSlot {
   id: string;
@@ -47,16 +50,31 @@ interface ExternalAvailabilityProps {
   date?: string | null;
   /** Match creation: how many slots are shown for `date` (0 lets the parent offer a manual grid). */
   onSlotCount?: (n: number) => void;
+  /** Match creation: the length a "notify me" watch asks for when no slot is selected yet. */
+  watchDurationMins?: number;
 }
+
+/** Every 30 min from `from` to `to` (HH:mm, inclusive). */
+const halfHours = (from: string, to: string) => {
+  const out: string[] = [];
+  let [h, m] = from.split(":").map(Number);
+  const [th, tm] = to.split(":").map(Number);
+  while (h < th || (h === th && m <= tm)) {
+    out.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    m += 30; if (m >= 60) { m = 0; h += 1; }
+  }
+  return out;
+};
 
 const STALE_MS = 30 * 60 * 1000;
 const fmtDuration = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}` : `${m} min`);
 
-const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, selected, date, onSlotCount }: ExternalAvailabilityProps) => {
+const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, selected, date, onSlotCount, watchDurationMins }: ExternalAvailabilityProps) => {
   const [slots, setSlots] = useState<ExternalSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [membersOnly, setMembersOnly] = useState(isMembersOnly(provider));
+  const [watchTarget, setWatchTarget] = useState<SlotWatchTarget | null>(null);
 
   const fetchSlots = useCallback(async () => {
     const { data } = await supabase
@@ -123,6 +141,21 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
   const shownCount = dayEntries.reduce((n, [, t]) => n + [...t.values()].reduce((m, a) => m + a.length, 0), 0);
   const fetchedAgo = slots[0] ? Math.max(0, Math.round((Date.now() - new Date(slots[0].fetched_at).getTime()) / 60000)) : null;
 
+  // Taken start times for `date`: the club's usual grid (every 30 min between the
+  // earliest and latest start seen in the next 7 days; 08:00–22:00 when nothing is
+  // known) minus the times with a free court, future times only.
+  const takenTimes = useMemo(() => {
+    if (!date) return [] as string[];
+    const seen = slots.map((s) => format(new Date(s.starts_at), "HH:mm")).sort();
+    const grid = seen.length ? halfHours(seen[0], seen[seen.length - 1]) : halfHours("08:00", "22:00");
+    const free = byDay.get(date);
+    const nowKey = format(new Date(), "yyyy-MM-dd");
+    const nowTime = format(new Date(), "HH:mm");
+    return grid.filter((t) => !free?.has(t) && (date > nowKey || (date === nowKey && t > nowTime)));
+    // byDay is derived from slots each render; slots/date are the real inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots, date]);
+
   useEffect(() => {
     if (!AVAILABILITY_ENABLED || membersOnly) { onSlotCount?.(0); return; }
     if (!loading) onSlotCount?.(shownCount);
@@ -159,7 +192,7 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
         <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-muted animate-pulse" />)}</div>
       ) : byDay.size === 0 ? (
         <p className="text-sm text-muted-foreground">Live availability isn't available for this club right now. Pick a time manually and book on the club's system.</p>
-      ) : date && dayEntries.length === 0 ? (
+      ) : date && dayEntries.length === 0 && takenTimes.length === 0 ? (
         <p className="text-sm text-muted-foreground">No free courts listed on {providerName} for this day yet. Pick another day, or a time manually.</p>
       ) : !date ? (
         /* overview: two days, one chip per start time */
@@ -190,8 +223,23 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
       ) : (
         /* day: rows by start time, a pill per duration */
         <>
+          {dayEntries.length === 0 && <p className="text-sm text-muted-foreground">No free courts listed on {providerName} for this day. Get told if one frees up:</p>}
           <div className="space-y-2">
-            {dayEntries.map(([, times]) => [...times.entries()].map(([time, arr]) => {
+            {[
+              ...dayEntries.flatMap(([, times]) => [...times.entries()].map(([time, arr]) => ({ time, arr }))),
+              ...takenTimes.map((time) => ({ time, arr: null as ExternalSlot[] | null })),
+            ].sort((a, b) => a.time.localeCompare(b.time)).map(({ time, arr }) => {
+              if (!arr) {
+                return (
+                  <div key={`taken-${time}`} className="flex items-center gap-2.5 p-2.5 pl-3 rounded-xl bg-card border border-border/50 opacity-70">
+                    <div className="w-[52px] font-mono text-base font-bold flex-shrink-0 text-muted-foreground">{time}</div>
+                    <button type="button" onClick={() => setWatchTarget({ clubId, clubName: clubName ?? "the club", date, time, durationMins: watchDurationMins ?? selected?.duration ?? 60 })}
+                      className="h-10 px-3 rounded-full text-[13px] font-bold border border-dashed border-border text-muted-foreground inline-flex items-center gap-1.5">
+                      <Bell className="w-3.5 h-3.5" /> Taken · notify me
+                    </button>
+                  </div>
+                );
+              }
               const rowOn = arr.some(isSelected);
               return (
                 <div key={time} className={cn("flex items-center gap-2.5 p-2.5 pl-3 rounded-xl bg-card border", rowOn ? "border-primary" : "border-border")}>
@@ -209,7 +257,7 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
                   </div>
                 </div>
               );
-            }))}
+            })}
           </div>
           <p className="text-xs text-muted-foreground">Price is for the whole court, as {providerName} lists it. Booking happens on {providerName} after you post.</p>
         </>
@@ -220,6 +268,7 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
           Book on the club's system <ExternalLink className="w-3.5 h-3.5" />
         </a>
       )}
+      <SlotWatchSheet target={watchTarget} onClose={() => setWatchTarget(null)} />
     </div>
   );
 };
