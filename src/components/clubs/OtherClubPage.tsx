@@ -144,14 +144,21 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
   }, [club.club_name]);
 
   // Free today: cheapest per start time, today only
+  // If nothing is free today, fall back to the first day that has something ("Next free · Tomorrow")
   const todayKey = format(new Date(), "yyyy-MM-dd");
+  const futureSlots = slots.filter((s) => new Date(s.starts_at).getTime() > Date.now());
+  const firstDayKey = futureSlots.some((s) => format(new Date(s.starts_at), "yyyy-MM-dd") === todayKey)
+    ? todayKey
+    : futureSlots.length ? format(new Date(futureSlots[0].starts_at), "yyyy-MM-dd") : todayKey;
   const byStart = new Map<string, Slot>();
-  for (const s of slots) {
-    if (format(new Date(s.starts_at), "yyyy-MM-dd") !== todayKey) continue;
+  for (const s of futureSlots) {
+    if (format(new Date(s.starts_at), "yyyy-MM-dd") !== firstDayKey) continue;
     const cur = byStart.get(s.starts_at);
     if (!cur || (s.price_cents ?? Infinity) < (cur.price_cents ?? Infinity)) byStart.set(s.starts_at, s);
   }
   const todaySlots = [...byStart.values()].slice(0, 3);
+  const slotsAreToday = firstDayKey === todayKey;
+  const slotsDayLabel = slotsAreToday ? "Free today" : `Next free · ${formatNextSlot(firstDayKey + "T12:00:00").day}`;
   const bookingUrl: string | null = club.external_booking_url ?? slots.find((s) => s.booking_url)?.booking_url ?? null;
   const website: string | null = club.website ?? null;
   const address = [club.address_line_1, club.city, club.postcode].filter(Boolean).join(", ") || club.location || "";
@@ -191,7 +198,7 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
         {/* ── Free today ── */}
         <section className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-sm font-black italic uppercase tracking-[0.08em]">Free today</h2>
+            <h2 className="font-display text-sm font-black italic uppercase tracking-[0.08em]">{membersOnly ? "Book a court" : slotsDayLabel}</h2>
             {!membersOnly && slots.length > 0 && (
               <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
                 <RefreshCw className={cn("w-3 h-3", refreshing && "animate-spin")} /> updated {formatDistanceToNowStrict(new Date(slots[0].fetched_at))} ago

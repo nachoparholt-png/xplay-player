@@ -227,7 +227,11 @@ const Home = () => {
       // (c) nearest clubs, only when the position is already known
       const dist = (c: ClubRow) => pos && c.latitude != null && c.longitude != null ? distanceMiles(pos.lat, pos.lng, c.latitude, c.longitude) : null;
       if (picked.length < 3 && pos) {
-        [...all].filter((c) => dist(c) != null).sort((a, b) => (dist(a) ?? 999) - (dist(b) ?? 999)).forEach((c) => add(c));
+        // XPLAY clubs first, then clubs with live courts, members-only last; nearest within each group
+        const rank = (c: ClubRow) => !isOtherClub(c.source) ? 0 : providerHasFeed(c.external_provider) && !isMembersOnly(c.external_provider) ? 1 : 2;
+        [...all].filter((c) => dist(c) != null && (dist(c) ?? 999) <= 25)
+          .sort((a, b) => rank(a) - rank(b) || (dist(a) ?? 999) - (dist(b) ?? 999))
+          .forEach((c) => add(c));
       }
 
       // Slots per club
@@ -371,11 +375,17 @@ const Home = () => {
             return (
               <div key={c.id} className={cn("rounded-2xl bg-card border p-4 space-y-3", other ? "border-border/60" : "border-primary/70")}>
                 <button onClick={() => navigate(`/clubs/${c.id}`, { state: { from: "/" } })} className="w-full flex items-center gap-2 text-left">
-                  {idx === 0 && <Star className="w-4 h-4 text-secondary fill-secondary flex-shrink-0" />}
-                  <span className="font-bold text-[15px] truncate flex-1">{c.club_name}</span>
-                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider flex-shrink-0",
-                    other ? "border border-border text-muted-foreground" : "bg-primary/15 text-primary")}>{tag}</span>
-                  {c.distanceMi != null && <span className="font-mono text-[11px] text-muted-foreground flex-shrink-0">{formatMiles(c.distanceMi)}</span>}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      {idx === 0 && <Star className="w-4 h-4 text-secondary fill-secondary flex-shrink-0" />}
+                      <span className="font-bold text-[15px] truncate">{c.club_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider flex-shrink-0",
+                        other ? "border border-border text-muted-foreground" : "bg-primary/15 text-primary")}>{tag}</span>
+                      {c.distanceMi != null && <span className="font-mono text-[11px] text-muted-foreground flex-shrink-0">{formatMiles(c.distanceMi)}</span>}
+                    </div>
+                  </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                 </button>
 
@@ -397,7 +407,7 @@ const Home = () => {
                   {!members && c.slots.length === 0 && (
                     <span className="self-center text-xs text-muted-foreground pr-1">No free courts listed</span>
                   )}
-                  <Pill onClick={() => openCreate({ club: toSelection(c) })} muted><span className="text-sm font-bold whitespace-nowrap">All times ›</span></Pill>
+                  {!members && <Pill onClick={() => openCreate({ club: toSelection(c) })} muted><span className="text-sm font-bold whitespace-nowrap">All times ›</span></Pill>}
                 </div>
               </div>
             );
