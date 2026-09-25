@@ -41,11 +41,15 @@ interface ExternalAvailabilityProps {
   onSelectSlot?: (slot: ExternalSlot) => void;
   /** Currently selected date+time in the parent form — highlights the matching chip. */
   selected?: { date: string; time: string } | null;
+  /** Match creation: show only this day's slots (yyyy-MM-dd). Null = no date picked yet. */
+  date?: string | null;
+  /** Match creation: how many slots are shown for `date` (0 lets the parent offer a manual grid). */
+  onSlotCount?: (n: number) => void;
 }
 
 const STALE_MS = 30 * 60 * 1000;
 
-const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, selected }: ExternalAvailabilityProps) => {
+const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, selected, date, onSlotCount }: ExternalAvailabilityProps) => {
   const [slots, setSlots] = useState<ExternalSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,9 +62,9 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
       .select("id, starts_at, duration_mins, price_cents, currency, booking_url, fetched_at")
       .eq("club_id", clubId)
       .gte("starts_at", new Date().toISOString())
-      .lte("starts_at", new Date(Date.now() + 48 * 3600 * 1000).toISOString())
+      .lte("starts_at", new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString())
       .order("starts_at")
-      .limit(60);
+      .limit(400);
     return (data as ExternalSlot[]) || [];
   }, [clubId]);
 
@@ -110,16 +114,6 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
     return () => { cancelled = true; };
   }, [clubId, fetchSlots, provider]);
 
-  if (!AVAILABILITY_ENABLED) return null;
-
-  if (membersOnly) {
-    return (
-      <p className="rounded-xl border border-border/40 bg-card p-3.5 text-xs text-foreground/85">
-        Members only · book the court in the David Lloyd Clubs app, then mark it booked here.
-      </p>
-    );
-  }
-
   // Group by day, dedupe by start time (multiple courts, same slot)
   const byDay = new Map<string, Map<string, ExternalSlot>>();
   for (const s of slots) {
@@ -130,6 +124,30 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
     if (!dayMap.has(time)) dayMap.set(time, s);
   }
   const bookingUrl = slots.find((s) => s.booking_url)?.booking_url;
+
+  // Match creation: one day at a time. Report the count so the parent can fall back to a manual grid.
+  const dayEntries = date ? [...byDay.entries()].filter(([d]) => d === date) : [...byDay.entries()].slice(0, 2);
+  const shownCount = dayEntries.reduce((n, [, t]) => n + t.size, 0);
+  useEffect(() => {
+    if (!AVAILABILITY_ENABLED || membersOnly) { onSlotCount?.(0); return; }
+    if (!loading) onSlotCount?.(shownCount);
+  }, [loading, shownCount, onSlotCount, membersOnly]);
+
+  // (hooks above this line — early returns must come after them)
+  if (!AVAILABILITY_ENABLED) return null;
+
+  if (membersOnly) {
+    return (
+      <p className="rounded-xl border border-border/40 bg-card p-3.5 text-xs text-foreground/85">
+        Members only · book the court in the David Lloyd Clubs app, then mark it booked here.
+      </p>
+    );
+  }
+
+  const fmtDuration = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}` : ""}` : `${m} min`);
+
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const matchDateHasSlots = !!date && byDay.has(date);
 
   const isSelected = (s: ExternalSlot) =>
     !!selected &&
@@ -142,7 +160,7 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5 text-primary" />
           <span className="text-[11px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-            Court availability{clubName ? ` · ${clubName}` : ""}
+            {date ? "Free courts on the club's booking site" : `Court availability${clubName ? ` · ${clubName}` : ""}`}
           </span>
         </div>
         {refreshing && <RefreshCw className="w-3.5 h-3.5 text-muted-foreground animate-spin" />}
@@ -159,46 +177,52 @@ const ExternalAvailability = ({ clubId, clubName, provider, onSelectSlot, select
           Live availability isn't available for this club right now — check the club's own
           booking system for slots.
         </p>
+      ) : date && !matchDateHasSlots ? (
+        <p className="text-xs text-muted-foreground">
+          {date === todayKey || date > todayKey
+            ? "No free courts listed for this day yet. Pick another day, or choose a time manually below."
+            : "Pick a day above to see the club's free courts."}
+        </p>
       ) : (
         <>
           {onSelectSlot && (
             <p className="text-[11px] text-muted-foreground">
-              Tap a time to use it for your match.
+              Tap a free court to use its time. Price is per court for the whole slot, as listed by the club.
             </p>
           )}
-          {[...byDay.entries()].slice(0, 2).map(([day, times]) => (
+          {dayEntries.map(([day, times]) => (
             <div key={day}>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
-                {format(new Date(day + "T00:00:00"), "EEE d MMM")}
-              </p>
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
-                {[...times.values()].slice(0, 12).map((s) =>
+              {!date && (
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  {format(new Date(day + "T00:00:00"), "EEE d MMM")}
+                </p>
+              )}
+              <div className={cn("gap-1.5 pb-1", date ? "grid grid-cols-3" : "flex overflow-x-auto")}>
+                {[...times.values()].slice(0, date ? 60 : 12).map((s) =>
                   onSelectSlot ? (
                     <button
                       key={s.id}
                       type="button"
                       onClick={() => onSelectSlot(s)}
                       className={cn(
-                        "flex-shrink-0 rounded-lg px-2.5 py-1.5 text-center border transition-colors",
+                        "flex-shrink-0 rounded-lg px-2.5 py-2 text-center border transition-colors",
                         isSelected(s)
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
                       )}
                     >
                       <span className={cn(
-                        "block font-mono text-xs font-bold",
+                        "block font-mono text-sm font-bold",
                         !isSelected(s) && "text-emerald-400"
                       )}>
                         {format(new Date(s.starts_at), "HH:mm")}
                       </span>
-                      {s.price_cents != null && (
-                        <span className={cn(
-                          "block text-[11px]",
-                          isSelected(s) ? "text-primary-foreground/70" : "text-muted-foreground"
-                        )}>
-                          £{(s.price_cents / 100).toFixed(0)}
-                        </span>
-                      )}
+                      <span className={cn(
+                        "block text-[11px]",
+                        isSelected(s) ? "text-primary-foreground/80" : "text-foreground/80"
+                      )}>
+                        {fmtDuration(s.duration_mins)}{s.price_cents != null ? ` · £${(s.price_cents / 100).toFixed(0)}` : ""}
+                      </span>
                     </button>
                   ) : (
                     <div

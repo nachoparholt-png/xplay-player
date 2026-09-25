@@ -90,6 +90,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
     if (part) setDayPart(part);
   }, [matchTime]);
   const [durationMins, setDurationMins] = useState(90); // for venues without XPLAY slots
+  // Directory clubs (Playtomic / Padelmates): live slots are the time picker; "Other time" opens the plain grid.
+  const [manualTime, setManualTime] = useState(false);
+  const [liveSlotCount, setLiveSlotCount] = useState<number | null>(null);
   const [matchFormat, setMatchFormat] = useState<"competitive" | "social">("competitive");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
 
@@ -196,6 +199,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
       setNotes("");
       setErrors({});
       setShowLevelEditor(false);
+      setManualTime(false);
+      setLiveSlotCount(null);
     }
   }, [open, profile?.padel_level]);
 
@@ -203,9 +208,10 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
   const handlePasteAutofill = async () => {
     try {
       setPasteLoading(true);
-      const clipText = await navigator.clipboard.readText();
+      let clipText = "";
+      try { clipText = await navigator.clipboard.readText(); } catch { clipText = ""; }
       if (!clipText || clipText.trim().length < 10) {
-        toast({ title: "Nothing to paste", description: "No match info found in your clipboard.", variant: "destructive" });
+        toast({ title: "Nothing to paste yet", description: "In Playtomic open the match, tap Share → Copy, then come back and tap this again." });
         return;
       }
 
@@ -242,11 +248,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
         description: `${parsed.clubName || "Match"} — ${parsed.players.length} player(s) detected.`,
       });
     } catch {
-      toast({
-        title: "Clipboard access denied",
-        description: "Please allow clipboard access or paste the text manually.",
-        variant: "destructive",
-      });
+      toast({ title: "Couldn't read that", description: "Copy the match from Playtomic (Share → Copy) and tap again, or fill in the venue and time below." });
     } finally {
       setPasteLoading(false);
     }
@@ -632,17 +634,9 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                     </div>
                   )}
 
-                  {/* ── Directory club: aggregated availability (tap to prefill) ── */}
+                  {/* ── Directory club: court name (live availability lives in the Time section) ── */}
                   {isDirectoryClub && selectedClub && (
                     <div className="space-y-2 pt-1">
-                      <ExternalAvailability
-                        clubId={selectedClub.id}
-                        provider={selectedClub.external_provider}
-                        onSelectSlot={handleExternalSlotSelect}
-                        selected={matchDate && matchTime
-                          ? { date: format(matchDate, "yyyy-MM-dd"), time: matchTime }
-                          : null}
-                      />
                       <div>
                         <label className="text-xs text-muted-foreground uppercase tracking-wider font-medium mb-1.5 block">
                           Court (optional)
@@ -787,7 +781,30 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
                 {useSmartSlots ? "Available Slots *" : "Time *"}
               </label>
 
-              {useSmartSlots ? (
+              {/* Directory club: the club's live slots ARE the time picker (one grid, not two) */}
+              {isDirectoryClub && selectedClub && !manualTime && (
+                <ExternalAvailability
+                  clubId={selectedClub.id}
+                  provider={selectedClub.external_provider}
+                  date={matchDate ? format(matchDate, "yyyy-MM-dd") : null}
+                  onSelectSlot={handleExternalSlotSelect}
+                  onSlotCount={setLiveSlotCount}
+                  selected={matchDate && matchTime
+                    ? { date: format(matchDate, "yyyy-MM-dd"), time: matchTime }
+                    : null}
+                />
+              )}
+              {isDirectoryClub && selectedClub && (
+                <button
+                  type="button"
+                  onClick={() => setManualTime((v) => !v)}
+                  className="text-xs font-semibold text-primary underline underline-offset-2 px-1"
+                >
+                  {manualTime ? "Back to the club's available times" : liveSlotCount === 0 ? "Pick a time manually" : "Other time (I'll book it myself)"}
+                </button>
+              )}
+
+              {isDirectoryClub && selectedClub && !manualTime && liveSlotCount !== 0 ? null : useSmartSlots ? (
                 /* Smart slot picker — only real available slots */
                 !selectedCourtObj || !matchDate ? (
                   <div className="bg-muted/30 border border-border/20 rounded-xl p-4 flex items-center gap-3">
@@ -895,8 +912,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated }: CreateMatchModalPro
               {/* Duration — only when the venue has no XPLAY-managed slots
                   (slot-based bookings carry the club's own duration) */}
               {!useSmartSlots && (
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium mr-1">Duration</span>
+                <div className="flex items-center gap-2 pt-1 flex-wrap">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium mr-1">How long *</span>
                   {[60, 90, 120].map((d) => (
                     <button
                       key={d}

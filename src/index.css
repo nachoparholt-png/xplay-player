@@ -250,5 +250,5 @@
 }
 .xplay-dialog.top-auto {
   bottom: var(--kb-h, 0px);
-  max-height: calc(100dvh - var(--kb-h, 0px) - 1.5rem);
+  max-height: min(90dvh, calc(100dvh - var(--kb-h, 0px)));
 }
