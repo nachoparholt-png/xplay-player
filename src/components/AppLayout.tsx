@@ -1,6 +1,6 @@
 import React, { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { MessageSquare, Shield } from "lucide-react";
+import { MessageSquare, Shield, Home, CalendarDays } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdmin } from "@/contexts/AdminContext";
 import NotificationBell from "@/components/NotificationBell";
@@ -16,30 +16,29 @@ import {
 } from "@/components/icons/XPlayIcons";
 import { TOURNAMENTS_ENABLED } from "@/lib/featureFlags";
 
-// Mobile tab bar (4 slots). MVP: Tourneys is out, so Messages takes its slot.
-// Beta (TOURNAMENTS_ENABLED): Tourneys is back and Messages lives in the header bell/sidebar.
-const navItems = TOURNAMENTS_ENABLED
-  ? [
-      { path: "/matches", icon: IconMatches, label: "Matches" },
-      { path: "/tournaments", icon: IconTournaments, label: "Tourneys" },
-      { path: "/rewards", icon: IconRewards, label: "Rewards" },
-      { path: "/profile", icon: IconProfile, label: "Profile" },
-    ]
-  : [
-      { path: "/matches", icon: IconMatches, label: "Matches" },
-      { path: "/messages", icon: MessageSquare, label: "Messages" },
-      { path: "/rewards", icon: IconRewards, label: "Rewards" },
-      { path: "/profile", icon: IconProfile, label: "Profile" },
-    ];
+// Mobile tab bar — exactly 4 slots (Home redesign, 25 Sep 2026):
+// Home · Activity · Rewards · Profile. Matches and Tournaments live inside Home /
+// Activity; Messages is always the header icon (both lanes).
+const navItems = [
+  { path: "/", icon: Home, label: "Home" },
+  { path: "/activity", icon: CalendarDays, label: "Activity" },
+  { path: "/rewards", icon: IconRewards, label: "Rewards" },
+  { path: "/profile", icon: IconProfile, label: "Profile" },
+];
 
-// Full list including Messages — used for desktop sidebar only
+// Desktop sidebar — the full list
 const sidebarItems = [
+  { path: "/", icon: Home, label: "Home" },
+  { path: "/activity", icon: CalendarDays, label: "Activity" },
   { path: "/matches", icon: IconMatches, label: "Matches" },
-  ...(TOURNAMENTS_ENABLED ? [{ path: "/tournaments", icon: IconTournaments, label: "Tourneys" }] : []),
+  ...(TOURNAMENTS_ENABLED ? [{ path: "/tournaments", icon: IconTournaments, label: "Tournaments" }] : []),
   { path: "/rewards", icon: IconRewards, label: "Rewards" },
   { path: "/messages", icon: MessageSquare, label: "Messages" },
   { path: "/profile", icon: IconProfile, label: "Profile" },
 ];
+
+const isPathActive = (pathname: string, path: string) =>
+  path === "/" ? pathname === "/" : pathname === path || pathname.startsWith(path + "/");
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
@@ -62,7 +61,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
         <nav className="flex-1 space-y-1">
           {sidebarItems.map((item) => {
-            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+            const isActive = isPathActive(location.pathname, item.path);
             return (
               <button
                 key={item.path}
@@ -108,8 +107,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </button>
           <div className="flex items-center gap-1.5">
             <PointsBalanceChip compact />
-            {/* Header Messages shortcut only when Messages isn't already a tab (beta lane) */}
-            {TOURNAMENTS_ENABLED && (
+            {/* Messages — always in the header (no longer a tab) */}
             <button
               onClick={() => navigate("/messages")}
               className={`p-2 rounded-xl transition-colors active:scale-95 ${
@@ -121,7 +119,6 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             >
               <MessageSquare className="w-5 h-5" />
             </button>
-            )}
             <NotificationBell />
           </div>
         </div>
@@ -145,7 +142,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
       >
         <div className="flex items-center justify-around px-2 pt-4 pb-1">
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + "/");
+            const isActive = isPathActive(location.pathname, item.path);
             return (
               <button
                 key={item.path}

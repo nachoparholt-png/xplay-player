@@ -46,6 +46,7 @@ function lazyWithRetry<T extends ComponentType<unknown>>(
 }
 
 // ── Eagerly loaded (critical path — always needed immediately) ──────────────
+import Home from "./pages/Home";
 import Matches from "./pages/Matches";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -54,6 +55,8 @@ import NotFound from "./pages/NotFound";
 
 // ── Lazy loaded (loaded on demand when user navigates there) ────────────────
 const ResetPassword       = lazyWithRetry(() => import("./pages/ResetPassword"));
+const Activity            = lazyWithRetry(() => import("./pages/Activity"));
+const CourtRadar          = lazyWithRetry(() => import("./pages/CourtRadar"));
 const CreateMatch         = lazyWithRetry(() => import("./pages/CreateMatch"));
 const MatchDetail         = lazyWithRetry(() => import("./pages/MatchDetail"));
 const PostMatchStats      = lazyWithRetry(() => import("./pages/PostMatchStats"));
@@ -129,7 +132,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-  if (session) return <Navigate to="/matches" replace />;
+  if (session) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -143,7 +146,7 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   // Must mirror ProtectedRoute: an onboarded profile WITHOUT accepted terms (accounts
   // created before the age/terms gate) has to stay here to accept them — bouncing it
   // to /matches made the two guards redirect to each other forever.
-  if (profile && profile.onboarding_completed && profile.terms_accepted_at) return <Navigate to="/matches" replace />;
+  if (profile && profile.onboarding_completed && profile.terms_accepted_at) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
@@ -209,7 +212,9 @@ const AppRoutes = () => {
           <Route path="/terms" element={<StandalonePage><Terms /></StandalonePage>} />
           <Route path="/privacy" element={<StandalonePage><Privacy /></StandalonePage>} />
           <Route path="/onboarding" element={<OnboardingRoute><StandalonePage><Onboarding /></StandalonePage></OnboardingRoute>} />
-          <Route path="/" element={<Navigate to="/matches" replace />} />
+          <Route path="/" element={<ProtectedRoute><AppLayout><Home /></AppLayout></ProtectedRoute>} />
+          <Route path="/activity" element={<ProtectedRoute><AppLayout><Activity /></AppLayout></ProtectedRoute>} />
+          <Route path="/courts" element={<ProtectedRoute><AppLayout><CourtRadar /></AppLayout></ProtectedRoute>} />
           <Route path="/matches" element={<ProtectedRoute><AppLayout><Matches /></AppLayout></ProtectedRoute>} />
           <Route path="/matches/create" element={<ProtectedRoute><AppLayout><CreateMatch /></AppLayout></ProtectedRoute>} />
           <Route path="/matches/:id" element={<ProtectedRoute><AppLayout><MatchDetail /></AppLayout></ProtectedRoute>} />
