@@ -14,7 +14,7 @@
  *  - any court     = free text, nothing from our database.
  */
 import { useState, useEffect, useMemo } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -179,7 +179,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
         const { data } = await supabase.from("clubs").select("id, club_name, location, city, source, external_provider").eq("id", initial.clubId).maybeSingle();
         club = (data as ClubSelection) ?? null;
       }
-      if (club) { setVenueKind("club"); setSelectedClub(club); setStep(2); }
+      if (club) { setVenueKind("club"); setSelectedClub(club); if (!initial.slot) setMatchDate(startOfDay(new Date())); setStep(2); }
       if (initial.slot) {
         const d = new Date(initial.slot.starts_at);
         setMatchDate(startOfDay(d));
@@ -241,11 +241,14 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
   const pickClub = (club: ClubSelection) => {
     setVenueKind("club"); setSelectedClub(club); setCustomVenueName("");
     setSelectedCourtObj(null); setAvailableSlots([]); setMatchTime(""); setLiveSlot(null); setManualTime(false); setLiveSlotCount(null); setCourtBooked(null);
+    if (!matchDate) setMatchDate(startOfDay(new Date()));
     setErrorMsg(null); setStep(2);
   };
   const pickAnyCourt = () => {
     setVenueKind("custom"); setSelectedClub(null); setCourts([]); setSelectedCourtObj(null); setAvailableSlots([]);
-    setMatchTime(""); setLiveSlot(null); setCourtBooked(null); setErrorMsg(null); setStep(2);
+    setMatchTime(""); setLiveSlot(null); setCourtBooked(null); setErrorMsg(null);
+    if (!matchDate) setMatchDate(startOfDay(new Date()));
+    setStep(2);
   };
 
   // ── Paste from Playtomic (shortcut: fills all three steps) ──
@@ -438,7 +441,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
     </>
   );
   const DayChips = () => (
-    <div className="flex gap-2 overflow-x-auto pb-1 px-4 -mx-4 pl-4">
+    <div className="flex gap-2 overflow-x-auto pb-1 w-full max-w-full">
       {nextSevenDays.map((day, i) => {
         const on = !!matchDate && isSameDay(matchDate, day);
         return (
@@ -493,15 +496,16 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[92dvh] overflow-y-auto overflow-x-hidden p-0 bg-background border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0"
+        className="!block !max-h-[92dvh] !w-screen !max-w-[100vw] min-w-0 overflow-y-auto overflow-x-hidden p-0 gap-0 bg-background border-border/50 rounded-t-3xl rounded-b-none border-x-0 border-b-0 [&>button.absolute]:hidden"
         style={{ position: "fixed", left: 0, right: 0, bottom: 0, top: "auto", width: "100vw", maxWidth: "100vw", transform: "none", paddingBottom: "env(safe-area-inset-bottom)", boxSizing: "border-box" }}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
+        <DialogTitle className="sr-only">{step === 1 ? "Where are you playing?" : step === 2 ? "When?" : step === 3 ? "Who's playing?" : "Match posted"}</DialogTitle>
         <div className="flex justify-center pt-2"><div className="w-10 h-1 rounded-full bg-border" /></div>
 
         {/* ════════════ STEP 1 · WHERE ════════════ */}
         {step === 1 && (
-          <div className="pb-6">
+          <div className="pb-6 w-full max-w-full min-w-0 overflow-x-hidden">
             <Header title="Where are you playing?" sub="A club, or any court you already have." />
             <div className="px-4 space-y-4">
               <div className="flex items-center gap-2.5 h-[52px] px-3.5 rounded-xl bg-muted border border-border">
@@ -555,8 +559,8 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
 
         {/* ════════════ STEP 2 · WHEN ════════════ */}
         {step === 2 && (
-          <div className="pb-6">
-            <Header title="When?" sub={`${venueName || "Any court"} · ${tierLabel}`} back={() => setStep(1)} />
+          <div className="pb-6 w-full max-w-full min-w-0 overflow-x-hidden">
+            <Header title="When?" sub={venueKind === "custom" ? (customVenueName.trim() ? `${customVenueName.trim()} · you sort the booking` : "Any court · you sort the booking") : `${venueName} · ${tierLabel}`} back={() => setStep(1)} />
             <div className="px-4 space-y-4">
               {venueKind === "custom" && (
                 <div className="space-y-2">
@@ -658,7 +662,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
 
         {/* ════════════ STEP 3 · WHO & POST ════════════ */}
         {step === 3 && (
-          <div className="pb-6">
+          <div className="pb-6 w-full max-w-full min-w-0 overflow-x-hidden">
             <Header title="Who's playing?" back={() => setStep(2)} />
             <div className="px-4 space-y-4">
               <div className="p-3.5 rounded-2xl bg-card border border-border space-y-2.5">
@@ -766,7 +770,7 @@ const CreateMatchModal = ({ open, onOpenChange, onCreated, initial }: CreateMatc
 
         {/* ════════════ DONE ════════════ */}
         {step === 4 && (
-          <div className="pb-6">
+          <div className="pb-6 w-full max-w-full min-w-0 overflow-x-hidden">
             <div className="flex items-center justify-end px-4 pt-3 pb-2">
               <button type="button" onClick={finish} aria-label="Close" className="w-11 h-11 rounded-full bg-card border border-border flex items-center justify-center"><X className="w-5 h-5" /></button>
             </div>
