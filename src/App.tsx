@@ -75,6 +75,8 @@ const ProgrammeRules      = lazyWithRetry(() => import("./pages/ProgrammeRules")
 const Terms               = lazyWithRetry(() => import("./pages/Terms"));
 const Privacy             = lazyWithRetry(() => import("./pages/Privacy"));
 const ClubDetail          = lazyWithRetry(() => import("./pages/ClubDetail"));
+const ClubMembership      = lazyWithRetry(() => import("./pages/ClubMembership"));
+const ClubStore           = lazyWithRetry(() => import("./pages/ClubStore"));
 const Bookings            = lazyWithRetry(() => import("./pages/Bookings"));
 const TournamentsList     = lazyWithRetry(() => import("./pages/tournaments/TournamentsList"));
 const TournamentDetail    = lazyWithRetry(() => import("./pages/tournaments/TournamentDetail"));
@@ -249,6 +251,8 @@ const AppRoutes = () => {
           {/* Programme Rules — public like /terms + /privacy (linked from landing + legal pages) */}
           <Route path="/programme-rules" element={<StandalonePage><ProgrammeRules /></StandalonePage>} />
           <Route path="/clubs/:clubId" element={<ProtectedRoute><AppLayout><ClubDetail /></AppLayout></ProtectedRoute>} />
+          <Route path="/clubs/:clubId/membership" element={<ProtectedRoute><AppLayout><ClubMembership /></AppLayout></ProtectedRoute>} />
+          <Route path="/clubs/:clubId/store" element={<ProtectedRoute><AppLayout><ClubStore /></AppLayout></ProtectedRoute>} />
           <Route path="/bookings" element={<ProtectedRoute><AppLayout><Bookings /></AppLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AppLayout><Profile /></AppLayout></ProtectedRoute>} />
           <Route path="/profile/settings" element={<ProtectedRoute><AppLayout><ProfileSettings /></AppLayout></ProtectedRoute>} />

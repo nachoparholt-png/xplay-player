@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { distanceMiles, formatMiles } from "@/lib/distance";
 import { isOtherClub, isMembersOnly, providerHasFeed, formatNextSlot } from "@/components/clubs/clubTier";
+import { favouriteClubIds } from "@/lib/favouriteClubs";
 import CreateMatchModal, { type CreateMatchInitial, type ClubSelection } from "@/components/CreateMatchModal";
 import MatchJoinModal from "@/components/MatchJoinModal";
 import CreateFab from "@/components/CreateFab";
@@ -191,6 +192,8 @@ const Home = () => {
       const picked: ClubRow[] = [];
       const add = (c: ClubRow | undefined) => { if (c && picked.length < 3 && !picked.some((p) => p.id === c.id)) picked.push(c); };
 
+      // (0) favourite club (starred on the club page) always first
+      favouriteClubIds().forEach((id) => add(all.find((c) => c.id === id)));
       // (a) clubs of my match history, most frequent first
       const ids = (joins || []).map((j) => j.match_id);
       if (ids.length) {

@@ -1,25 +1,29 @@
 /**
- * OtherClubPage — light page for a club that is NOT hosted by XPLAY (clubs.source = 'directory').
- * CL5 (with availability) / CL6 (info only).
- *
- * Says plainly, once, that XPLAY can't secure the court; shows live availability from the club's
- * own booking system; deep-links the booking; keeps the XPLAY part (organise a match, earn points)
- * in lime. No tabs — memberships / shop / events only exist for XPLAY Clubs.
+ * OtherClubPage (25 Sep 2026) — a club that is NOT hosted by XPLAY (clubs.source = 'directory').
+ * One scroll: header · Free today (live feed, cheapest per start) · Set up a match / Book on <provider> ·
+ * Open games here · Details · Claim. Members-only chains (David Lloyd) have no feed.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ExternalLink, Info, MapPin, RefreshCw, Users, Zap, Building2, Check } from "lucide-react";
+import { ArrowLeft, Star, ExternalLink, RefreshCw, ChevronRight } from "lucide-react";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { Browser } from "@capacitor/browser";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import { AVAILABILITY_ENABLED } from "@/lib/featureFlags";
-import { isMembersOnly, providerLabel } from "./clubTier";
+import { distanceMiles, formatMiles } from "@/lib/distance";
+import { isFavouriteClub, toggleFavouriteClub } from "@/lib/favouriteClubs";
+import { isMembersOnly, providerLabel, formatNextSlot } from "./clubTier";
 import ClaimClubSheet from "./ClaimClubSheet";
+import CreateMatchModal, { type CreateMatchInitial, type ClubSelection } from "@/components/CreateMatchModal";
+import MatchJoinModal from "@/components/MatchJoinModal";
 
 interface Slot {
   id: string;
   provider: string | null;
   starts_at: string;
+  duration_mins: number | null;
   price_cents: number | null;
   booking_url: string | null;
   fetched_at: string;
@@ -29,36 +33,43 @@ interface MatchRow {
   id: string;
   match_date: string;
   match_time: string;
-  format: string | null;
   level_min: number | null;
   level_max: number | null;
   max_players: number | null;
-  court_booking_status: string | null;
+  organizer_id: string | null;
   _players: number;
 }
 
 const STALE_MS = 30 * 60 * 1000;
-
+const fmtDur = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? `${m % 60}` : ""}` : `${m} min`);
 const openExternal = async (url: string) => {
   try { await Browser.open({ url }); } catch { window.open(url, "_blank", "noopener"); }
 };
 
 const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [courtCount, setCourtCount] = useState<number | null>(null);
+  const [distanceMi, setDistanceMi] = useState<number | null>(null);
+  const [fav, setFav] = useState(() => isFavouriteClub(club.id));
   const [claimOpen, setClaimOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createInitial, setCreateInitial] = useState<CreateMatchInitial | null>(null);
+  const [joinMatchId, setJoinMatchId] = useState<string | null>(null);
+  const [allGames, setAllGames] = useState(false);
 
   const currency = club.currency_symbol ?? "£";
-  // David Lloyd & co: members-only, no availability feed — never call the collectors.
   const membersOnly = isMembersOnly(club.external_provider);
+  const provider = providerLabel(slots[0]?.provider ?? club.external_provider);
 
   const fetchSlots = useCallback(async () => {
     const { data } = await supabase
       .from("external_court_slots")
-      .select("id, provider, starts_at, price_cents, booking_url, fetched_at")
+      .select("id, provider, starts_at, duration_mins, price_cents, booking_url, fetched_at")
       .eq("club_id", club.id)
       .gte("starts_at", new Date().toISOString())
       .lte("starts_at", new Date(Date.now() + 48 * 3600 * 1000).toISOString())
@@ -93,23 +104,38 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
     return () => { cancelled = true; };
   }, [club.id, fetchSlots, membersOnly]);
 
-  // XPLAY matches at this club (matches.club is free text = club name)
+  // Courts count + distance (position only when already on the profile)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { count } = await supabase.from("courts").select("id", { count: "exact", head: true }).eq("club_id", club.id).eq("active", true);
+      if (!cancelled) setCourtCount(count ?? null);
+      if (user && club.latitude != null && club.longitude != null) {
+        const { data: p } = await supabase.from("profiles").select("last_lat, last_lng").eq("user_id", user.id).maybeSingle();
+        const pos = p as unknown as { last_lat: number | null; last_lng: number | null } | null;
+        if (!cancelled && pos?.last_lat != null && pos?.last_lng != null) setDistanceMi(distanceMiles(pos.last_lat, pos.last_lng, club.latitude, club.longitude));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [club.id, user]);
+
+  // Open XPLAY games at this club (matches.club is free text = club name)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const today = new Date().toISOString().slice(0, 10);
       const { data } = await supabase
         .from("matches")
-        .select("id, match_date, match_time, format, level_min, level_max, max_players, court_booking_status")
+        .select("id, match_date, match_time, level_min, level_max, max_players, organizer_id")
         .eq("club", club.club_name)
         .in("status", ["open", "almost_full"])
         .gte("match_date", today)
         .order("match_date")
         .order("match_time")
-        .limit(3);
+        .limit(8);
       const rows = (data as any[]) || [];
       if (rows.length === 0) { if (!cancelled) setMatches([]); return; }
-      const { data: players } = await supabase.from("match_players").select("match_id").in("match_id", rows.map((r) => r.id));
+      const { data: players } = await supabase.from("match_players").select("match_id").in("match_id", rows.map((r) => r.id)).eq("status", "confirmed");
       const counts: Record<string, number> = {};
       (players || []).forEach((p: any) => { counts[p.match_id] = (counts[p.match_id] || 0) + 1; });
       if (!cancelled) setMatches(rows.map((r) => ({ ...r, _players: counts[r.id] || 0 })));
@@ -117,262 +143,173 @@ const OtherClubPage = ({ club, onBack }: { club: any; onBack: () => void }) => {
     return () => { cancelled = true; };
   }, [club.club_name]);
 
-  // Group slots by day, one chip per start time (cheapest court)
-  const byDay = new Map<string, Map<string, Slot>>();
+  // Free today: cheapest per start time, today only
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+  const byStart = new Map<string, Slot>();
   for (const s of slots) {
-    const d = new Date(s.starts_at);
-    const day = format(d, "yyyy-MM-dd");
-    const time = format(d, "HH:mm");
-    if (!byDay.has(day)) byDay.set(day, new Map());
-    const m = byDay.get(day)!;
-    if (!m.has(time)) m.set(time, s);
+    if (format(new Date(s.starts_at), "yyyy-MM-dd") !== todayKey) continue;
+    const cur = byStart.get(s.starts_at);
+    if (!cur || (s.price_cents ?? Infinity) < (cur.price_cents ?? Infinity)) byStart.set(s.starts_at, s);
   }
-  const hasSlots = byDay.size > 0;
-
-  const via = providerLabel(slots[0]?.provider ?? club.external_provider);
-  const bookingUrl = slots.find((s) => s.booking_url)?.booking_url ?? null;
+  const todaySlots = [...byStart.values()].slice(0, 3);
+  const bookingUrl: string | null = club.external_booking_url ?? slots.find((s) => s.booking_url)?.booking_url ?? null;
   const website: string | null = club.website ?? null;
   const address = [club.address_line_1, club.city, club.postcode].filter(Boolean).join(", ") || club.location || "";
-  const mapsUrl =
-    club.latitude != null && club.longitude != null
-      ? `https://www.google.com/maps/search/?api=1&query=${club.latitude},${club.longitude}${club.google_place_id ? `&query_place_id=${club.google_place_id}` : ""}`
-      : null;
-  const bookSystem = membersOnly ? "the David Lloyd Clubs app" : via ?? "the club's system";
-
-  const dayLabel = (day: string) => {
-    const today = format(new Date(), "yyyy-MM-dd");
-    const tomorrow = format(new Date(Date.now() + 86400000), "yyyy-MM-dd");
-    if (day === today) return "Today";
-    if (day === tomorrow) return "Tomorrow";
-    return format(new Date(day + "T00:00:00"), "EEE d MMM");
-  };
-
-  const organise = () =>
-    navigate("/matches/create", { state: { prefillClubId: club.id, prefillClubName: club.club_name } });
+  const mapsUrl = club.latitude != null && club.longitude != null
+    ? `https://www.google.com/maps/search/?api=1&query=${club.latitude},${club.longitude}${club.google_place_id ? `&query_place_id=${club.google_place_id}` : ""}`
+    : address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
+  const phone: string | null = club.contact_phone || club.phone || null;
+  const hours: string | null = club.operating_hours || (club.opening_time && club.closing_time ? `${club.opening_time}–${club.closing_time}` : null);
+  const selection: ClubSelection = { id: club.id, club_name: club.club_name, location: club.location ?? null, city: club.city ?? null, source: club.source, external_provider: club.external_provider };
+  const openCreate = (initial: CreateMatchInitial) => { setCreateInitial(initial); setCreateOpen(true); };
+  const appUrl = membersOnly ? (bookingUrl || website) : bookingUrl;
+  const games = allGames ? matches : matches.slice(0, 3);
 
   return (
-    <div className="bg-background pb-4">
-      {/* Header */}
-      <header className="flex items-center gap-2.5 px-4 pt-3 pb-2">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back"
-          className="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0"
-        >
-          <ArrowLeft className="w-4 h-4 text-foreground" />
+    <div className="pb-8">
+      {/* ── Header ── */}
+      <div className="relative h-28 bg-gradient-to-b from-muted to-background">
+        <button onClick={onBack} aria-label="Back" className="absolute top-3 left-3 w-9 h-9 rounded-full bg-background/80 backdrop-blur flex items-center justify-center active:scale-95">
+          <ArrowLeft className="w-4 h-4" />
         </button>
-        <span className="text-sm font-bold text-foreground truncate">Club</span>
-      </header>
+        <button onClick={() => setFav(toggleFavouriteClub(club.id))} aria-label="Favourite" className="absolute top-3 right-3 w-9 h-9 rounded-full bg-background/80 backdrop-blur flex items-center justify-center active:scale-95">
+          <Star className={cn("w-4 h-4", fav ? "text-secondary fill-secondary" : "text-foreground")} />
+        </button>
+      </div>
 
-      <div className="px-4 space-y-5">
-        {/* Identity */}
-        <section className="space-y-2">
-          <h1 className="font-display font-bold text-2xl leading-tight text-foreground">{club.club_name}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            {membersOnly ? (
-              <>
-                <span className="inline-flex items-center rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
-                  {via}
-                </span>
-                <span className="inline-flex items-center rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
-                  Members only
-                </span>
-              </>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-high text-foreground px-2.5 py-1 text-[11px] font-semibold">
-                {via ? <ExternalLink className="w-3 h-3" /> : <Info className="w-3 h-3" />}
-                {via ? `via ${via}` : "Info only"}
-              </span>
-            )}
-          </div>
-          {address && (
-            mapsUrl ? (
-              <button type="button" onClick={() => openExternal(mapsUrl)} className="flex items-start gap-1.5 text-left text-sm text-foreground/85">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                <span className="underline underline-offset-2 decoration-foreground/40">{address}</span>
-              </button>
-            ) : (
-              <p className="flex items-start gap-1.5 text-sm text-foreground/85">
-                <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" /> {address}
-              </p>
-            )
-          )}
-        </section>
-
-        {/* The one plain notice — a fact, not an error (neutral, never amber) */}
-        <section className="rounded-2xl border border-outline-variant bg-surface-container-high p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-foreground flex-shrink-0 mt-0.5" />
-          {membersOnly ? (
-            <p className="text-sm text-foreground leading-relaxed">
-              <span className="font-bold">This club is for David Lloyd members.</span> Members book padel courts in the
-              David Lloyd Clubs app, up to 9 days ahead. Everyone can organise or join an XPLAY match here and earn points.
-            </p>
-          ) : (
-            <p className="text-sm text-foreground leading-relaxed">
-              <span className="font-bold">This club isn't on XPLAY yet.</span> You book and pay on {bookSystem}, so we
-              can't secure the court for you.
-            </p>
-          )}
-        </section>
-
-        {/* Availability — not rendered for members-only clubs (no feed, nothing to show) */}
-        {!membersOnly && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-display font-black italic uppercase text-base text-foreground tracking-tight">Next 48 hours</h2>
-            {hasSlots && (
-              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground/80">
-                <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
-                updated {formatDistanceToNowStrict(new Date(slots[0].fetched_at))} ago
-              </span>
-            )}
-          </div>
-
-          {loadingSlots ? (
-            <div className="flex gap-2">
-              {[1, 2, 3, 4].map((i) => <div key={i} className="h-14 w-[72px] rounded-xl bg-card animate-pulse" />)}
-            </div>
-          ) : hasSlots ? (
-            <>
-              {[...byDay.entries()].slice(0, 2).map(([day, times]) => (
-                <div key={day} className="space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-foreground/75">{dayLabel(day)}</p>
-                  <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                    {[...times.values()].slice(0, 14).map((s) => (
-                      <div key={s.id} className="flex-shrink-0 w-[72px] rounded-xl border border-outline-variant bg-card py-2 text-center">
-                        <span className="block font-mono text-sm font-bold text-foreground">{format(new Date(s.starts_at), "HH:mm")}</span>
-                        {s.price_cents != null && (
-                          <span className="block font-mono text-[11px] text-foreground/80">{currency}{Math.round(s.price_cents / 100)}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <p className="text-[11px] text-foreground/75">Indicative prices · confirm at booking</p>
-            </>
-          ) : (
-            <p className="text-sm text-foreground/85">
-              {refreshing ? "Checking the club's booking system…" : "Live availability isn't available for this club."}
-            </p>
-          )}
-        </section>
-        )}
-
-        {/* Actions: external path keeps primary weight but stays neutral; lime marks the XPLAY action */}
-        {membersOnly ? (
-        <section className="space-y-2.5">
-          <button
-            type="button"
-            onClick={organise}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground py-3.5 text-xs font-display font-black uppercase tracking-widest active:scale-[0.98] transition-transform"
-          >
-            <Users className="w-4 h-4" /> Organise a match here
-          </button>
-          {website && (
-            <button
-              type="button"
-              onClick={() => openExternal(website)}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-surface-bright text-foreground py-3 text-sm font-bold active:scale-[0.98] transition-transform"
-            >
-              Padel at {club.club_name} <ExternalLink className="w-4 h-4" />
-            </button>
-          )}
-        </section>
-        ) : (
-        <section className="space-y-2.5">
-          {(bookingUrl || website) && (
-            <button
-              type="button"
-              onClick={() => openExternal((bookingUrl || website)!)}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-surface-bright text-foreground py-3.5 text-sm font-bold active:scale-[0.98] transition-transform"
-            >
-              {bookingUrl ? `Book on ${bookSystem}` : "Visit club website"} <ExternalLink className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={organise}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-full border-2 border-primary text-primary py-3 text-xs font-display font-black uppercase tracking-widest active:scale-[0.98] transition-transform"
-          >
-            <Users className="w-4 h-4" /> Organise a match here
-          </button>
-        </section>
-        )}
-
-        {/* Matches here */}
-        <section className="space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-display font-black italic uppercase text-base text-foreground tracking-tight">XPLAY matches here</h2>
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-secondary">
-              <Zap className="w-3 h-3" /> Earn points for playing
+      <div className="px-4 -mt-4 relative space-y-6">
+        <div className="space-y-1.5">
+          <h1 className="font-display font-black italic uppercase leading-none tracking-tight" style={{ fontSize: "clamp(26px, 7.5vw, 36px)" }}>{club.club_name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full border border-border text-muted-foreground px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">{membersOnly ? "Members only" : "Live courts"}</span>
+            <span className="font-mono text-xs text-muted-foreground">
+              {[distanceMi != null ? formatMiles(distanceMi) : null, courtCount ? `${courtCount} court${courtCount === 1 ? "" : "s"}` : null, provider ? `books on ${provider}` : null].filter(Boolean).join(" · ")}
             </span>
           </div>
-          <p className="text-xs text-foreground/80">The match lives in XPLAY. The court is booked by the organiser on {bookSystem}.</p>
+        </div>
 
-          {matches.length === 0 ? (
-            <p className="text-sm text-foreground/85 rounded-2xl bg-card border border-border/60 p-4">
-              No open matches here yet. Be the first to organise one.
-            </p>
+        {/* ── Free today ── */}
+        <section className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-black italic uppercase tracking-[0.08em]">Free today</h2>
+            {!membersOnly && slots.length > 0 && (
+              <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                <RefreshCw className={cn("w-3 h-3", refreshing && "animate-spin")} /> updated {formatDistanceToNowStrict(new Date(slots[0].fetched_at))} ago
+              </span>
+            )}
+          </div>
+          {membersOnly ? (
+            <p className="text-sm text-muted-foreground">Pick a time, book in the {provider ?? "club"} app</p>
+          ) : loadingSlots ? (
+            <div className="flex gap-2">{[1, 2, 3].map((i) => <div key={i} className="h-[52px] w-[92px] rounded-xl bg-muted animate-pulse" />)}</div>
+          ) : todaySlots.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{refreshing ? "Checking…" : "Nothing free today"}</p>
           ) : (
-            matches.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => navigate(`/matches/${m.id}`)}
-                className="w-full flex items-center gap-3 rounded-2xl bg-card border border-border/60 p-3.5 text-left"
-              >
-                <div className="flex-shrink-0 text-center w-12">
-                  <p className="font-mono text-sm font-bold text-foreground">{m.match_time?.slice(0, 5)}</p>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-foreground/75">
-                    {format(new Date(m.match_date + "T00:00:00"), "EEE d")}
-                  </p>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-foreground truncate capitalize">
-                    {m.format || "Match"}
-                    {m.level_min != null && m.level_max != null && (
-                      <span className="font-mono font-normal text-foreground/80"> · {Number(m.level_min).toFixed(1)}–{Number(m.level_max).toFixed(1)}</span>
-                    )}
-                  </p>
-                  <p className="font-mono text-[11px] text-foreground/80">{m._players} of {m.max_players ?? 4} in</p>
-                </div>
-                {m.court_booking_status === "booked" ? (
-                  <span className="flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-win/20 border border-win/50 text-foreground px-2 py-1 text-[9px] font-black uppercase tracking-wider">
-                    <Check className="w-3 h-3 text-win" /> Court booked
-                  </span>
-                ) : (
-                  <span className="flex-shrink-0 rounded-full bg-secondary/20 border border-secondary/50 text-foreground px-2 py-1 text-[9px] font-black uppercase tracking-wider">
-                    Court not booked yet
-                  </span>
-                )}
-              </button>
-            ))
+            <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-0.5 scrollbar-hide">
+              {todaySlots.map((s) => (
+                <Pill key={s.id} onClick={() => openCreate({ club: selection, slot: { starts_at: s.starts_at, duration_mins: s.duration_mins, price_cents: s.price_cents, booking_url: s.booking_url } })}>
+                  <span className="block font-mono font-bold text-base leading-none">{formatNextSlot(s.starts_at).time}</span>
+                  <span className="block font-mono text-xs text-muted-foreground mt-1">{fmtDur(s.duration_mins ?? 90)}{s.price_cents != null ? ` · ${currency}${Math.round(s.price_cents / 100)}` : ""}</span>
+                </Pill>
+              ))}
+            </div>
+          )}
+          <button onClick={() => openCreate({ club: selection })} className="w-full rounded-xl bg-primary text-primary-foreground py-3.5 font-display font-black italic uppercase text-sm tracking-wider active:scale-[0.98] transition-transform">
+            Set up a match here
+          </button>
+          {appUrl && (
+            <button onClick={() => openExternal(appUrl)} className="w-full rounded-xl border border-border py-3 text-sm font-bold inline-flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+              {membersOnly ? `Open the ${provider ?? "club"} app` : `Book on ${provider ?? "the club's site"}`} <ExternalLink className="w-4 h-4" />
+            </button>
           )}
         </section>
 
-        {/* Claim */}
-        <section className="rounded-2xl border border-dashed border-outline-variant p-4 space-y-2.5">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-foreground/70">For club owners</p>
-          <h3 className="font-display font-bold text-base text-foreground">Run this club? Get it on XPLAY</h3>
-          <p className="text-sm text-foreground/85">
-            Players are already organising matches at {club.club_name}. Booking, memberships and tournaments in one
-            place, 0% fee on court bookings.
-          </p>
-          <button
-            type="button"
-            onClick={() => setClaimOpen(true)}
-            className="inline-flex items-center gap-2 rounded-full border border-primary text-primary px-4 py-2 text-xs font-bold"
-          >
-            <Building2 className="w-3.5 h-3.5" /> Claim this club
-          </button>
+        {/* ── Open games ── */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-black italic uppercase tracking-[0.08em]">Open games</h2>
+            {matches.length > 3 && <button onClick={() => setAllGames((v) => !v)} className="text-xs font-bold text-primary">{allGames ? "Less" : "All"} ›</button>}
+          </div>
+          {matches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No open games here yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {games.map((m) => {
+                const mine = m.organizer_id === user?.id;
+                const full = (m.max_players ?? 4) - m._players <= 0;
+                return (
+                  <div key={m.id} className="rounded-2xl bg-card border border-border/60 px-4 py-3 flex items-center gap-3">
+                    <button onClick={() => navigate(`/matches/${m.id}`)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                      <div className="flex-shrink-0">
+                        <div className="font-mono text-xl font-bold leading-none">{m.match_time?.slice(0, 5)}</div>
+                        <div className="text-[10px] font-bold text-muted-foreground uppercase mt-0.5">{formatNextSlot(`${m.match_date}T${m.match_time}`).day}</div>
+                      </div>
+                      <div className="min-w-0 text-xs text-muted-foreground">
+                        {m.level_min != null && m.level_max != null ? <>Level {Number(m.level_min).toFixed(1)}–{Number(m.level_max).toFixed(1)} · </> : null}{m._players} of {m.max_players ?? 4}
+                      </div>
+                    </button>
+                    {mine ? (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <button onClick={() => setJoinMatchId(m.id)} disabled={full} className="rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-black uppercase tracking-wider active:scale-95 flex-shrink-0 disabled:opacity-50">
+                        {full ? "Full" : "Join"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* ── Details ── */}
+        {(address || hours || phone || website) && (
+          <section className="space-y-3">
+            <h2 className="font-display text-sm font-black italic uppercase tracking-[0.08em]">Details</h2>
+            <div className="rounded-2xl bg-card border border-border/60 divide-y divide-border/60">
+              {address && (
+                <Row>
+                  <span className="text-sm flex-1 min-w-0 truncate">{address}</span>
+                  {mapsUrl && <button onClick={() => openExternal(mapsUrl)} className="text-xs font-bold text-primary">Map</button>}
+                </Row>
+              )}
+              {hours && <Row><span className="text-sm flex-1 font-mono">{hours}</span></Row>}
+              {phone && (
+                <Row>
+                  <span className="text-sm flex-1 font-mono">{phone}</span>
+                  <a href={`tel:${phone.replace(/\s+/g, "")}`} className="text-xs font-bold text-primary">Call</a>
+                </Row>
+              )}
+              {website && (
+                <Row>
+                  <span className="text-sm flex-1 min-w-0 truncate">{website.replace(/^https?:\/\//, "")}</span>
+                  <button onClick={() => openExternal(website)} className="text-xs font-bold text-primary">Open</button>
+                </Row>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ── Claim ── */}
+        <section className="rounded-2xl border border-dashed border-border p-4 flex items-center gap-3">
+          <span className="text-sm font-bold flex-1">Is this your club?</span>
+          <button onClick={() => setClaimOpen(true)} className="rounded-full border border-primary text-primary px-4 py-2 text-xs font-bold">Claim it</button>
         </section>
       </div>
 
       <ClaimClubSheet open={claimOpen} onOpenChange={setClaimOpen} clubId={club.id} clubName={club.club_name} />
+      <CreateMatchModal open={createOpen} onOpenChange={setCreateOpen} initial={createInitial} />
+      <MatchJoinModal matchId={joinMatchId} open={!!joinMatchId} onOpenChange={(o) => !o && setJoinMatchId(null)} />
     </div>
   );
 };
+
+const Row = ({ children }: { children: ReactNode }) => <div className="px-4 py-3 flex items-center gap-3">{children}</div>;
+
+const Pill = ({ children, onClick }: { children: ReactNode; onClick: () => void }) => (
+  <button type="button" onClick={onClick} className="flex-shrink-0 rounded-xl px-3.5 py-2.5 text-left border border-border bg-muted active:scale-95 transition-transform min-h-[52px] flex flex-col justify-center">
+    {children}
+  </button>
+);
 
 export default OtherClubPage;
