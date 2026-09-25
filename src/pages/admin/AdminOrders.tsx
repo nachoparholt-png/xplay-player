@@ -59,7 +59,7 @@ const AdminOrders = () => {
       if (error) throw error;
       const ids = Array.from(new Set((data ?? []).map((o: Order) => o.user_id)));
       const { data: people } = ids.length
-        ? await db.from("profiles").select("user_id, display_name, full_name, email").in("user_id", ids)
+        ? await db.from("profiles_contact").select("user_id, display_name, full_name, email").in("user_id", ids)
         : { data: [] };
       const byId = new Map((people ?? []).map((p: Order) => [p.user_id, p]));
       return (data ?? []).map((o: Order) => ({ ...o, player: byId.get(o.user_id) ?? null }));

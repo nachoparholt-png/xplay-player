@@ -34,7 +34,24 @@ const typeLabels: Record<string, string> = {
   weekly_streak: "Monthly streak",
   referral_complete: "Referral",
   tournament_play: "Tournament",
+  tournament_checked_in: "Tournament check-in",
+  tournament_completed: "Tournament played",
+  onboarding_completed: "Welcome bonus",
+  match_completed: "Match played",
+  match_won: "Win bonus",
+  store_order: "Store order",
+  store_refund: "Store refund",
+  redeem: "Redeemed",
   xplay_pro_multiplier: "Pro bonus",
+};
+
+// reason often holds a machine code (onboarding_completed, daily_check_in…): map it, never show it raw.
+const humanise = (code: string) => code.replace(/[_-]+/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+const labelFor = (tx: { reason?: string | null; transaction_type: string }) => {
+  const r = (tx.reason || "").trim();
+  if (r && typeLabels[r]) return typeLabels[r];
+  if (r && /^[a-z0-9_]+$/.test(r)) return typeLabels[tx.transaction_type] || humanise(r);
+  return r || typeLabels[tx.transaction_type] || humanise(tx.transaction_type);
 };
 
 const TransactionHistory = ({ transactions }: TransactionHistoryProps) => {
@@ -66,7 +83,7 @@ const TransactionHistory = ({ transactions }: TransactionHistoryProps) => {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{tx.reason || typeLabels[tx.transaction_type] || tx.transaction_type}</p>
+                <p className="text-sm font-medium truncate">{labelFor(tx)}</p>
                 <p className="text-[10px] text-muted-foreground">{format(new Date(tx.created_at), "MMM d, HH:mm")}</p>
               </div>
               <div className="flex items-center gap-1">

@@ -510,7 +510,15 @@ const MatchDetail = () => {
       ].filter(Boolean).join(" / ") : "";
       return `Team ${m.score_winner} wins${score ? ` — ${score}` : ""}`;
     }
-    if (m?.score_winner === "draw") return "Draw — 0-0";
+    if (m?.score_winner === "draw") {
+      // Show the real sets when a score was submitted (e.g. 6-3 / 4-6); plain "Draw" otherwise.
+      const drawScore = latestSubmission ? [
+        latestSubmission.team_a_set_1 !== null ? `${latestSubmission.team_a_set_1}-${latestSubmission.team_b_set_1}` : null,
+        latestSubmission.team_a_set_2 !== null ? `${latestSubmission.team_a_set_2}-${latestSubmission.team_b_set_2}` : null,
+        latestSubmission.team_a_set_3 !== null ? `${latestSubmission.team_a_set_3}-${latestSubmission.team_b_set_3}` : null,
+      ].filter(Boolean).filter((x) => x !== "0-0").join(" / ") : "";
+      return drawScore ? `Draw — ${drawScore}` : "Draw";
+    }
 
     if (!latestSubmission) return null;
     const s = latestSubmission;

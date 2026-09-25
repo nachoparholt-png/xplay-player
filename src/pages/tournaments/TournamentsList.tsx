@@ -70,7 +70,7 @@ const TournamentsList = () => {
     const today = new Date().toISOString().slice(0, 10);
 
     const [profileRes, playersRes, guestRes, waitRes, invRes, openRes] = await Promise.all([
-      sb.from("profiles").select("last_lat, last_lng, email").eq("user_id", user.id).maybeSingle(),
+      sb.from("profiles").select("last_lat, last_lng").eq("user_id", user.id).maybeSingle(),
       sb.from("tournament_players").select("tournament_id, partner_user_id").eq("user_id", user.id).eq("status", "confirmed"),
       sb.from("tournament_guest_entries").select("id, tournament_id, entry_type, invited_by, amount_cents").eq("claimed_user_id", user.id),
       sb.from("tournament_waitlist").select("tournament_id, position").eq("user_id", user.id).is("resolved", null),
