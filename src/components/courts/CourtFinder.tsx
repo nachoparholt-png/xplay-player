@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import { Geolocation } from "@capacitor/geolocation";
 import { format, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import CreateMatchModal, { type CreateMatchInitial } from "@/components/CreateMatchModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,8 @@ const CourtFinder = () => {
   const [sheet, setSheet] = useState<SheetData | null>(null);
   const [variantIdx, setVariantIdx] = useState(0);
   const [sheetStage, setSheetStage] = useState<"detail" | "confirm">("detail");
+  // One create flow for every entry point: a tapped slot opens the 3-step sheet at step 3.
+  const [createInitial, setCreateInitial] = useState<CreateMatchInitial | null>(null);
   const [creating, setCreating] = useState(false);
   const [editingArea, setEditingArea] = useState(false);
 
@@ -180,42 +183,15 @@ const CourtFinder = () => {
   const closeSheet = () => { setSheet(null); setSheetStage("detail"); setVariantIdx(0); };
   const sel = sheet?.slots[variantIdx];
 
-  /* create the XPLAY match for an external slot */
-  const createLinkedMatch = async (slot: Slot, booked: boolean) => {
-    if (!user || creating) return;
-    setCreating(true);
-    const start = new Date(slot.starts_at);
-    const level = profile?.padel_level ?? 3.0;
-    const { data, error } = await supabase.from("matches").insert({
-      organizer_id: user.id,
-      club: slot.club_name,
-      court: slot.court_label && !/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(slot.court_label) ? slot.court_label : null,
-      match_date: format(start, "yyyy-MM-dd"),
-      match_time: format(start, "HH:mm"),
-      format: "social",
-      level_min: Math.max(1, Math.round((level - 0.75) * 10) / 10),
-      level_max: Math.min(7, Math.round((level + 0.75) * 10) / 10),
-      max_players: 4,
-      price_per_player: 0,
-      visibility: "public",
-      duration_mins: slot.duration_mins,
-      court_booking_status: booked ? "booked" : "not_booked",
-      external_booking_url: slot.booking_url,
-    }).select().single();
-
-    if (error || !data) {
-      toast({ title: "Couldn't create the match", description: error?.message, variant: "destructive" });
-      setCreating(false);
-      return;
-    }
-    await supabase.from("match_players").insert({ match_id: data.id, user_id: user.id, team: "A", status: "confirmed" });
-    setCreating(false);
+  /* open the shared create sheet with this slot (club, time, length, price, booking link) */
+  const createLinkedMatch = (slot: Slot, booked: boolean) => {
+    if (!user) return;
     closeSheet();
-    toast({
-      title: booked ? "Linked match created — court booked ✓" : "Match created — gathering players",
-      description: booked ? "Players can join freely." : "Book the court any time — the link is on the match page.",
+    setCreateInitial({
+      club: { id: slot.club_id, club_name: slot.club_name, location: null, city: null, source: slot.is_native ? "xplay_partner" : "directory", external_provider: slot.provider },
+      slot: { starts_at: slot.starts_at, duration_mins: slot.duration_mins, price_cents: slot.price_cents, booking_url: slot.booking_url, court_label: slot.court_label },
+      courtBooked: booked,
     });
-    navigate(`/matches/${data.id}`);
   };
 
   const chip = (label: string, on: boolean, onClick: () => void, key?: string) => (
@@ -593,10 +569,7 @@ const CourtFinder = () => {
                         <span className="text-xs">+100 XP for playing this match · <b className="text-amber-400">worth £1</b></span>
                       </div>
                       <button
-                        onClick={() => {
-                          closeSheet();
-                          navigate("/matches/create", { state: { prefillClubId: sel.club_id, prefillClubName: sel.club_name } });
-                        }}
+                        onClick={() => createLinkedMatch(sel, true)}
                         className="mt-4 w-full bg-primary text-primary-foreground rounded-[14px] py-4 font-display font-black italic text-[15px] uppercase tracking-wide active:scale-[0.98] transition-transform"
                       >
                         Book court & create match
@@ -647,6 +620,12 @@ const CourtFinder = () => {
           </>
         )}
       </AnimatePresence>
+      <CreateMatchModal
+        open={!!createInitial}
+        initial={createInitial}
+        onOpenChange={(o) => { if (!o) setCreateInitial(null); }}
+        onCreated={(id) => navigate(`/matches/${id}`)}
+      />
     </div>
   );
 };
