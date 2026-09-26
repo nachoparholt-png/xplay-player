@@ -1,15 +1,17 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Clock, Calendar, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Zap, Globe, Lock, Share2, MapPin, User, Users, ShieldCheck, Coins } from "lucide-react";
+import { ArrowLeft, Clock, Zap, LogOut, AlertTriangle, UserMinus, XCircle, MessageSquare, Globe, Lock, Share2, User, Users, Trophy, CheckCircle2, Plus, ExternalLink, UserPlus, Navigation, ChevronRight, ChevronDown, Check, X } from "lucide-react";
+import { Browser } from "@capacitor/browser";
+import { cn } from "@/lib/utils";
+import { isOtherClub, isMembersOnly, providerLabel } from "@/components/clubs/clubTier";
+import { distanceMiles, formatMiles } from "@/lib/distance";
 import SlotActionModal from "@/components/SlotActionModal";
 import InvitePlayerModal from "@/components/InvitePlayerModal";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import StatusChip from "@/components/StatusChip";
-import type { Enums } from "@/integrations/supabase/types";
 
 import BetModal from "@/components/BetModal";
 import MatchBettingSection from "@/components/MatchBettingSection";
@@ -110,6 +112,18 @@ const levelToCategory = (level: number | null): 1 | 2 | 3 | 4 | 5 => {
   return 5;
 };
 
+const openExternal = async (url: string) => {
+  try { await Browser.open({ url }); } catch { window.open(url, "_blank", "noopener"); }
+};
+
+const ActionPill = ({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled?: boolean }) => (
+  <button type="button" onClick={onClick} disabled={disabled} className="h-9 px-3 rounded-full bg-surface-container text-[13px] font-bold inline-flex items-center gap-1.5 active:scale-[0.97] transition-transform disabled:opacity-60">
+    {children}
+  </button>
+);
+
+type ClubRow = { id: string; source: string | null; external_provider: string | null; latitude: number | null; longitude: number | null; website: string | null; google_place_id: string | null; booking_url?: string | null };
+
 const AFTER_GAME_STATUSES = ["awaiting_score", "score_submitted", "pending_review", "review_requested", "confirmed", "completed", "draw", "closed_as_draw", "auto_closed"];
 
 /** Shape returned by the get_my_join_status RPC. */
@@ -161,6 +175,10 @@ const MatchDetail = () => {
   const [escrow, setEscrow] = useState<EscrowLedger>(null);
   // Private cancel window in hours — loaded from club config when available, fallback 12h
   const [privateCancelWindowHours, setPrivateCancelWindowHours] = useState<number>(12);
+  const [clubRow, setClubRow] = useState<ClubRow | null>(null);
+  const [distanceMi, setDistanceMi] = useState<number | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [joinSheet, setJoinSheet] = useState<{ mode: "in" | "outside"; team?: "A" | "B" } | null>(null);
 
   const fetchMatch = useCallback(async () => {
     if (!id) return;
@@ -313,6 +331,32 @@ const MatchDetail = () => {
   };
 
   useEffect(() => { fetchMatch(); fetchJoinRequests(); fetchMyJoinStatus(); }, [fetchMatch, user?.id]);
+
+  // The club behind the match (matches store the club name only): tag, booking link, directions, distance
+  useEffect(() => {
+    if (!match?.club) { setClubRow(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any).from("clubs")
+        .select("id, source, external_provider, latitude, longitude, website, google_place_id")
+        .eq("club_name", match.club).limit(1).maybeSingle();
+      if (cancelled) return;
+      const row = (data as ClubRow | null) ?? null;
+      if (row && isOtherClub(row.source) && !isMembersOnly(row.external_provider)) {
+        // Where the court gets booked: the club feed's booking link
+        const { data: slot } = await (supabase as any).from("external_court_slots").select("booking_url").eq("club_id", row.id).not("booking_url", "is", null).order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+        row.booking_url = (slot as { booking_url: string | null } | null)?.booking_url ?? null;
+      }
+      if (cancelled) return;
+      setClubRow(row);
+      if (row?.latitude != null && row?.longitude != null && user) {
+        const { data: p } = await supabase.from("profiles").select("last_lat, last_lng").eq("user_id", user.id).maybeSingle();
+        const pp = p as unknown as { last_lat: number | null; last_lng: number | null } | null;
+        if (!cancelled && pp?.last_lat != null && pp?.last_lng != null) setDistanceMi(distanceMiles(pp.last_lat, pp.last_lng, row.latitude, row.longitude));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [match?.club, user?.id]);
 
   // Fetch cancellation settings
   useEffect(() => {
@@ -887,19 +931,42 @@ const MatchDetail = () => {
 
   const isPreGame = !isAfterGame && !["cancelled", "completed"].includes(match.status);
 
-  // Average (not summed) team level — summed values read as the wrong scale
-  // next to per-player levels (~3.2 each showing "Team A Lvl: 6.5")
-  const teamARated = confirmedPlayers.filter(p => p.team === "A" && p.profiles?.padel_level);
-  const teamBRated = confirmedPlayers.filter(p => p.team === "B" && p.profiles?.padel_level);
-  const teamALevel = teamARated.length
-    ? teamARated.reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0) / teamARated.length
-    : 0;
-  const teamBLevel = teamBRated.length
-    ? teamBRated.reduce((sum, p) => sum + (p.profiles?.padel_level || 0), 0) / teamBRated.length
-    : 0;
-  const totalLevel = teamALevel + teamBLevel || 1;
-
   const matchIdShort = match.id.slice(-3).toUpperCase();
+  const seatsPerTeam = Math.max(1, Math.ceil((match.max_players ?? 4) / 2));
+  const durationLabel = (() => { const d = match.duration_mins ?? 90; return d < 60 ? `${d} min` : `${Math.floor(d / 60)}h${d % 60 ? `${d % 60}` : ""}`; })();
+  const dayLabel = format(new Date(match.match_date + "T00:00:00"), "EEE d MMM");
+  const timeLabel = match.match_time.slice(0, 5);
+
+  // Club kind → tag, colour, where the court gets booked
+  const otherClub = isOtherClub(clubRow?.source);
+  const membersOnly = otherClub && isMembersOnly(clubRow?.external_provider);
+  const provider = providerLabel(clubRow?.external_provider);
+  const tagLabel = membersOnly ? "Members only" : otherClub ? "Live courts" : "XPLAY club";
+  const bookingUrl: string | null = match.external_booking_url || clubRow?.booking_url || (membersOnly ? clubRow?.website ?? null : null);
+  const mapsUrl = clubRow?.latitude != null && clubRow?.longitude != null
+    ? `https://www.google.com/maps/dir/?api=1&destination=${clubRow.latitude},${clubRow.longitude}${clubRow.google_place_id ? `&destination_place_id=${clubRow.google_place_id}` : ""}`
+    : null;
+  const priceLine = [match.court, match.price_per_player != null && Number(match.price_per_player) > 0 ? `£${Number(match.price_per_player) % 1 ? Number(match.price_per_player).toFixed(2) : Number(match.price_per_player).toFixed(0)} pp` : null].filter(Boolean).join(" · ");
+
+  const notBooked = isPreGame && otherClub && match.court_booking_status !== "booked";
+  const courtBooked = match.court_booking_status === "booked";
+
+  // One status line — never two contradictory messages
+  const status: { text: string; tone: "amber" | "lime" | "muted" | "red"; icon: ReactNode } = (() => {
+    if (isAfterGame) {
+      const settled = ["confirmed", "completed", "draw", "closed_as_draw", "auto_closed"].includes(match.status);
+      const r = settled ? getResultSummary() : null;
+      if (r) return { text: r, tone: "lime", icon: <Trophy className="w-4 h-4" /> };
+      return { text: `Played ${format(new Date(match.match_date + "T00:00:00"), "EEE d MMM")}`, tone: "muted", icon: <Clock className="w-4 h-4" /> };
+    }
+    if (match.status === "completed") return { text: "Played", tone: "muted", icon: <Clock className="w-4 h-4" /> };
+    if (notBooked) return { text: "Court not booked yet", tone: "amber", icon: <AlertTriangle className="w-4 h-4" /> };
+    if (spotsLeft > 0) return { text: `${spotsLeft} spot${spotsLeft > 1 ? "s" : ""} left`, tone: "amber", icon: <User className="w-4 h-4" /> };
+    return { text: "Full · see you there", tone: "lime", icon: <CheckCircle2 className="w-4 h-4" /> };
+  })();
+  const toneClass = { amber: "bg-secondary/12 text-secondary", lime: "bg-primary/12 text-primary", muted: "bg-muted text-muted-foreground", red: "bg-destructive/10 text-destructive" }[status.tone];
+
+  const goBack = () => { if (window.history.length > 1) navigate(-1); else navigate("/activity"); };
 
   const handleShare = async () => {
     try {
@@ -910,82 +977,152 @@ const MatchDetail = () => {
     }
   };
 
-  const renderPlayerSlot = (team: "A" | "B", index: number) => {
-    const teamPlayers = confirmedPlayers.filter(p => p.team === team);
-    const player = teamPlayers[index];
+  const openChat = async () => {
+    setOpeningChat(true);
+    const convId = await getOrCreateMatchChat(match.id, `${match.club}${match.court ? ` — ${match.court}` : ""}`);
+    setOpeningChat(false);
+    if (convId) navigate(`/messages/${convId}`);
+  };
 
+  const firstEmptySeat = (): { team: string; slotIndex: number } => {
+    for (const team of ["A", "B"]) {
+      const n = confirmedPlayers.filter((p) => p.team === team).length;
+      if (n < seatsPerTeam) return { team, slotIndex: n };
+    }
+    return { team: "A", slotIndex: 0 };
+  };
+  const openInvite = (target?: { team: string; slotIndex: number }) => { setInviteTarget(target ?? firstEmptySeat()); setShowInviteModal(true); };
+
+  const markBooked = async () => {
+    const { error } = await supabase.from("matches").update({ court_booking_status: "booked" }).eq("id", match.id);
+    if (error) toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
+    else { toast({ title: "Court booked", description: "Players can see the court is secured." }); fetchMatch(); }
+  };
+
+  // The seat the join sheet offers: the smaller team, next to whoever is already there
+  const autoTeam: "A" | "B" = confirmedPlayers.filter((p) => p.team === "A").length <= confirmedPlayers.filter((p) => p.team === "B").length ? "A" : "B";
+  const joinTeam: "A" | "B" = joinSheet?.team ?? autoTeam;
+  const joinPartner = confirmedPlayers.find((p) => p.team === joinTeam) ?? null;
+
+  const renderSeat = (team: "A" | "B", index: number) => {
+    const teamPlayers = confirmedPlayers.filter((p) => p.team === team);
+    const player = teamPlayers[index];
     if (player) {
+      const me = player.user_id === user?.id;
       return (
-        <button
-          onClick={() => setViewPlayerId(player.user_id)}
-          className="flex items-center gap-3 py-2.5 w-full text-left hover:bg-muted/30 rounded-lg transition-colors cursor-pointer"
-        >
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-sm font-bold text-primary overflow-hidden shrink-0">
+        <button key={`${team}${index}`} onClick={() => setViewPlayerId(player.user_id)} className="flex items-center gap-2.5 min-h-[44px] w-full text-left">
+          <div className={cn("w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-muted text-sm font-bold", me && "ring-2 ring-primary")}>
             {player.profiles?.avatar_url ? (
               <img src={player.profiles.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
-              player.profiles?.display_name?.[0]?.toUpperCase() || "?"
+              <span className="text-muted-foreground">{player.profiles?.display_name?.[0]?.toUpperCase() || "?"}</span>
             )}
           </div>
-          <span className="text-sm font-medium flex-1 truncate">{player.profiles?.display_name || "Player"}</span>
-          <span className="text-xs font-semibold text-primary">
-            {player.profiles?.padel_level?.toFixed(1) || "N/A"}
-          </span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold truncate">{me ? "You" : player.profiles?.display_name || "Player"}</div>
+            <div className="font-mono text-xs text-muted-foreground">{player.profiles?.padel_level?.toFixed(1) ?? "—"}</div>
+          </div>
         </button>
       );
     }
-
-    // Already in this team → the only useful action on an empty slot is inviting someone.
-    const inviteOnly = isJoined && currentPlayerEntry?.team === team;
+    const canInvite = isJoined || isOrganizer;
+    const label = !isPreGame ? "Open" : canInvite ? "Invite" : needsApproval && !approvedToJoin ? (requestPending ? "Waiting" : "Ask to join") : "Join here";
     return (
       <button
+        key={`${team}${index}`}
+        disabled={!isPreGame || !user}
         onClick={() => {
           if (!isPreGame || !user) return;
-          if (inviteOnly) {
-            setInviteTarget({ team, slotIndex: index });
-            setShowInviteModal(true);
-          } else if (needsApproval && !approvedToJoin) {
-            if (!requestPending) handleRequestToJoin();
-          } else {
-            setSlotAction({ team, slotIndex: index });
-          }
+          if (canInvite) openInvite({ team, slotIndex: index });
+          else if (needsApproval && !approvedToJoin) { if (!requestPending) setJoinSheet({ mode: "outside" }); }
+          else setJoinSheet({ mode: "in", team });
         }}
-        className="flex items-center gap-2.5 py-2.5 w-full min-h-[44px] text-left group"
-        disabled={!isPreGame || !user}
+        className="flex items-center gap-2.5 min-h-[44px] w-full text-left"
       >
-        <div className="w-9 h-9 rounded-full bg-muted/50 border border-dashed border-muted-foreground/30 flex items-center justify-center group-hover:border-primary/50 transition-colors">
-          <User className="w-4 h-4 text-muted-foreground/50" />
-        </div>
-        <span className="text-sm text-muted-foreground flex-1 whitespace-nowrap">Open</span>
-        <span className="text-xs text-primary font-semibold whitespace-nowrap">{isJoined ? "Invite" : needsApproval && !approvedToJoin ? (requestPending ? "Waiting" : "Request") : "Join"}</span>
+        <div className="w-10 h-10 rounded-full border border-dashed border-primary/60 text-primary flex items-center justify-center shrink-0"><Plus className="w-4 h-4" /></div>
+        <span className="text-sm font-bold text-primary">{label}</span>
       </button>
     );
   };
 
+  // The one main button, by state
+  const primary: { label: string; icon: ReactNode; onClick: () => void; disabled?: boolean; external?: boolean } | null = (() => {
+    if (!user) return null;
+    if (isAfterGame) {
+      if (canSubmitScore) return { label: "Add score", icon: <Plus className="w-5 h-5" />, onClick: () => setShowScoreUpload(true) };
+      if (canReviewScore) return { label: "Review score", icon: <CheckCircle2 className="w-5 h-5" />, onClick: () => setShowScoreReview(true) };
+      return null;
+    }
+    if (!isPreGame) return null;
+    if (isOrganizer) {
+      if (notBooked && bookingUrl) return { label: membersOnly ? `Open the ${provider ?? "club"} app` : "Book the court", icon: null, onClick: () => openExternal(bookingUrl), external: true };
+      if (spotsLeft > 0) return { label: "Invite players", icon: <UserPlus className="w-5 h-5" />, onClick: () => openInvite() };
+      return { label: openingChat ? "Opening…" : "Open chat", icon: <MessageSquare className="w-5 h-5" />, onClick: openChat, disabled: openingChat };
+    }
+    if (isJoined) return { label: openingChat ? "Opening…" : "Open chat", icon: <MessageSquare className="w-5 h-5" />, onClick: openChat, disabled: openingChat };
+    if (isWaitlisted) return null;
+    if (needsApproval && !approvedToJoin) {
+      return { label: requestPending ? "Request sent · waiting" : requestDeclined ? "Ask again" : "Ask to join", icon: <Users className="w-5 h-5" />, onClick: () => setJoinSheet({ mode: "outside" }), disabled: requestPending };
+    }
+    return { label: isFull ? "Join waitlist" : approvedToJoin ? "You're approved · join" : "Join match", icon: <Users className="w-5 h-5" />, onClick: () => setJoinSheet({ mode: "in" }), disabled: joining };
+  })();
+
   return (
-    <div className="pb-24">
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-4 py-4">
-        <button onClick={() => navigate("/matches")} aria-label="Back to matches" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="font-display font-bold text-lg">Match Detail</h1>
-        <button onClick={handleShare} aria-label="Share match" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center hover:bg-muted transition-colors">
-          <Share2 className="w-5 h-5" />
-        </button>
+    <div className={cn(primary ? "pb-32" : "pb-24")}>
+      {/* Back + share, no title */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <button onClick={goBack} aria-label="Back" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"><ArrowLeft className="w-5 h-5" /></button>
+        <button onClick={handleShare} aria-label="Share match" className="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center"><Share2 className="w-5 h-5" /></button>
       </div>
 
       <div className="px-4 space-y-4">
-        {/* Status + ID row */}
-        <div className="flex items-center justify-between">
-          <StatusChip status={match.status} />
-          <span className="text-xs font-mono text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
-            Match ID: #XP-{matchIdShort}
-          </span>
+        {/* Hero: when, then where */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-1">
+          <div className="font-mono text-sm text-muted-foreground">{dayLabel}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-[44px] font-bold leading-none tracking-tight">{timeLabel}</span>
+            <span className="font-mono text-base text-muted-foreground">{durationLabel}</span>
+          </div>
+          <button onClick={() => clubRow?.id && navigate(`/clubs/${clubRow.id}`, { state: { from: `/matches/${match.id}` } })} className="flex items-center gap-1 text-left mt-1.5 max-w-full">
+            <span className="font-display text-lg font-bold leading-tight truncate">{match.club}</span>
+            {clubRow?.id && <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          </button>
+          {clubRow && (
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider", otherClub ? "border border-border text-muted-foreground" : "bg-primary/15 text-primary")}>{tagLabel}</span>
+              {distanceMi != null && <span className="font-mono text-[11px] text-muted-foreground">{formatMiles(distanceMi)}</span>}
+            </div>
+          )}
+          {priceLine && <div className="font-mono text-sm pt-0.5">{priceLine}</div>}
+        </motion.div>
+
+        {/* One status line */}
+        <div className={cn("flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-bold", toneClass)}>
+          {status.icon}<span className="truncate">{status.text}</span>
         </div>
 
-        {/* After-game card */}
-        {isAfterGame && (
+        {match.notes && <p className="text-sm text-muted-foreground border-l-2 border-primary/30 pl-3">{match.notes}</p>}
+
+        {/* Players: two teams, photo · name · level */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="rounded-2xl bg-card border border-border/60 p-3.5">
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-center">
+            <div className="space-y-2">{Array.from({ length: seatsPerTeam }, (_, i) => renderSeat("A", i))}</div>
+            <span className="font-mono text-[10px] font-bold text-muted-foreground px-1">VS</span>
+            <div className="space-y-2">{Array.from({ length: seatsPerTeam }, (_, i) => renderSeat("B", i))}</div>
+          </div>
+        </motion.div>
+
+        {/* Score */}
+        {isAfterGame && match.status === "awaiting_score" ? (
+          <div className="rounded-2xl bg-card border border-border/60 p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold">No score yet</span>
+              <span className="font-mono text-sm text-muted-foreground">– : –</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[13px]"><Zap className="w-3.5 h-3.5 text-primary" /><span className="font-mono text-primary">+50</span><span className="text-muted-foreground">XPLAY Points when the score is confirmed</span></div>
+            {isPlayerInMatch && <button onClick={handleMarkDraw} className="text-[13px] font-bold text-muted-foreground pt-1">It was a draw</button>}
+          </div>
+        ) : isAfterGame ? (
           <AfterGameCard
             status={match.status}
             deadlineAt={(match as any).score_deadline_at ?? match.deadline_at}
@@ -1000,534 +1137,277 @@ const MatchDetail = () => {
             onMarkDraw={handleMarkDraw}
             onDeadlineExpired={handleDeadlineExpired}
           />
-        )}
+        ) : null}
 
-        {/* Club hero */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="font-display text-2xl font-bold">{match.club}</h2>
-          {match.court && <p className="text-sm text-muted-foreground mt-0.5">{match.court}</p>}
-        </motion.div>
-
-        {/* External-court booking status (organizer attestation) */}
-        {match.court_booking_status === "booked" && (
-          <div className="flex items-center gap-2 rounded-xl border border-green-500/25 bg-green-500/5 px-3.5 py-2.5">
-            <ShieldCheck className="w-4 h-4 text-green-500 shrink-0" />
-            <p className="text-xs text-foreground/80">
-              <b>Court booked</b> — the organizer confirmed the court on the club's booking system.
-            </p>
-          </div>
-        )}
-        {match.court_booking_status === "not_booked" && (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 px-3.5 py-2.5 space-y-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-              <p className="text-xs text-foreground/80">
-                <b>Court not booked yet</b> — this club isn't managed on XPLAY. The organizer
-                still needs to book the court on the club's own system.
-              </p>
-            </div>
-            {isOrganizer && (
-              <div className="space-y-2">
-                {match.external_booking_url && (
-                  <a
-                    href={match.external_booking_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full h-9 rounded-lg text-xs font-semibold bg-amber-400 text-[#1A2833] flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-                  >
-                    Book the court on Playtomic ↗
-                  </a>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-9 rounded-lg text-xs font-semibold border-amber-400/40"
-                  onClick={async () => {
-                    const { error } = await supabase
-                      .from("matches")
-                      .update({ court_booking_status: "booked" })
-                      .eq("id", match.id);
-                    if (error) {
-                      toast({ title: "Couldn't update", description: error.message, variant: "destructive" });
-                    } else {
-                      toast({ title: "Court marked as booked", description: "Players will see the court is secured." });
-                      fetchMatch();
-                    }
-                  }}
-                >
-                  I've booked the court — mark as secured
-                </Button>
-              </div>
+        {/* Court: only when it matters */}
+        {isPreGame && (notBooked ? (
+          <div className="rounded-2xl bg-card border border-border/60 p-4 space-y-3">
+            <div className="text-sm font-bold">Book the court</div>
+            {isOrganizer ? (
+              <>
+                <p className="text-sm text-muted-foreground">{membersOnly ? `Book it in the ${provider ?? "club"} app, then confirm here.` : `Book it on ${provider ?? "the club's own system"}, then confirm here.`}</p>
+                <button onClick={markBooked} className="w-full h-11 rounded-xl bg-surface-container text-sm font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"><Check className="w-4 h-4" /> I've booked it</button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">The organiser still has to book the court{provider ? ` on ${provider}` : ""}.</p>
             )}
           </div>
-        )}
+        ) : courtBooked ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground px-1"><CheckCircle2 className="w-4 h-4 text-primary" /> Court booked</div>
+        ) : !otherClub && clubRow ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground px-1"><CheckCircle2 className="w-4 h-4 text-primary" /> Reserved by XPLAY{match.price_per_player != null && Number(match.price_per_player) > 0 ? " · paid" : ""}</div>
+        ) : null)}
 
-        {/* Info pills */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
-            <Calendar className="w-4 h-4 text-primary" />
-            <span>{format(new Date(match.match_date + "T00:00:00"), "EEE d MMM")} · {match.match_time.slice(0, 5)} <span className="text-xs text-muted-foreground">(club time)</span></span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
-            <Clock className="w-4 h-4 text-primary" />
-            <span>{(() => { const d = match.duration_mins ?? 90; return d < 60 ? `${d} min` : `${Math.floor(d / 60)}h${d % 60 ? ` ${d % 60}` : ""}`; })()}</span>
-          </div>
-          {/* Club-name-fragment pill removed — it duplicated the heading with a
-              meaningless last word ("Club"); re-add if a real city/area field lands */}
-          {match.price_per_player != null && match.price_per_player > 0 && (
-            <div className="flex items-center gap-1.5 bg-surface-container px-3 py-2 rounded-xl text-sm whitespace-nowrap">
-              <Coins className="w-4 h-4 text-primary" />
-              <span>£{Number(match.price_per_player).toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Tags */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium capitalize">{match.format}</span>
-          <span className="text-xs bg-muted px-2.5 py-1 rounded-full font-medium">Level {match.level_min.toFixed(1)} – {match.level_max.toFixed(1)}</span>
-          <span className="flex items-center gap-1 text-xs bg-muted px-2.5 py-1 rounded-full font-medium capitalize">
-            {match.visibility === "public" ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-            {match.visibility}
-          </span>
-        </div>
-
-        {match.notes && (
-          <p className="text-sm text-muted-foreground italic border-l-2 border-primary/30 pl-3">{match.notes}</p>
-        )}
-
-        {/* Spots indicator */}
-        {isPreGame && (
-          <div className={`text-center text-sm font-semibold py-2 rounded-xl ${
-            spotsLeft === 0 ? "bg-destructive/10 text-destructive" : spotsLeft === 1 ? "bg-yellow-500/10 text-yellow-500" : "bg-primary/10 text-primary"
-          }`}>
-            {spotsLeft === 0 ? "Match is full" : `${spotsLeft} spot${spotsLeft > 1 ? "s" : ""} left`}
+        {/* Approval state for players outside the level range */}
+        {isPreGame && needsApproval && (approvedToJoin || requestPending || requestDeclined) && (
+          <div className="rounded-xl bg-secondary/10 px-3.5 py-2.5 text-[13px] text-secondary font-semibold">
+            {approvedToJoin
+              ? (isFull ? "You're approved. If a spot opens, the first approved player to join gets it." : "You're approved. Take a free spot now.")
+              : requestPending
+                ? `Waiting for approval · ${approvalsHave} of ${myJoin?.players ?? 0} players said yes`
+                : "Your request was declined. You can ask again."}
           </div>
         )}
 
-        {/* Team VS Panel */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-2xl border border-border/50 overflow-hidden bg-card"
-        >
-          {/* VS Header */}
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center bg-surface-container">
-            <span className="text-xs font-bold uppercase tracking-widest text-center py-3 text-primary">Team A</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-3">VS</span>
-            <span className="text-xs font-bold uppercase tracking-widest text-center py-3 text-primary">Team B</span>
-          </div>
-
-          {/* Player rows */}
-          <div className="grid grid-cols-2 divide-x divide-border/30">
-            <div className="px-3 py-1 space-y-0.5">
-              {renderPlayerSlot("A", 0)}
-              <div className="border-t border-border/20" />
-              {renderPlayerSlot("A", 1)}
-            </div>
-            <div className="px-3 py-1 space-y-0.5">
-              {renderPlayerSlot("B", 0)}
-              <div className="border-t border-border/20" />
-              {renderPlayerSlot("B", 1)}
-            </div>
-          </div>
-
-          {/* Skill delta bar */}
-          <div className="px-4 py-3 bg-surface-container/50 border-t border-border/30">
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-              <span>Team A avg {teamALevel > 0 ? teamALevel.toFixed(1) : "—"}</span>
-              <span className="text-primary/80">Level balance</span>
-              <span>Team B avg {teamBLevel > 0 ? teamBLevel.toFixed(1) : "—"}</span>
-            </div>
-            {/* The balance bar only means something once both teams have a player. */}
-            {teamALevel > 0 && teamBLevel > 0 && (
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full transition-all duration-500"
-                style={{ width: `${(teamALevel / totalLevel) * 100}%` }}
-              />
-            </div>
+        {/* Small actions */}
+        {!["cancelled"].includes(match.status) && (
+          <div className="flex flex-wrap gap-2">
+            {isPlayerInMatch && (
+              <ActionPill onClick={openChat} disabled={openingChat}><MessageSquare className="w-3.5 h-3.5" /> Chat</ActionPill>
             )}
+            {isPreGame && (isJoined || isOrganizer) && spotsLeft > 0 && (
+              <ActionPill onClick={() => openInvite()}><UserPlus className="w-3.5 h-3.5" /> Invite</ActionPill>
+            )}
+            <ActionPill onClick={handleShare}><Share2 className="w-3.5 h-3.5" /> Share</ActionPill>
+            {mapsUrl && <ActionPill onClick={() => openExternal(mapsUrl)}><Navigation className="w-3.5 h-3.5" /> Directions</ActionPill>}
           </div>
-        </motion.div>
+        )}
 
-        {/* Admin: remove player buttons */}
-        {isAdmin && isPreGame && confirmedPlayers.length > 0 && (
-          <div className="rounded-xl border border-border/50 p-3 space-y-2 bg-card">
-            <p className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Manage Players</p>
-            {confirmedPlayers.map(p => (
-              <div key={p.id} className="flex items-center justify-between">
-                <span className="text-sm">{p.profiles?.display_name || "Player"}</span>
-                <button
-                  onClick={() => setShowRemovePlayer({ userId: p.user_id, name: p.profiles?.display_name || "Player" })}
-                  className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                >
-                  <UserMinus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+        {/* Join requests — every player in the match approves */}
+        {isJoined && joinRequests.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[10px] font-black uppercase tracking-wider text-secondary">Wants to join</div>
+            {joinRequests.map((req) => {
+              const alreadyApproved = req.approvals.includes(user?.id ?? "");
+              const isProcessing = processingRequest === req.id;
+              return (
+                <div key={req.id} className="rounded-2xl bg-card border border-border/60 p-3.5 space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-sm font-bold">{req.display_name?.[0]?.toUpperCase() ?? "?"}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold truncate">{req.display_name ?? "Player"}</div>
+                      <div className="font-mono text-xs text-muted-foreground">{req.padel_level?.toFixed(1) ?? "—"} · match is {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</div>
+                    </div>
+                    <span className="font-mono text-[11px] text-muted-foreground">{req.approvals.length}/{confirmedPlayers.length}</span>
+                  </div>
+                  {alreadyApproved ? (
+                    <p className="text-xs text-primary font-semibold">You said yes · waiting for the others</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleApproveRequest(req)} disabled={isProcessing} className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-bold">Approve</button>
+                      <button onClick={() => handleRejectRequest(req)} disabled={isProcessing} className="flex-1 h-10 rounded-xl border border-border text-sm font-bold text-muted-foreground">Decline</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
         {/* Waitlist */}
         {waitlistPlayers.length > 0 && (
-          <div>
-            <h3 className="font-display font-bold mb-3 text-muted-foreground">Waitlist ({waitlistPlayers.length})</h3>
-            <div className="space-y-2">
+          <div className="rounded-2xl bg-card border border-border/60 p-3.5">
+            <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">Waiting list · {waitlistPlayers.length}</div>
+            <div className="flex flex-wrap gap-2">
               {waitlistPlayers.map((p) => (
-                <div key={p.id} className="rounded-xl border border-border/50 bg-card p-3 flex items-center gap-3 opacity-60">
-                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
-                    {p.profiles?.display_name?.[0]?.toUpperCase() || "?"}
-                  </div>
-                  <p className="font-semibold text-sm">{p.profiles?.display_name || "Player"}</p>
-                </div>
+                <span key={p.id} className="text-sm font-semibold text-muted-foreground">{p.profiles?.display_name || "Player"}</span>
               ))}
             </div>
           </div>
         )}
 
-        {/* Resolution Timeline */}
-        {isAfterGame && timelineEvents.length > 0 && (
-          <MatchResultTimeline events={timelineEvents} />
-        )}
-
-        {/* Inline Betting Section — entirely gated behind STAKES_ENABLED */}
-        {STAKES_ENABLED && isPreGame && id && match?.format === "social" && (
-          <div className="rounded-xl border border-border/50 bg-card p-4 opacity-50">
-            <div className="flex items-center justify-center gap-2">
-              <Zap className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm font-medium text-muted-foreground">
-                Betting is not available for friendly matches
-              </p>
-            </div>
-          </div>
-        )}
-        {STAKES_ENABLED && isPreGame && id && match?.format !== "social" && (
-          <MatchBettingSection
-            matchId={id}
-            userTeam={currentPlayerEntry?.team === "A" ? "A" : currentPlayerEntry?.team === "B" ? "B" : null}
-            matchStatus={match?.status}
-            matchDateTime={`${match?.match_date}T${match?.match_time}`}
-          />
-        )}
-
-        {/* Chat with Players */}
-        {isPlayerInMatch && !["cancelled"].includes(match.status) && (
-          <Button
-            variant="outline"
-            onClick={async () => {
-              setOpeningChat(true);
-              const convId = await getOrCreateMatchChat(match.id, `${match.club}${match.court ? ` — ${match.court}` : ""}`);
-              setOpeningChat(false);
-              if (convId) navigate(`/messages/${convId}`);
-            }}
-            disabled={openingChat}
-            className="w-full h-12 rounded-xl font-semibold gap-2"
-          >
-            <MessageSquare className="w-4 h-4" />
-            {openingChat ? "Opening..." : "Chat with Players"}
-          </Button>
-        )}
-
-        {/* Join request approvals — visible to confirmed players */}
-        {isJoined && joinRequests.length > 0 && (
-          <div>
-            <h3 className="font-display font-bold mb-3 text-amber-500">Join Requests ({joinRequests.length})</h3>
-            <div className="space-y-3">
-              {joinRequests.map((req) => {
-                const alreadyApproved = req.approvals.includes(user?.id ?? "");
-                const isProcessing = processingRequest === req.id;
-                return (
-                  <div key={req.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-sm font-bold text-amber-600">
-                        {req.display_name?.[0]?.toUpperCase() ?? "?"}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{req.display_name ?? "Player"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Level {req.padel_level?.toFixed(1) ?? "N/A"} · outside {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)} range
-                        </p>
-                      </div>
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                        {req.approvals.length}/{confirmedPlayers.length} approved
-                      </span>
-                    </div>
-                    {alreadyApproved ? (
-                      <p className="text-xs text-primary font-medium">✓ You approved — waiting for others</p>
-                    ) : (
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => handleApproveRequest(req)} disabled={isProcessing}
-                          className="flex-1 h-9 rounded-lg text-xs font-semibold">
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleRejectRequest(req)} disabled={isProcessing}
-                          className="flex-1 h-9 rounded-lg text-xs font-semibold border-destructive/30 text-destructive hover:bg-destructive/10">
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Escrow summary — organiser of private match only */}
-        {isPreGame && isOrganizer && match.visibility === "private" && escrow && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Coins className="w-4 h-4 text-amber-400 flex-shrink-0" />
-              <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider">Escrow Summary</span>
+        {isPreGame && isOrganizer && match.visibility === "private" && escrow && (() => {
+          const symbol = (escrow.currency ?? "gbp") === "eur" ? "€" : "£";
+          const charged = escrow.total_charged_cents / 100;
+          const refunded = escrow.total_refunded_cents / 100;
+          const remaining = charged - refunded;
+          return (
+            <div className="rounded-2xl bg-card border border-border/60 p-3.5 space-y-1.5 text-sm">
+              <div className="text-[10px] font-black uppercase tracking-wider text-secondary">Held for you</div>
+              <div className="flex justify-between text-muted-foreground"><span>You paid</span><span className="font-mono text-foreground">{symbol}{charged.toFixed(0)}</span></div>
+              <div className="flex justify-between text-muted-foreground"><span>Refunded as players join</span><span className="font-mono text-primary">− {symbol}{refunded.toFixed(0)}</span></div>
+              <div className="flex justify-between font-bold border-t border-border/40 pt-1.5"><span>Still held</span><span className="font-mono text-secondary">{symbol}{remaining.toFixed(0)}</span></div>
             </div>
-            <div className="space-y-1.5 text-[12px]">
-              {(() => {
-                const symbol = (escrow.currency ?? "gbp") === "eur" ? "€" : "£";
-                const charged = escrow.total_charged_cents / 100;
-                const refunded = escrow.total_refunded_cents / 100;
-                const remaining = charged - refunded;
-                const perSpot = escrow.per_spot_full_price_cents / 100;
-                const spotsJoined = escrow.per_spot_full_price_cents > 0
-                  ? Math.round(escrow.total_refunded_cents / escrow.per_spot_full_price_cents)
-                  : 0;
-                const spotsRemaining = (escrow.spots_count - 1) - spotsJoined;
-                return (
-                  <>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>You paid upfront</span>
-                      <span className="text-foreground font-medium">{symbol}{charged.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Refunded so far ({spotsJoined} {spotsJoined === 1 ? "player" : "players"} joined)</span>
-                      <span className="text-emerald-400 font-medium">− {symbol}{refunded.toFixed(0)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold border-t border-amber-500/20 pt-1.5 mt-1">
-                      <span className="text-foreground">Still held in escrow</span>
-                      <span className="text-amber-300">{symbol}{remaining.toFixed(0)}</span>
-                    </div>
-                    {spotsRemaining > 0 && perSpot > 0 && (
-                      <p className="text-[11px] text-muted-foreground pt-0.5">
-                        {symbol}{perSpot.toFixed(0)} returned for each of the {spotsRemaining} remaining {spotsRemaining === 1 ? "spot" : "spots"}.
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
+          );
+        })()}
+
+        {/* Resolution timeline (after the match) */}
+        {isAfterGame && timelineEvents.length > 0 && <MatchResultTimeline events={timelineEvents} />}
+
+        {/* Betting — gated behind STAKES_ENABLED */}
+        {STAKES_ENABLED && isPreGame && id && match?.format !== "social" && (
+          <MatchBettingSection matchId={id} userTeam={currentPlayerEntry?.team === "A" ? "A" : currentPlayerEntry?.team === "B" ? "B" : null} matchStatus={match?.status} matchDateTime={`${match?.match_date}T${match?.match_time}`} />
         )}
 
-        {/* Pre-game action buttons (non-FAB ones) */}
-        {isPreGame && (
-          <div className="space-y-2">
-            {needsApproval && (
-              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center">
-                <p className="text-[13px] font-semibold text-amber-200">
-                  {approvedToJoin
-                    ? "You're approved to join"
-                    : requestPending
-                      ? `Waiting for approval · ${approvalsHave} of ${myJoin?.players ?? 0} players said yes`
-                      : requestDeclined
-                        ? "Your request was declined"
-                        : `Your level (${profile?.padel_level?.toFixed(1)}) is outside this match's range (${match.level_min.toFixed(1)}–${match.level_max.toFixed(1)})`}
-                </p>
-                <p className="text-[12px] text-foreground/70 mt-1 leading-[1.5]">
-                  {approvedToJoin
-                    ? isFull ? "The match is full right now. If a spot opens, the first approved player to join gets it." : "Take a free spot now. Other approved players can take it too — first one in gets it."
-                    : requestPending
-                      ? "Every player in the match has to approve. If someone new joins, they need to approve you too."
-                      : requestDeclined
-                        ? "You can ask again, for example if the players in the match change."
-                        : "You can ask to join. Every player already in the match has to approve you."}
-                </p>
+        {/* Details, collapsed */}
+        <div className="rounded-2xl bg-card border border-border/60">
+          <button onClick={() => setDetailsOpen((v) => !v)} className="w-full flex items-center justify-between px-4 py-3.5 text-left">
+            <span className="text-sm"><span className="font-bold">Details</span> <span className="text-muted-foreground">{match.format === "social" ? "Social" : "Competitive"} · {match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</span></span>
+            <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", detailsOpen && "rotate-180")} />
+          </button>
+          {detailsOpen && (
+            <div className="px-4 pb-4 space-y-3 text-sm">
+              <div className="grid grid-cols-[110px_1fr] gap-y-2 gap-x-3">
+                <span className="text-muted-foreground">Type</span><span>{match.format === "social" ? "Social · just play" : "Competitive · counts"}</span>
+                <span className="text-muted-foreground">Level</span><span className="font-mono">{match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</span>
+                <span className="text-muted-foreground">Who can join</span><span>{match.visibility === "public" ? "Anyone at my level" : "Only people I invite"}</span>
+                <span className="text-muted-foreground">Organiser</span><span>{isOrganizer ? "You" : (players.find((p) => p.user_id === match.organizer_id)?.profiles?.display_name ?? "—")}</span>
+                <span className="text-muted-foreground">When</span><span>{dayLabel} · {timeLabel} · {durationLabel} <span className="text-muted-foreground">(club time)</span></span>
               </div>
-            )}
-            {!isOrganizer && (isJoined || isWaitlisted) && (
-              <>
-                {isWaitlisted ? (
-                  <Button variant="outline" onClick={handleLeave} disabled={joining} className="w-full h-12 rounded-xl font-semibold gap-2">
-                    <LogOut className="w-4 h-4" />
-                    Leave Waitlist
-                  </Button>
+
+              {/* Organiser: who can join */}
+              {isPreGame && isOrganizer && (
+                !showVisibilityConfirm ? (
+                  <button onClick={() => setShowVisibilityConfirm(true)} className="text-sm font-bold text-primary inline-flex items-center gap-1.5">
+                    {match.visibility === "private" ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    {match.visibility === "private" ? "Open the match to anyone at this level" : "Make it invite only"}
+                  </button>
+                ) : (
+                  <div className="rounded-xl bg-surface-container p-3 space-y-2">
+                    <p className="text-sm">{match.visibility === "private" ? "Anyone at this level will be able to see and join." : "Only people you invite will see and join."}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setShowVisibilityConfirm(false)} disabled={togglingVisibility} className="flex-1 h-10 rounded-xl border border-border text-sm font-bold">Keep</button>
+                      <button
+                        onClick={async () => {
+                          setTogglingVisibility(true);
+                          const newVisibility = match.visibility === "public" ? "private" : "public";
+                          const { error } = await supabase.from("matches").update({ visibility: newVisibility }).eq("id", match.id);
+                          if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+                          else { setMatch({ ...match, visibility: newVisibility }); toast({ title: newVisibility === "public" ? "Open to anyone at this level" : "Invite only now" }); }
+                          setTogglingVisibility(false); setShowVisibilityConfirm(false);
+                        }}
+                        disabled={togglingVisibility}
+                        className="flex-1 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-bold"
+                      >{togglingVisibility ? "Updating…" : "Change"}</button>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {/* Player: leave */}
+              {isPreGame && !isOrganizer && (isJoined || isWaitlisted) && (
+                isWaitlisted ? (
+                  <button onClick={handleLeave} disabled={joining} className="text-sm font-bold text-muted-foreground inline-flex items-center gap-1.5"><LogOut className="w-4 h-4" /> Leave the waiting list</button>
                 ) : canPlayerCancel ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCancelModal(true)}
-                    className="w-full h-12 rounded-xl font-semibold gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Cancel My Spot
-                  </Button>
-                ) : isJoined ? (
-                  <div className="rounded-xl border border-border/50 bg-card p-3.5 text-center space-y-1.5">
-                    <p className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                      {isInsidePrivateCancelWindow && match.visibility === "private"
-                        ? "Cancellation not allowed"
-                        : "Cancellation window closed"
-                      }
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {isInsidePrivateCancelWindow && match.visibility === "private"
-                        ? `You're inside the ${privateCancelWindowHours}h cancellation window for this private match. Contact the club to cancel.`
-                        : !cancellationEnabled
-                          ? "Player cancellation is currently disabled."
-                          : "Contact an admin if you need to be removed."
-                      }
-                    </p>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </div>
-        )}
+                  <button onClick={() => setShowCancelModal(true)} className="text-sm font-bold text-destructive inline-flex items-center gap-1.5"><LogOut className="w-4 h-4" /> Cancel my spot</button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {isInsidePrivateCancelWindow && match.visibility === "private"
+                      ? `Inside the ${privateCancelWindowHours}h window for this private match — contact the club to cancel.`
+                      : !cancellationEnabled ? "Player cancellation is off." : "The cancellation window has closed. Contact an admin to be removed."}
+                  </p>
+                )
+              )}
 
-        {/* Organizer: Visibility toggle */}
-        {isPreGame && isOrganizer && (
-          <div className="space-y-2">
-            {!showVisibilityConfirm ? (
-              <Button
-                variant="outline"
-                onClick={() => setShowVisibilityConfirm(true)}
-                className="w-full h-12 rounded-xl font-semibold gap-2"
-              >
-                {match.visibility === "private" ? <Globe className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                {match.visibility === "private" ? "Make Match Public" : "Make Match Private"}
-              </Button>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-border/50 bg-card p-4 space-y-3"
-              >
-                <div className="flex items-start gap-2.5">
-                  {match.visibility === "private" ? (
-                    <Globe className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                  ) : (
-                    <Lock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {match.visibility === "private" ? "Make this match public?" : "Make this match private?"}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {match.visibility === "private"
-                        ? "Players will be able to see and join your match."
-                        : "Only players you invite will be able to see and join your match."}
-                    </p>
-                  </div>
+              {/* Admin: remove a player */}
+              {isAdmin && isPreGame && confirmedPlayers.length > 0 && (
+                <div className="space-y-1.5 pt-1 border-t border-border/40">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground pt-2">Admin · remove</div>
+                  {confirmedPlayers.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between">
+                      <span className="text-sm">{p.profiles?.display_name || "Player"}</span>
+                      <button onClick={() => setShowRemovePlayer({ userId: p.user_id, name: p.profiles?.display_name || "Player" })} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive"><UserMinus className="w-3.5 h-3.5" /></button>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowVisibilityConfirm(false)} className="flex-1 h-10 rounded-xl font-semibold" disabled={togglingVisibility}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      setTogglingVisibility(true);
-                      const newVisibility = match.visibility === "public" ? "private" : "public";
-                      const { error } = await supabase.from("matches").update({ visibility: newVisibility }).eq("id", match.id);
-                      if (error) {
-                        toast({ title: "Error", description: error.message, variant: "destructive" });
-                      } else {
-                        setMatch({ ...match, visibility: newVisibility });
-                        toast({ title: `Match set to ${newVisibility}` });
-                      }
-                      setTogglingVisibility(false);
-                      setShowVisibilityConfirm(false);
-                    }}
-                    disabled={togglingVisibility}
-                    className="flex-1 h-10 rounded-xl font-semibold"
-                  >
-                    {togglingVisibility ? "Updating..." : "Confirm"}
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        )}
-
-        {/* Organizer: Cancel Match */}
-        {isPreGame && isOrganizer && (
-          <div className="mb-4">
-            {!showCancelMatchConfirm ? (
-              <Button
-                variant="outline"
-                onClick={() => setShowCancelMatchConfirm(true)}
-                className="w-full h-12 rounded-xl font-semibold gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-              >
-                <XCircle className="w-4 h-4" />
-                Cancel Match
-              </Button>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl border border-destructive/20 bg-card p-4 space-y-3"
-              >
-                <div className="flex items-start gap-2.5">
-                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold">Cancel this match?</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      All players will be removed and notified. Any XPLAY Points will be refunded. This cannot be undone.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowCancelMatchConfirm(false)} className="flex-1 h-10 rounded-xl font-semibold" disabled={cancellingMatch}>
-                    Keep Match
-                  </Button>
-                  <Button variant="destructive" onClick={handleCancelMatch} disabled={cancellingMatch} className="flex-1 h-10 rounded-xl font-semibold">
-                    {cancellingMatch ? "Cancelling..." : "Confirm Cancel"}
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Join Match FAB — bottom offset clears the AppLayout bottom nav
-          (fixed bottom-0 z-50, ~98px + safe-area tall). Was `bottom-20` (80px),
-          which left the CTA mostly hidden underneath the nav on notched iPhones. */}
-      {isPreGame && needsApproval && !approvedToJoin && (
-        <div className="fixed left-0 right-0 px-4 z-40" style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}>
-          <Button
-            onClick={handleRequestToJoin}
-            disabled={requesting || requestPending}
-            className="w-full h-14 rounded-2xl font-bold text-base gap-2"
-            size="lg"
-          >
-            <Users className="w-5 h-5" />
-            {requestPending ? "Request sent · waiting for approval" : requestDeclined ? "Ask again" : "Request to join"}
-          </Button>
-        </div>
-      )}
-      {isPreGame && !isJoined && !isWaitlisted && !isOrganizer && (userLevelFits || approvedToJoin) && user && (
-        <div
-          className="fixed left-0 right-0 px-4 z-40 space-y-2"
-          style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}
-        >
-          {/* Private match joining warning */}
-          {match.visibility === "private" && isInsidePrivateCancelWindow && (
-            <div className="rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-2 flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-amber-200 leading-relaxed">
-                You're inside the {privateCancelWindowHours}h window — if you join now you <strong>cannot cancel</strong>. Contact the club if you need to leave.
-              </p>
+              )}
             </div>
           )}
-          <Button
-            onClick={handleJoin}
-            disabled={joining}
-            className="w-full h-14 rounded-2xl font-bold text-base gap-2 shadow-[0_0_30px_hsl(var(--primary)/0.3)]"
-            size="lg"
+        </div>
+
+        {/* Organiser: cancel — the only red on the screen */}
+        {isPreGame && isOrganizer && (
+          !showCancelMatchConfirm ? (
+            <button onClick={() => setShowCancelMatchConfirm(true)} className="w-full text-center text-sm font-bold text-destructive py-2">Cancel match</button>
+          ) : (
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-destructive/30 bg-card p-4 space-y-3">
+              <p className="text-sm font-bold">Cancel this match?</p>
+              <p className="text-xs text-muted-foreground">Everyone in it is told. Any XPLAY Points come back. This can't be undone.</p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowCancelMatchConfirm(false)} disabled={cancellingMatch} className="flex-1 h-10 rounded-xl border border-border text-sm font-bold">Keep it</button>
+                <button onClick={handleCancelMatch} disabled={cancellingMatch} className="flex-1 h-10 rounded-xl bg-destructive text-destructive-foreground text-sm font-bold">{cancellingMatch ? "Cancelling…" : "Cancel match"}</button>
+              </div>
+            </motion.div>
+          )
+        )}
+
+        <div className="text-center font-mono text-[11px] text-muted-foreground pt-1">#XP-{matchIdShort}</div>
+      </div>
+
+      {/* The one main button, pinned above the tab bar */}
+      {primary && (
+        <div className="fixed left-0 right-0 px-4 z-40" style={{ bottom: "calc(var(--bottom-nav-clearance, 98px) + 10px)" }}>
+          <button
+            onClick={primary.onClick}
+            disabled={primary.disabled}
+            className="w-full h-14 rounded-full bg-primary text-primary-foreground font-display font-black italic uppercase tracking-wider text-sm inline-flex items-center justify-center gap-2 shadow-[0_0_30px_hsl(var(--primary)/0.3)] active:scale-[0.98] transition-transform disabled:opacity-60"
           >
-            <Users className="w-5 h-5" />
-            {isFull ? "Join Waitlist" : approvedToJoin ? "You're approved · Join now" : "Join Match"}
-          </Button>
+            {primary.icon}{primary.label}{primary.external && <ExternalLink className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+
+      {/* Join sheet */}
+      {joinSheet && isPreGame && (
+        <div className="fixed inset-0 z-[70] flex items-end" role="dialog" aria-modal="true" aria-label="Join match">
+          <button type="button" aria-label="Close" onClick={() => setJoinSheet(null)} className="absolute inset-0 bg-black/60" />
+          <div className="relative w-full bg-background rounded-t-3xl border-t border-border/50 px-5 pt-4 space-y-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}>
+            <div className="mx-auto w-10 h-1 rounded-full bg-muted-foreground/30" />
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="font-display text-[24px] font-black italic uppercase leading-none">Join match</h2>
+                <p className="font-mono text-sm text-muted-foreground mt-1.5">{dayLabel} <span className="text-foreground font-bold">{timeLabel}</span> {durationLabel} · {match.club}</p>
+              </div>
+              <button type="button" onClick={() => setJoinSheet(null)} aria-label="Close" className="w-9 h-9 -mr-2 -mt-1 rounded-full flex items-center justify-center text-muted-foreground"><X className="w-5 h-5" /></button>
+            </div>
+            {!isFull && (
+              <div className="rounded-2xl bg-card border border-border/60 p-3.5">
+                <div className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2">Your seat</div>
+                <div className="space-y-2">
+                  {joinPartner && (
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-muted flex items-center justify-center text-sm font-bold">
+                        {joinPartner.profiles?.avatar_url ? <img src={joinPartner.profiles.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <span className="text-muted-foreground">{joinPartner.profiles?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                      </div>
+                      <div><div className="text-sm font-bold">{joinPartner.profiles?.display_name || "Player"}</div><div className="font-mono text-xs text-muted-foreground">{joinPartner.profiles?.padel_level?.toFixed(1) ?? "—"}</div></div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-muted ring-2 ring-primary flex items-center justify-center text-sm font-bold">
+                      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <span className="text-muted-foreground">{profile?.display_name?.[0]?.toUpperCase() || "?"}</span>}
+                    </div>
+                    <div><div className="text-sm font-bold">You</div><div className="font-mono text-xs text-muted-foreground">{profile?.padel_level?.toFixed(1) ?? "—"}</div></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className={cn("flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold", joinSheet.mode === "outside" ? "bg-secondary/12 text-secondary" : "bg-primary/12 text-primary")}>
+              {joinSheet.mode === "outside" ? <AlertTriangle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+              <span>You're <span className="font-mono">{profile?.padel_level?.toFixed(1) ?? "—"}</span> · this match is <span className="font-mono">{match.level_min.toFixed(1)}–{match.level_max.toFixed(1)}</span></span>
+            </div>
+            {match.visibility === "private" && isInsidePrivateCancelWindow && joinSheet.mode === "in" && (
+              <p className="text-xs text-secondary">Inside the {privateCancelWindowHours}h window: if you join now you can't cancel.</p>
+            )}
+            {joinSheet.mode === "outside" ? (
+              <>
+                <button onClick={async () => { await handleRequestToJoin(); setJoinSheet(null); }} disabled={requesting || requestPending} className="w-full h-14 rounded-full bg-primary text-primary-foreground font-display font-black italic uppercase tracking-wider text-sm disabled:opacity-60">{requesting ? "Sending…" : "Ask to join"}</button>
+                <p className="text-center text-xs text-muted-foreground">The players in the match approve it.</p>
+              </>
+            ) : (
+              <button onClick={async () => { const t = joinSheet.team; setJoinSheet(null); if (t && !isFull) await handleSlotJoin(t); else await handleJoin(); }} disabled={joining} className="w-full h-14 rounded-full bg-primary text-primary-foreground font-display font-black italic uppercase tracking-wider text-sm disabled:opacity-60">{joining ? "Joining…" : isFull ? "Join the waiting list" : "Join"}</button>
+            )}
+          </div>
         </div>
       )}
 
